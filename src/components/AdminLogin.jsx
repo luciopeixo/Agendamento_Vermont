@@ -99,11 +99,11 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
 
         <form onSubmit={handleSubmit} style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left' }}>
           <div className="form-group">
-            <label className="form-label form-label-required">Usuário ou E-mail Admin</label>
+            <label className="form-label form-label-required">Usuário de Acesso</label>
             <input
               type="text"
               className="form-input"
-              placeholder="Ex: admin ou faturamento@vermontmineracao.com.br"
+              placeholder="Digite seu usuário"
               value={usuario}
               onChange={(e) => setUsuario(e.target.value)}
               required
@@ -117,7 +117,7 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
               <input
                 type={mostrarSenha ? 'text' : 'password'}
                 className="form-input"
-                placeholder="Digite a senha institucional"
+                placeholder="Digite sua senha"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 required
@@ -141,9 +141,6 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
                 {mostrarSenha ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', marginTop: 2 }}>
-              Senha padrão inicial: <code style={{ color: '#4ade80' }}>vermont@2026</code>
-            </span>
           </div>
 
           <button
