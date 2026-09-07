@@ -1,0 +1,70 @@
+# ========================================================
+# GITIGNORE - PORTAL DE AGENDAMENTO VERMONT MINERAÇÃO
+# Proteção de credenciais, dependências e artefatos
+# ========================================================
+
+# Dependências
+node_modules/
+.pnp
+.pnp.js
+
+# Builds de Produção
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+
+# Variáveis de Ambiente e Credenciais Seguras (NUNCA SUBIR AO GITHUB)
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+.env.*.local
+*.env
+*.pem
+*.key
+*.cert
+
+# Permitir apenas o template público de variáveis
+!.env.example
+
+# Logs e Relatórios
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Scripts de Teste e Rascunhos Locais
+test_*.js
+test*.js
+test_*.mjs
+test_*.ts
+scratch/
+temp/
+tmp/
+
+# Supabase Local e Cache de CLI
+.supabase/
+supabase/.temp/
+
+# Editores e SO
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.gemini/
