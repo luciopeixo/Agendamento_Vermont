@@ -497,6 +497,31 @@ export function excluirAgendamentoLocal(id) {
 }
 
 /**
+ * Normaliza o nome da pedreira para chave única insensível a maiúsculas/minúsculas e acentuação
+ */
+export function normalizarChavePedreira(nome) {
+  if (!nome) return '';
+  const up = String(nome).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (up.includes('URUOCA')) return 'URUOCA';
+  if (up.includes('NEGRESCO')) return 'MASSAPE_NEGRESCO';
+  if (up.includes('DEL MARE') || up.includes('DELMARE')) return 'MASSAPE_DELMARE';
+  if (up.includes('JAIBARAS') || (up.includes('SOBRAL') && !up.includes('MASSAPE'))) return 'SOBRAL_JAIBARAS';
+  if (up.includes('SERROTE') || up.includes('SAO GONCALO')) return 'SERROTE';
+  if (up.includes('BEBERIBE')) return 'BEBERIBE';
+  return up.replace(/[^A-Z0-9]/g, '');
+}
+
+/**
+ * Compara se duas strings de pedreira referem-se à mesma unidade
+ */
+export function saoMesmaPedreira(p1, p2) {
+  if (!p1 || !p2) return false;
+  if (p1 === p2) return true;
+  if (p1.toLowerCase() === p2.toLowerCase()) return true;
+  return normalizarChavePedreira(p1) === normalizarChavePedreira(p2);
+}
+
+/**
  * Consulta horários que já foram agendados para a pedreira e data selecionadas
  */
 export async function obterHorariosOcupados(dataStr, pedreira) {
@@ -508,13 +533,13 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
       try {
         const { data, error } = await supabase
           .from('agendamentos_pedreira')
-          .select('horario_agendamento')
+          .select('horario_agendamento, pedreira, status')
           .eq('data_agendamento', dataStr)
-          .eq('pedreira', pedreira)
           .neq('status', 'Cancelado');
 
         if (!error && data) {
           ocupados = data
+            .filter(item => saoMesmaPedreira(item.pedreira, pedreira))
             .map(item => item.horario_agendamento)
             .filter(h => h && h !== 'outros' && !h.startsWith('Sábado'));
           return ocupados;
@@ -526,7 +551,7 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
 
     const locais = obterAgendamentosLocais();
     ocupados = locais
-      .filter(item => item.data_agendamento === dataStr && item.pedreira === pedreira && item.status !== 'Cancelado')
+      .filter(item => item.data_agendamento === dataStr && saoMesmaPedreira(item.pedreira, pedreira) && item.status !== 'Cancelado')
       .map(item => item.horario_agendamento)
       .filter(h => h && h !== 'outros' && !h.startsWith('Sábado'));
 
@@ -546,17 +571,14 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
       try {
         let query = supabase
           .from('agendamentos_pedreira')
-          .select('id, pedreira, status', { count: 'exact' })
+          .select('id, pedreira, status')
           .eq('data_agendamento', dataStr)
           .neq('status', 'Cancelado');
 
-        if (pedreira) {
-          query = query.eq('pedreira', pedreira);
-        }
-
-        const { count, error } = await query;
-        if (!error && typeof count === 'number') {
-          const total = count || 0;
+        const { data, error } = await query;
+        if (!error && data) {
+          const filtrados = pedreira ? data.filter(item => saoMesmaPedreira(item.pedreira, pedreira)) : data;
+          const total = filtrados.length;
           const limite = 12;
           const disponivel = Math.max(0, limite - total);
           const lotado = total >= limite;
@@ -570,7 +592,7 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
     const locais = obterAgendamentosLocais();
     const total = locais.filter(item => {
       const matchData = item.data_agendamento === dataStr;
-      const matchPedreira = pedreira ? item.pedreira === pedreira : true;
+      const matchPedreira = pedreira ? saoMesmaPedreira(item.pedreira, pedreira) : true;
       const matchStatus = item.status !== 'Cancelado';
       return matchData && matchPedreira && matchStatus;
     }).length;
@@ -600,10 +622,6 @@ export async function listarAgendamentos(filtros = {}) {
           .order('data_agendamento', { ascending: false })
           .order('created_at', { ascending: false });
 
-        if (filtros.pedreira && filtros.pedreira !== 'todas') {
-          query = query.eq('pedreira', filtros.pedreira);
-        }
-
         if (filtros.status && filtros.status !== 'todos') {
           if (filtros.status === 'Liberado para Carregar') {
             query = query.in('status', ['Liberado para Carregar', 'Confirmado']);
@@ -623,7 +641,7 @@ export async function listarAgendamentos(filtros = {}) {
           const locais = obterAgendamentosLocais();
           const locaisMap = new Map(locais.map(l => [l.id, l]));
 
-          resultado = data.map(item => {
+          let listaSup = data.map(item => {
             const loc = locaisMap.get(item.id);
             return {
               ...item,
@@ -631,7 +649,12 @@ export async function listarAgendamentos(filtros = {}) {
               ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || null
             };
           });
-          return resultado;
+
+          if (filtros.pedreira && filtros.pedreira !== 'todas') {
+            listaSup = listaSup.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
+          }
+
+          return listaSup;
         }
       } catch (e) {
         console.warn('Erro ao listar do Supabase, buscando locais:', e);
@@ -640,7 +663,7 @@ export async function listarAgendamentos(filtros = {}) {
 
     resultado = obterAgendamentosLocais();
     if (filtros.pedreira && filtros.pedreira !== 'todas') {
-      resultado = resultado.filter(item => item.pedreira === filtros.pedreira);
+      resultado = resultado.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
     }
     if (filtros.status && filtros.status !== 'todos') {
       if (filtros.status === 'Liberado para Carregar') {
