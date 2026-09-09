@@ -218,6 +218,56 @@ export function obterPrimeiroHorarioDisponivel(horariosOcupados = [], dataStr = 
   return 'outros';
 }
 
+/**
+ * Extrai números de blocos individuais se o usuário digitou múltiplos blocos no mesmo campo
+ * Exemplos aceitos: "1256926 - 1256972", "1256926 e 1256972", "1256926 / 1256972", "1256926, 1256972"
+ */
+export function extrairBlocosDigitados(texto = '') {
+  if (!texto || typeof texto !== 'string') return [];
+  const limpo = texto.trim();
+  if (!limpo) return [];
+
+  let partes = [];
+
+  // 1. Separadores textuais explícitos com espaços: ' e ', ' E ', ' & ', ' + ', ' / ', ' - ', ' – '
+  if (/\s+(?:e|E|&|\+|\/|-|–)\s+/.test(limpo)) {
+    partes = limpo.split(/\s+(?:e|E|&|\+|\/|-|–)\s+/);
+  } 
+  // 2. Separadores por vírgula ou ponto-e-vírgula
+  else if (/[,;]/.test(limpo)) {
+    partes = limpo.split(/[,;]+/);
+  } 
+  // 3. Padrão numérico duplo (ex: "1256926-1256972" ou "1256926/1256972" onde ambos são números longos)
+  else if (/(\d{3,})\s*[-/–]\s*(\d{3,})/.test(limpo)) {
+    partes = limpo.split(/\s*[-/–]\s*/);
+  } 
+  // 4. Espaço simples entre dois códigos numéricos longos (ex: "1256926 1256972")
+  else if (/\s+/.test(limpo) && !limpo.toUpperCase().startsWith('BLOCO')) {
+    const pedacos = limpo.split(/\s+/);
+    if (pedacos.length >= 2 && pedacos.every(p => p.length >= 3 && /^\d+$/.test(p))) {
+      partes = pedacos;
+    }
+  }
+
+  const blocos = (partes.length > 1 ? partes : [limpo])
+    .map(b => b.trim().replace(/^BLOCO\s+/i, ''))
+    .filter(b => b.length > 0);
+
+  return blocos;
+}
+
+/**
+ * Detecta se o campo de bloco contém mais de 1 numeração informada
+ */
+export function detectarMultiplosBlocos(texto = '') {
+  const blocos = extrairBlocosDigitados(texto);
+  return {
+    isMultiplos: blocos.length > 1,
+    quantidade: blocos.length,
+    blocos
+  };
+}
+
 export const TIPOS_VEICULO = [
   'Carreta LS (6 Eixos)',
   'LS 7 Eixos (4 Eixos no Cavalo)',
@@ -1240,6 +1290,11 @@ export async function salvarAgendamento(dados) {
       if (ocupados.includes(dados.horario_agendamento)) {
         throw new Error(`O horário ${dados.horario_agendamento} já foi reservado por outro transportador para esta data na pedreira selecionada. Por favor, escolha outro horário.`);
       }
+    }
+
+    const analiseBloco = detectarMultiplosBlocos(dados.numero_bloco);
+    if (analiseBloco.isMultiplos) {
+      throw new Error(`Detectamos ${analiseBloco.quantidade} blocos digitados no campo 'Numeração do Bloco' (${analiseBloco.blocos.join(', ')}). No agendamento simples é permitido apenas 1 bloco por vez. Para carregar 2 ou 3 blocos no mesmo veículo, utilize a modalidade 'Carga Combinada (2 ou 3 Blocos)'.`);
     }
 
     const configPlacas = obterConfigPlacas(dados.tipo_veiculo);

@@ -19,7 +19,9 @@ import {
   isHorarioPassado,
   obterPrimeiroHorarioDisponivel,
   obterDataHoraAtualBrasil,
-  formatarDataBR
+  formatarDataBR,
+  detectarMultiplosBlocos,
+  extrairBlocosDigitados
 } from '../services/agendamentoService';
 
 export function AgendamentoForm({ onAgendamentoSucesso }) {
@@ -27,7 +29,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   const hoje = dataHoje || new Date().toISOString().split('T')[0];
   const horarioInicial = obterPrimeiroHorarioDisponivel([], hoje);
 
-  // Modo: 'simples' (1 Bloco) ou 'combinado' (2 Blocos em pedreiras diferentes)
+  // Modo: 'simples' (1 Bloco) ou 'combinado' (2 ou 3 Blocos)
   const [tipoCarregamento, setTipoCarregamento] = useState('simples');
 
   // Ponto 1 (ou Agendamento Simples)
@@ -270,9 +272,46 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     if (mensagemErro) setMensagemErro('');
   };
 
+  const converterParaCargaCombinada = () => {
+    const analise = detectarMultiplosBlocos(formData.numero_bloco);
+    const blocos = analise.blocos;
+    const qtd = Math.min(3, Math.max(2, blocos.length));
+    setTipoCarregamento('combinado');
+    setQtdBlocosCombinados(qtd);
+    setFormData(prev => ({ ...prev, numero_bloco: (blocos[0] || '').toUpperCase() }));
+    setPonto2(prev => ({
+      ...prev,
+      numero_bloco: (blocos[1] || '').toUpperCase(),
+      pedreira: formData.pedreira,
+      material: formData.material,
+      data_agendamento: formData.data_agendamento,
+      horario_agendamento: formData.horario_agendamento
+    }));
+    if (qtd === 3) {
+      setPonto3(prev => ({
+        ...prev,
+        numero_bloco: (blocos[2] || '').toUpperCase(),
+        pedreira: formData.pedreira,
+        material: formData.material,
+        data_agendamento: formData.data_agendamento,
+        horario_agendamento: formData.horario_agendamento
+      }));
+    }
+    setMensagemErro('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMensagemErro('');
+
+    // Validação de múltiplos blocos no carregamento simples
+    if (tipoCarregamento === 'simples') {
+      const analiseBloco = detectarMultiplosBlocos(formData.numero_bloco);
+      if (analiseBloco.isMultiplos) {
+        setMensagemErro(`Identificamos ${analiseBloco.quantidade} blocos informados no campo 'Numeração do Bloco' (${analiseBloco.blocos.join(', ')}). No carregamento simples é permitido apenas 1 bloco por agendamento. Para carregar 2 ou 3 blocos no mesmo veículo, selecione 'Carga Combinada (2 ou 3 Blocos)' no topo da página.`);
+        return;
+      }
+    }
 
     // Validações do 1º Ponto
     if (tipoDia === 'domingo') {
@@ -314,6 +353,12 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
     // Validações do 2º Ponto (se for carga combinada)
     if (tipoCarregamento === 'combinado') {
+      const analiseB1 = detectarMultiplosBlocos(formData.numero_bloco);
+      if (analiseB1.isMultiplos) {
+        setMensagemErro(`Informe apenas 1 número de bloco no 1º carregamento (você digitou: ${formData.numero_bloco}). O 2º bloco deve ser digitado no campo do 2º ponto.`);
+        return;
+      }
+
       if (tipoDia2 === 'domingo') {
         setMensagemErro('As pedreiras não realizam carregamentos aos domingos. Por favor, selecione outra data para o 2º carregamento.');
         return;
@@ -348,6 +393,12 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
       if (!ponto2.numero_bloco.trim()) {
         setMensagemErro('Informe a numeração do bloco do 2º carregamento.');
+        return;
+      }
+
+      const analiseB2 = detectarMultiplosBlocos(ponto2.numero_bloco);
+      if (analiseB2.isMultiplos) {
+        setMensagemErro(`Informe apenas 1 número de bloco no 2º carregamento (você digitou: ${ponto2.numero_bloco}). Caso tenha um 3º bloco, selecione '3 Blocos' acima.`);
         return;
       }
 
@@ -387,6 +438,12 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
         if (!ponto3.numero_bloco.trim()) {
           setMensagemErro('Informe a numeração do bloco do 3º carregamento.');
+          return;
+        }
+
+        const analiseB3 = detectarMultiplosBlocos(ponto3.numero_bloco);
+        if (analiseB3.isMultiplos) {
+          setMensagemErro(`Informe apenas 1 número de bloco no 3º carregamento (você digitou: ${ponto3.numero_bloco}).`);
           return;
         }
       }
@@ -614,7 +671,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           }}
         >
           <Layers size={19} />
-          Carga Combinada (2 ou 3 Blocos / Pedreiras)
+          Carga Combinada (2 ou 3 Blocos)
         </button>
       </div>
 
@@ -653,7 +710,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 transition: 'all 0.15s'
               }}
             >
-              2 Blocos (2 Pedreiras)
+              2 Blocos
             </button>
             <button
               type="button"
@@ -671,7 +728,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 transition: 'all 0.15s'
               }}
             >
-              3 Blocos (Até 3 Pedreiras)
+              3 Blocos
             </button>
           </div>
         </div>
@@ -748,18 +805,63 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   </span>
                 </div>
 
-                {/* Numeração do Bloco */}
+                {/* Numeração do Bloco (Apenas 1 Bloco) */}
                 <div className="form-group">
-                  <label className="form-label form-label-required">Numeração do Bloco</label>
+                  <label className="form-label form-label-required">Numeração do Bloco (Apenas 1 Bloco)</label>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Ex: VT-2026/089 ou 4512"
+                    placeholder="Ex: 1256926 ou VT-2026/089"
                     value={formData.numero_bloco}
                     onChange={(e) => handleChange('numero_bloco', e.target.value)}
                     required
                     style={{ textTransform: 'uppercase' }}
                   />
+                  <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block', marginTop: 4 }}>
+                    Digite apenas 1 número de bloco. Para 2 ou 3 blocos, use "Carga Combinada".
+                  </span>
+
+                  {/* Alerta em tempo real com botão de conversão automática se múltiplos blocos digitados */}
+                  {detectarMultiplosBlocos(formData.numero_bloco).isMultiplos && (
+                    <div className="animate-fade" style={{
+                      marginTop: 8,
+                      padding: '10px 12px',
+                      background: 'rgba(245, 158, 11, 0.12)',
+                      border: '1px solid rgba(245, 158, 11, 0.4)',
+                      borderRadius: 8,
+                      color: '#fbbf24',
+                      fontSize: '0.82rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontWeight: 700 }}>
+                        <AlertTriangle size={15} color="#fbbf24" />
+                        <span>Detectamos múltiplos blocos ({detectarMultiplosBlocos(formData.numero_bloco).quantidade} blocos) neste campo!</span>
+                      </div>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '0.76rem', color: '#fef3c7', lineHeight: 1.4 }}>
+                        Blocos identificados: <strong>{detectarMultiplosBlocos(formData.numero_bloco).blocos.join(', ')}</strong>. No agendamento simples é permitido apenas 1 bloco.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={converterParaCargaCombinada}
+                        style={{
+                          background: 'var(--vermont-green-light)',
+                          color: '#000',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '6px 12px',
+                          fontWeight: 700,
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          boxShadow: '0 2px 8px rgba(74, 222, 128, 0.3)'
+                        }}
+                      >
+                        <Layers size={14} />
+                        Converter agora para Carga Combinada ({detectarMultiplosBlocos(formData.numero_bloco).quantidade} Blocos)
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -951,12 +1053,17 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Ex: VT-1020"
+                    placeholder="Ex: 1256926"
                     value={formData.numero_bloco}
                     onChange={(e) => handleChange('numero_bloco', e.target.value)}
                     required
                     style={{ textTransform: 'uppercase' }}
                   />
+                  {detectarMultiplosBlocos(formData.numero_bloco).isMultiplos && (
+                    <span style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
+                      ⚠️ Digite apenas 1 bloco aqui. O 2º bloco deve ser informado no 2º ponto logo abaixo.
+                    </span>
+                  )}
                 </div>
 
                 {/* Data 1 */}
@@ -1065,12 +1172,17 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Ex: VT-3040"
+                    placeholder="Ex: 1256972"
                     value={ponto2.numero_bloco}
                     onChange={(e) => handlePonto2Change('numero_bloco', e.target.value)}
                     required
                     style={{ textTransform: 'uppercase' }}
                   />
+                  {detectarMultiplosBlocos(ponto2.numero_bloco).isMultiplos && (
+                    <span style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
+                      ⚠️ Digite apenas 1 bloco aqui. Caso tenha um 3º bloco, selecione '3 Blocos' no topo.
+                    </span>
+                  )}
                 </div>
 
                 {/* Data 2 */}
@@ -1221,12 +1333,17 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Ex: VT-5060"
+                      placeholder="Ex: 1256980"
                       value={ponto3.numero_bloco}
                       onChange={(e) => handlePonto3Change('numero_bloco', e.target.value)}
                       required
                       style={{ textTransform: 'uppercase' }}
                     />
+                    {detectarMultiplosBlocos(ponto3.numero_bloco).isMultiplos && (
+                      <span style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
+                        ⚠️ Digite apenas 1 bloco por campo.
+                      </span>
+                    )}
                   </div>
 
                   {/* Data 3 */}
