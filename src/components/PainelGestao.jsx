@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Search, RefreshCw, Printer, CheckCircle, CheckCircle2, Clock, Truck, Mail, FileText, 
   AlertCircle, Trash2, ShieldCheck, ShieldAlert, RotateCcw, Edit3, CheckCheck, PlayCircle,
-  FileSpreadsheet, Download, History
+  FileSpreadsheet, Download, History, MessageCircle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -12,6 +12,7 @@ import {
   dispararEmailConfirmacao,
   formatarPlacasExibicao,
   formatarDataBR,
+  abrirNotificacaoWhatsAppAdmin,
   PEDREIRAS_CEARA, 
   EMAIL_NOTIFICACAO_DESTINO,
   STATUS_AGENDAMENTO
@@ -1004,6 +1005,16 @@ export function PainelGestao({
                             title="Reenviar e-mail de notificação para a logística"
                           >
                             <Mail size={14} color="var(--info)" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => abrirNotificacaoWhatsAppAdmin(ag, usuarioInfo)}
+                            className="btn btn-secondary"
+                            style={{ padding: '6px 8px', fontSize: '0.78rem', color: '#4ade80', borderColor: 'rgba(74, 222, 128, 0.35)' }}
+                            title="Disparar/Testar Notificação no WhatsApp do Admin"
+                          >
+                            <MessageCircle size={14} />
                           </button>
 
                           {/* BOTÃO EXCLUIR AGENDAMENTO (Exclusivo para ADMIN GERAL) */}

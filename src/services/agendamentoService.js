@@ -150,6 +150,87 @@ export const TIPOS_VEICULO = [
 ];
 
 export const EMAIL_NOTIFICACAO_DESTINO = import.meta.env.VITE_EMAIL_NOTIFICACAO_DESTINO || 'faturamento@vermontmineracao.com.br';
+export const WHATSAPP_ADMIN_PADRAO = import.meta.env.VITE_WHATSAPP_ADMIN_NUMERO || '';
+
+/**
+ * Gera mensagem estruturada para notificação via WhatsApp no início do carregamento
+ */
+export function gerarMensagemWhatsAppCarregando(agendamento, usuarioInfo = {}) {
+  const protocolo = (agendamento.id || 'VT-' + Date.now()).substring(0, 8).toUpperCase();
+  const placas = formatarPlacasExibicao(agendamento).map(p => `   🔹 *${p.label}:* ${p.placa}`).join('\n');
+  const dataFmt = formatarDataBR(agendamento.data_agendamento);
+  const dataHoraAtual = new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Fortaleza'
+  }).format(new Date());
+
+  const operadorNome = usuarioInfo.nome || usuarioInfo.email?.split('@')[0]?.toUpperCase() || 'Operador da Pedreira';
+  const operadorRole = usuarioInfo.role || (usuarioInfo.isAdmin ? 'Administrador Geral' : 'Operador Pedreira');
+
+  return `🚨 *[VERMONT MINERAÇÃO] - INÍCIO DE CARREGAMENTO* 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 *Protocolo:* #${protocolo}
+🔵 *Status:* *CARREGANDO (EM ANDAMENTO)*
+
+🪨 *DADOS DO BLOCO & PEDREIRA:*
+🏢 *Pedreira:* *${agendamento.pedreira}*
+🏷️ *Nº do Bloco:* *${agendamento.numero_bloco}*
+💎 *Material:* *${agendamento.material}*
+📅 *Data Agendada:* ${dataFmt} às ${agendamento.horario_agendamento}
+
+🚛 *TRANSPORTE & MOTORISTA:*
+👤 *Motorista:* *${agendamento.motorista_nome}*
+🪪 *CPF:* ${agendamento.motorista_cpf}
+📱 *WhatsApp Motorista:* ${agendamento.motorista_telefone || 'Não informado'}
+🏢 *Transportadora:* ${agendamento.transportadora}
+🛣️ *Tipo Veículo:* ${agendamento.tipo_veiculo}
+⚖️ *Placas:*
+${placas}
+💼 *Cliente Destino:* *${agendamento.cliente}*
+${agendamento.observacoes ? `\n📝 *Observações / Balança:* _${agendamento.observacoes}_\n` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👷 *Operador Responsável:* ${operadorNome} (${operadorRole})
+⏱️ *Horário do Registro:* ${dataHoraAtual}
+_Acompanhe em tempo real no Portal de Gestão Vermont_`;
+}
+
+/**
+ * Dispara link ou requisição de WhatsApp para notificar o Admin
+ */
+export function abrirNotificacaoWhatsAppAdmin(agendamento, usuarioInfo = {}, numeroPersonalizado = '') {
+  const mensagem = gerarMensagemWhatsAppCarregando(agendamento, usuarioInfo);
+  const numeroLimpo = (numeroPersonalizado || WHATSAPP_ADMIN_PADRAO || '').replace(/\D/g, '');
+  
+  let url = '';
+  if (numeroLimpo) {
+    const numFinal = numeroLimpo.startsWith('55') ? numeroLimpo : `55${numeroLimpo}`;
+    url = `https://api.whatsapp.com/send?phone=${numFinal}&text=${encodeURIComponent(mensagem)}`;
+  } else {
+    url = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensagem)}`;
+  }
+
+  // Tenta webhook se configurado
+  const webhookUrl = import.meta.env.VITE_WHATSAPP_WEBHOOK_URL;
+  if (webhookUrl) {
+    try {
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evento: 'carregamento_iniciado',
+          telefone_destino: numeroLimpo,
+          mensagem: mensagem,
+          agendamento: agendamento,
+          usuario: usuarioInfo
+        })
+      }).catch(e => console.warn('Erro ao disparar webhook WhatsApp:', e));
+    } catch (e) {}
+  }
+
+  window.open(url, '_blank');
+  return { success: true, url };
+}
 
 /**
  * Verifica se a pedreira é Uruoca (única que opera aos sábados)
