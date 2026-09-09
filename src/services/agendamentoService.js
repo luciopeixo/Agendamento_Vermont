@@ -591,14 +591,39 @@ export function atualizarAgendamentoLocalCompleto(agendamentoAtualizado, usuario
   }
 }
 
-export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo = {}) {
+export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo = {}, agendamentoOriginal = null) {
   try {
     if (!agendamentoAtualizado || !agendamentoAtualizado.id) {
       throw new Error('ID do agendamento inválido para edição.');
     }
 
-    const listaLocal = obterAgendamentosLocais();
-    const itemAtual = listaLocal.find(item => item.id === agendamentoAtualizado.id) || {};
+    const id = agendamentoAtualizado.id;
+
+    // 1. Obtém o item anterior de forma 100% confiável
+    let itemAtual = agendamentoOriginal && agendamentoOriginal.id === id ? { ...agendamentoOriginal } : null;
+
+    if (!itemAtual) {
+      const listaLocal = obterAgendamentosLocais();
+      const achado = listaLocal.find(item => item.id === id);
+      if (achado) itemAtual = { ...achado };
+    }
+
+    if ((!itemAtual || !itemAtual.status) && isSupabaseConfigurado()) {
+      try {
+        const { data: dataRemota } = await supabase
+          .from('agendamentos_pedreira')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (dataRemota) itemAtual = { ...dataRemota };
+      } catch (e) {}
+    }
+
+    if (!itemAtual) {
+      itemAtual = { ...agendamentoAtualizado };
+    }
+
+    // 2. Registra o histórico comparando o item anterior com os novos valores
     const historicoAtualizado = registrarHistoricoEdicao(itemAtual, agendamentoAtualizado, usuarioInfo);
     agendamentoAtualizado.historico_status = historicoAtualizado;
 
@@ -651,7 +676,7 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
             .single();
 
           if (!errorPadrao && dataPadrao) {
-            resultado = { ...dataPadrao, historico_status: historicoAtualizado };
+            resultado = { ...dataPadrao, historico_status: historicoAtualizado, ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema' };
           } else if (errorPadrao) {
             console.error('Erro definitivo ao atualizar agendamento no Supabase:', errorPadrao);
           }
@@ -838,6 +863,11 @@ export async function listarAgendamentos(filtros = {}) {
             listaSup = listaSup.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
           }
 
+          // Mantém localStorage sempre sincronizado com os dados reais do Supabase
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(listaSup));
+          } catch (e) {}
+
           return listaSup;
         }
       } catch (e) {
@@ -871,12 +901,39 @@ export async function listarAgendamentos(filtros = {}) {
 /**
  * Atualiza o status de um agendamento com persistência e fallback de colunas
  */
-export async function atualizarStatusAgendamento(id, novoStatus, usuarioInfo = {}) {
+export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, usuarioInfo = {}) {
   try {
-    let atualizado = null;
-    const listaLocal = obterAgendamentosLocais();
-    const itemAtual = listaLocal.find(item => item.id === id) || {};
+    const id = typeof agendamentoOuId === 'object' && agendamentoOuId ? agendamentoOuId.id : agendamentoOuId;
+    if (!id) throw new Error('ID do agendamento inválido.');
+
+    // 1. Obtém o item anterior de forma 100% confiável
+    let itemAtual = typeof agendamentoOuId === 'object' && agendamentoOuId ? { ...agendamentoOuId } : null;
+
+    if (!itemAtual || !itemAtual.status) {
+      const listaLocal = obterAgendamentosLocais();
+      const achado = listaLocal.find(item => item.id === id);
+      if (achado) itemAtual = { ...achado };
+    }
+
+    if ((!itemAtual || !itemAtual.status) && isSupabaseConfigurado()) {
+      try {
+        const { data: dataRemota } = await supabase
+          .from('agendamentos_pedreira')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (dataRemota) itemAtual = { ...dataRemota };
+      } catch (e) {}
+    }
+
+    if (!itemAtual) {
+      itemAtual = { id, status: 'Aguardando Liberação', historico_status: [] };
+    }
+
+    // 2. Gera o novo histórico com status_anterior correto
     const historicoAtualizado = registrarHistoricoStatus(itemAtual, novoStatus, usuarioInfo);
+
+    let atualizado = null;
 
     if (isSupabaseConfigurado()) {
       try {
@@ -905,7 +962,7 @@ export async function atualizarStatusAgendamento(id, novoStatus, usuarioInfo = {
             .single();
 
           if (!errorSimples && dataSimples) {
-            atualizado = { ...dataSimples, historico_status: historicoAtualizado };
+            atualizado = { ...dataSimples, historico_status: historicoAtualizado, ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema' };
           }
         }
       } catch (e) {

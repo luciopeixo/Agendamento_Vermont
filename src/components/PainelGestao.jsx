@@ -345,7 +345,7 @@ export function PainelGestao({
     const { agendamento, novoStatus } = mudancaStatusPendente;
 
     setProcessandoMudancaStatus(true);
-    const res = await atualizarStatusAgendamento(agendamento.id, novoStatus, usuarioInfo);
+    const res = await atualizarStatusAgendamento(agendamento, novoStatus, usuarioInfo);
     setProcessandoMudancaStatus(false);
     setMudancaStatusPendente(null);
 

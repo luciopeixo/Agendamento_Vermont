@@ -81,7 +81,7 @@ export function ModalEditarAgendamento({
       return;
     }
 
-    const res = await salvarEdicaoAgendamento(formData, usuarioInfo || { isAdmin });
+    const res = await salvarEdicaoAgendamento(formData, usuarioInfo || { isAdmin }, agendamento);
     setSalvando(false);
 
     if (res.success) {
