@@ -15,11 +15,17 @@ import {
   DOCUMENTOS_OBRIGATORIOS_PEDREIRA,
   AVISO_CONFIRMACAO_CLIENTE,
   EMAIL_NOTIFICACAO_DESTINO,
-  obterMateriaisPorPedreira
+  obterMateriaisPorPedreira,
+  isHorarioPassado,
+  obterPrimeiroHorarioDisponivel,
+  obterDataHoraAtualBrasil,
+  formatarDataBR
 } from '../services/agendamentoService';
 
 export function AgendamentoForm({ onAgendamentoSucesso }) {
-  const hoje = new Date().toISOString().split('T')[0];
+  const { dataHoje } = obterDataHoraAtualBrasil();
+  const hoje = dataHoje || new Date().toISOString().split('T')[0];
+  const horarioInicial = obterPrimeiroHorarioDisponivel([], hoje);
 
   // Modo: 'simples' (1 Bloco) ou 'combinado' (2 Blocos em pedreiras diferentes)
   const [tipoCarregamento, setTipoCarregamento] = useState('simples');
@@ -40,7 +46,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     placa_carreta_2: '',
     tipo_veiculo: TIPOS_VEICULO[0],
     data_agendamento: hoje,
-    horario_agendamento: '07:40',
+    horario_agendamento: horarioInicial,
     justificativa_outros: '',
     observacoes: ''
   });
@@ -57,7 +63,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     material: materiaisIniciaisPonto2[0] || '',
     numero_bloco: '',
     data_agendamento: hoje,
-    horario_agendamento: '13:30',
+    horario_agendamento: horarioInicial,
     justificativa_outros: ''
   });
 
@@ -76,7 +82,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     material: materiaisIniciaisPonto3[0] || '',
     numero_bloco: '',
     data_agendamento: hoje,
-    horario_agendamento: '15:10',
+    horario_agendamento: horarioInicial,
     justificativa_outros: ''
   });
 
@@ -150,10 +156,10 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     setHorariosOcupados(ocupados);
     setCarregandoOcupacao(false);
 
-    if (ocupados.includes(formData.horario_agendamento)) {
-      const primeiroLivre = HORARIOS_SEMANA.find(h => h.id !== 'outros' && !ocupados.includes(h.id));
+    if (ocupados.includes(formData.horario_agendamento) || isHorarioPassado(dataStr, formData.horario_agendamento)) {
+      const primeiroLivre = obterPrimeiroHorarioDisponivel(ocupados, dataStr);
       if (primeiroLivre) {
-        setFormData(prev => ({ ...prev, horario_agendamento: primeiroLivre.id }));
+        setFormData(prev => ({ ...prev, horario_agendamento: primeiroLivre }));
       }
     }
   };
@@ -177,10 +183,10 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       setTipoDia2('dia_util');
       obterHorariosOcupados(ponto2.data_agendamento, ponto2.pedreira).then(ocupados => {
         setHorariosOcupados2(ocupados);
-        if (ocupados.includes(ponto2.horario_agendamento)) {
-          const primeiroLivre = HORARIOS_SEMANA.find(h => h.id !== 'outros' && !ocupados.includes(h.id));
+        if (ocupados.includes(ponto2.horario_agendamento) || isHorarioPassado(ponto2.data_agendamento, ponto2.horario_agendamento)) {
+          const primeiroLivre = obterPrimeiroHorarioDisponivel(ocupados, ponto2.data_agendamento);
           if (primeiroLivre) {
-            setPonto2(prev => ({ ...prev, horario_agendamento: primeiroLivre.id }));
+            setPonto2(prev => ({ ...prev, horario_agendamento: primeiroLivre }));
           }
         }
       });
@@ -206,10 +212,10 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       setTipoDia3('dia_util');
       obterHorariosOcupados(ponto3.data_agendamento, ponto3.pedreira).then(ocupados => {
         setHorariosOcupados3(ocupados);
-        if (ocupados.includes(ponto3.horario_agendamento)) {
-          const primeiroLivre = HORARIOS_SEMANA.find(h => h.id !== 'outros' && !ocupados.includes(h.id));
+        if (ocupados.includes(ponto3.horario_agendamento) || isHorarioPassado(ponto3.data_agendamento, ponto3.horario_agendamento)) {
+          const primeiroLivre = obterPrimeiroHorarioDisponivel(ocupados, ponto3.data_agendamento);
           if (primeiroLivre) {
-            setPonto3(prev => ({ ...prev, horario_agendamento: primeiroLivre.id }));
+            setPonto3(prev => ({ ...prev, horario_agendamento: primeiroLivre }));
           }
         }
       });
@@ -284,9 +290,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return;
     }
 
-    if (tipoDia === 'dia_util' && formData.horario_agendamento !== 'outros' && horariosOcupados.includes(formData.horario_agendamento)) {
-      setMensagemErro(`O horário ${formData.horario_agendamento} já foi reservado nesta pedreira (1º carregamento). Por favor, selecione outro horário disponível.`);
-      return;
+    if (tipoDia === 'dia_util' && formData.horario_agendamento !== 'outros') {
+      if (isHorarioPassado(formData.data_agendamento, formData.horario_agendamento)) {
+        setMensagemErro(`O horário ${formData.horario_agendamento} já passou para a data de hoje (${formatarDataBR(formData.data_agendamento)}). Por favor, selecione um horário futuro disponível.`);
+        return;
+      }
+
+      if (horariosOcupados.includes(formData.horario_agendamento)) {
+        setMensagemErro(`O horário ${formData.horario_agendamento} já foi reservado nesta pedreira (1º carregamento). Por favor, selecione outro horário disponível.`);
+        return;
+      }
     }
 
     if (!formData.material || !formData.material.trim()) {
@@ -316,9 +329,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         return;
       }
 
-      if (tipoDia2 === 'dia_util' && ponto2.horario_agendamento !== 'outros' && horariosOcupados2.includes(ponto2.horario_agendamento)) {
-        setMensagemErro(`O horário ${ponto2.horario_agendamento} já foi reservado nesta pedreira (2º carregamento). Por favor, selecione outro horário disponível.`);
-        return;
+      if (tipoDia2 === 'dia_util' && ponto2.horario_agendamento !== 'outros') {
+        if (isHorarioPassado(ponto2.data_agendamento, ponto2.horario_agendamento)) {
+          setMensagemErro(`O horário ${ponto2.horario_agendamento} do 2º carregamento já passou para a data de hoje (${formatarDataBR(ponto2.data_agendamento)}). Selecione um horário futuro.`);
+          return;
+        }
+
+        if (horariosOcupados2.includes(ponto2.horario_agendamento)) {
+          setMensagemErro(`O horário ${ponto2.horario_agendamento} já foi reservado nesta pedreira (2º carregamento). Por favor, selecione outro horário disponível.`);
+          return;
+        }
       }
 
       if (!ponto2.material || !ponto2.material.trim()) {
@@ -328,16 +348,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
       if (!ponto2.numero_bloco.trim()) {
         setMensagemErro('Informe a numeração do bloco do 2º carregamento.');
-        return;
-      }
-
-      if (
-        formData.pedreira === ponto2.pedreira &&
-        formData.data_agendamento === ponto2.data_agendamento &&
-        formData.horario_agendamento === ponto2.horario_agendamento &&
-        formData.horario_agendamento !== 'outros'
-      ) {
-        setMensagemErro('Para a mesma pedreira e mesma data, selecione horários distintos para o 1º e 2º blocos.');
         return;
       }
 
@@ -358,9 +368,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           return;
         }
 
-        if (tipoDia3 === 'dia_util' && ponto3.horario_agendamento !== 'outros' && horariosOcupados3.includes(ponto3.horario_agendamento)) {
-          setMensagemErro(`O horário ${ponto3.horario_agendamento} já foi reservado nesta pedreira (3º carregamento). Por favor, selecione outro horário disponível.`);
-          return;
+        if (tipoDia3 === 'dia_util' && ponto3.horario_agendamento !== 'outros') {
+          if (isHorarioPassado(ponto3.data_agendamento, ponto3.horario_agendamento)) {
+            setMensagemErro(`O horário ${ponto3.horario_agendamento} do 3º carregamento já passou para a data de hoje (${formatarDataBR(ponto3.data_agendamento)}). Selecione um horário futuro.`);
+            return;
+          }
+
+          if (horariosOcupados3.includes(ponto3.horario_agendamento)) {
+            setMensagemErro(`O horário ${ponto3.horario_agendamento} já foi reservado nesta pedreira (3º carregamento). Por favor, selecione outro horário disponível.`);
+            return;
+          }
         }
 
         if (!ponto3.material || !ponto3.material.trim()) {
@@ -370,27 +387,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
         if (!ponto3.numero_bloco.trim()) {
           setMensagemErro('Informe a numeração do bloco do 3º carregamento.');
-          return;
-        }
-
-        // Colisões entre 3º ponto e 1º ou 2º ponto
-        if (
-          formData.pedreira === ponto3.pedreira &&
-          formData.data_agendamento === ponto3.data_agendamento &&
-          formData.horario_agendamento === ponto3.horario_agendamento &&
-          formData.horario_agendamento !== 'outros'
-        ) {
-          setMensagemErro('Para a mesma pedreira e mesma data, selecione horários distintos para o 1º e 3º blocos.');
-          return;
-        }
-
-        if (
-          ponto2.pedreira === ponto3.pedreira &&
-          ponto2.data_agendamento === ponto3.data_agendamento &&
-          ponto2.horario_agendamento === ponto3.horario_agendamento &&
-          ponto2.horario_agendamento !== 'outros'
-        ) {
-          setMensagemErro('Para a mesma pedreira e mesma data, selecione horários distintos para o 2º e 3º blocos.');
           return;
         }
       }
@@ -810,9 +806,12 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       <optgroup label="Turno Manhã (07:40 às 12:00 - Intervalos de 20 min)">
                         {HORARIOS_SEMANA.filter(h => h.turno === 'manha').map(h => {
                           const ocupado = horariosOcupados.includes(h.id);
+                          const expirado = isHorarioPassado(formData.data_agendamento, h.id);
+                          const indisponivel = ocupado || expirado;
+
                           return (
-                            <option key={h.id} value={h.id} disabled={ocupado}>
-                              {h.id} {ocupado ? '— [INDISPONÍVEL / OCUPADO]' : '— Disponível'}
+                            <option key={h.id} value={h.id} disabled={indisponivel}>
+                              {h.id} {expirado ? '— [HORÁRIO JÁ PASSOU]' : (ocupado ? '— [INDISPONÍVEL / OCUPADO]' : '— Disponível')}
                             </option>
                           );
                         })}
@@ -820,9 +819,12 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       <optgroup label="Turno Tarde (13:30 às 15:30 - Intervalos de 20 min)">
                         {HORARIOS_SEMANA.filter(h => h.turno === 'tarde').map(h => {
                           const ocupado = horariosOcupados.includes(h.id);
+                          const expirado = isHorarioPassado(formData.data_agendamento, h.id);
+                          const indisponivel = ocupado || expirado;
+
                           return (
-                            <option key={h.id} value={h.id} disabled={ocupado}>
-                              {h.id} {ocupado ? '— [INDISPONÍVEL / OCUPADO]' : '— Disponível'}
+                            <option key={h.id} value={h.id} disabled={indisponivel}>
+                              {h.id} {expirado ? '— [HORÁRIO JÁ PASSOU]' : (ocupado ? '— [INDISPONÍVEL / OCUPADO]' : '— Disponível')}
                             </option>
                           );
                         })}
@@ -980,11 +982,17 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     onChange={(e) => handleChange('horario_agendamento', e.target.value)}
                     required
                   >
-                    {HORARIOS_SEMANA.map(h => (
-                      <option key={h.id} value={h.id} disabled={horariosOcupados.includes(h.id)}>
-                        {h.id} {horariosOcupados.includes(h.id) ? '— [OCUPADO]' : ''}
-                      </option>
-                    ))}
+                    {HORARIOS_SEMANA.map(h => {
+                      const ocupado = horariosOcupados.includes(h.id);
+                      const expirado = isHorarioPassado(formData.data_agendamento, h.id);
+                      const indisponivel = (ocupado || expirado) && h.id !== 'outros';
+
+                      return (
+                        <option key={h.id} value={h.id} disabled={indisponivel}>
+                          {h.id} {h.id === 'outros' ? '' : (expirado ? '— [JÁ PASSOU]' : (ocupado ? '— [OCUPADO]' : '— Disponível'))}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
@@ -1088,34 +1096,60 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     onChange={(e) => handlePonto2Change('horario_agendamento', e.target.value)}
                     required
                   >
-                    {HORARIOS_SEMANA.map(h => (
-                      <option key={h.id} value={h.id} disabled={horariosOcupados2.includes(h.id)}>
-                        {h.id} {horariosOcupados2.includes(h.id) ? '— [OCUPADO]' : ''}
-                      </option>
-                    ))}
+                    {HORARIOS_SEMANA.map(h => {
+                      const ocupado = horariosOcupados2.includes(h.id);
+                      const expirado = isHorarioPassado(ponto2.data_agendamento, h.id);
+                      const indisponivel = (ocupado || expirado) && h.id !== 'outros';
+
+                      return (
+                        <option key={h.id} value={h.id} disabled={indisponivel}>
+                          {h.id} {h.id === 'outros' ? '' : (expirado ? '— [JÁ PASSOU]' : (ocupado ? '— [OCUPADO]' : '— Disponível'))}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
 
-              {/* Dica de deslocamento se for na mesma data */}
+              {/* Dica contextual de mesma pedreira ou deslocamento */}
               {formData.data_agendamento === ponto2.data_agendamento && (
-                <div style={{
-                  marginTop: 14,
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  background: 'rgba(56, 189, 248, 0.08)',
-                  border: '1px solid rgba(56, 189, 248, 0.25)',
-                  fontSize: '0.8rem',
-                  color: '#93c5fd',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8
-                }}>
-                  <Info size={16} style={{ flexShrink: 0 }} />
-                  <span>
-                    <strong>Deslocamento entre pedreiras:</strong> Certifique-se de prever tempo suficiente de trânsito entre o 1º horário ({formData.horario_agendamento}) e o 2º horário ({ponto2.horario_agendamento}).
-                  </span>
-                </div>
+                formData.pedreira === ponto2.pedreira ? (
+                  <div style={{
+                    marginTop: 14,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    background: 'rgba(74, 222, 128, 0.08)',
+                    border: '1px solid rgba(74, 222, 128, 0.25)',
+                    fontSize: '0.8rem',
+                    color: '#86efac',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8
+                  }}>
+                    <Info size={16} style={{ flexShrink: 0 }} />
+                    <span>
+                      <strong>Mesma Pedreira:</strong> Os blocos podem ser carregados no <strong>mesmo horário ({formData.horario_agendamento})</strong> no mesmo veículo ou em horários diferentes.
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{
+                    marginTop: 14,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    background: 'rgba(56, 189, 248, 0.08)',
+                    border: '1px solid rgba(56, 189, 248, 0.25)',
+                    fontSize: '0.8rem',
+                    color: '#93c5fd',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8
+                  }}>
+                    <Info size={16} style={{ flexShrink: 0 }} />
+                    <span>
+                      <strong>Deslocamento entre pedreiras:</strong> Certifique-se de prever tempo suficiente de trânsito entre o 1º horário ({formData.horario_agendamento}) e o 2º horário ({ponto2.horario_agendamento}).
+                    </span>
+                  </div>
+                )
               )}
             </div>
 
@@ -1218,14 +1252,41 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       onChange={(e) => handlePonto3Change('horario_agendamento', e.target.value)}
                       required
                     >
-                      {HORARIOS_SEMANA.map(h => (
-                        <option key={h.id} value={h.id} disabled={horariosOcupados3.includes(h.id)}>
-                          {h.id} {horariosOcupados3.includes(h.id) ? '— [OCUPADO]' : ''}
-                        </option>
-                      ))}
+                      {HORARIOS_SEMANA.map(h => {
+                        const ocupado = horariosOcupados3.includes(h.id);
+                        const expirado = isHorarioPassado(ponto3.data_agendamento, h.id);
+                        const indisponivel = (ocupado || expirado) && h.id !== 'outros';
+
+                        return (
+                          <option key={h.id} value={h.id} disabled={indisponivel}>
+                            {h.id} {h.id === 'outros' ? '' : (expirado ? '— [JÁ PASSOU]' : (ocupado ? '— [OCUPADO]' : '— Disponível'))}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>
+
+                {/* Dica contextual de mesma pedreira para o 3º ponto */}
+                {ponto3.data_agendamento === formData.data_agendamento && ponto3.pedreira === formData.pedreira && (
+                  <div style={{
+                    marginTop: 14,
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    background: 'rgba(74, 222, 128, 0.08)',
+                    border: '1px solid rgba(74, 222, 128, 0.25)',
+                    fontSize: '0.8rem',
+                    color: '#86efac',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8
+                  }}>
+                    <Info size={16} style={{ flexShrink: 0 }} />
+                    <span>
+                      <strong>Mesma Pedreira (3 Blocos):</strong> Todos os 3 blocos podem ser carregados no <strong>mesmo horário ({formData.horario_agendamento})</strong> no mesmo veículo.
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </>

@@ -137,6 +137,87 @@ export const HORARIOS_SEMANA = [
   { id: 'outros', label: 'Outros (Especificar Horário / Justificativa)', turno: 'especial' }
 ];
 
+/**
+ * Converte 'HH:MM' em minutos do dia (ex: '07:40' => 460)
+ */
+export function converterHorarioParaMinutos(horarioStr = '') {
+  if (!horarioStr || typeof horarioStr !== 'string') return 0;
+  const partes = horarioStr.trim().split(':');
+  if (partes.length < 2) return 0;
+  const h = parseInt(partes[0], 10);
+  const m = parseInt(partes[1], 10);
+  if (isNaN(h) || isNaN(m)) return 0;
+  return h * 60 + m;
+}
+
+/**
+ * Retorna a data e hora atuais no fuso horário do Brasil / Ceará (America/Fortaleza)
+ */
+export function obterDataHoraAtualBrasil() {
+  const agora = new Date();
+  
+  // Data no padrão YYYY-MM-DD (en-CA)
+  const formatadorData = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Fortaleza',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const dataHoje = formatadorData.format(agora);
+
+  const formatadorHora = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Fortaleza',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const horaAtualStr = formatadorHora.format(agora);
+  const minutosTotais = converterHorarioParaMinutos(horaAtualStr);
+
+  return { dataHoje, horaAtualStr, minutosTotais };
+}
+
+/**
+ * Verifica se um horário de agendamento específico já expirou / passou
+ * para a data selecionada em relação ao momento atual.
+ */
+export function isHorarioPassado(dataStr, horarioId) {
+  if (!dataStr || !horarioId || horarioId === 'outros' || String(horarioId).startsWith('Sábado')) {
+    return false;
+  }
+
+  const { dataHoje, minutosTotais } = obterDataHoraAtualBrasil();
+
+  // Se a data do agendamento for anterior a hoje, já passou
+  if (dataStr < dataHoje) {
+    return true;
+  }
+
+  // Se for para a data de hoje, compara os minutos do horário com os minutos atuais
+  if (dataStr === dataHoje) {
+    const slotMinutos = converterHorarioParaMinutos(horarioId);
+    return slotMinutos <= minutosTotais;
+  }
+
+  // Se for data futura, não passou
+  return false;
+}
+
+/**
+ * Retorna o primeiro horário livre e válido (não ocupado e não expirado) para uma pedreira e data
+ */
+export function obterPrimeiroHorarioDisponivel(horariosOcupados = [], dataStr = '') {
+  for (const h of HORARIOS_SEMANA) {
+    if (h.id === 'outros') continue;
+    const ocupado = Array.isArray(horariosOcupados) && horariosOcupados.includes(h.id);
+    const expirado = isHorarioPassado(dataStr, h.id);
+    if (!ocupado && !expirado) {
+      return h.id;
+    }
+  }
+  return 'outros';
+}
+
 export const TIPOS_VEICULO = [
   'Carreta LS (6 Eixos)',
   'LS 7 Eixos (4 Eixos no Cavalo)',
@@ -1151,6 +1232,10 @@ export async function salvarAgendamento(dados) {
         throw new Error(`Limite máximo de 12 veículos para o sábado (${dados.data_agendamento}) na pedreira de Uruoca já foi atingido. Escolha outra data.`);
       }
     } else if (dados.tipo_dia === 'dia_util' && dados.horario_agendamento !== 'outros') {
+      if (isHorarioPassado(dados.data_agendamento, dados.horario_agendamento)) {
+        throw new Error(`O horário ${dados.horario_agendamento} já passou para a data de hoje (${formatarDataBR(dados.data_agendamento)}). Por favor, selecione um horário futuro disponível.`);
+      }
+
       const ocupados = await obterHorariosOcupados(dados.data_agendamento, dados.pedreira);
       if (ocupados.includes(dados.horario_agendamento)) {
         throw new Error(`O horário ${dados.horario_agendamento} já foi reservado por outro transportador para esta data na pedreira selecionada. Por favor, escolha outro horário.`);
@@ -1247,6 +1332,9 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
           throw new Error(`[${numPonto}º Carregamento] Limite máximo de 12 veículos para o sábado (${p.data_agendamento}) na pedreira de Uruoca já foi atingido.`);
         }
       } else if (p.tipo_dia === 'dia_util' && p.horario_agendamento !== 'outros') {
+        if (isHorarioPassado(p.data_agendamento, p.horario_agendamento)) {
+          throw new Error(`[${numPonto}º Carregamento] O horário ${p.horario_agendamento} já encerrou/passou para a data de hoje (${formatarDataBR(p.data_agendamento)}). Escolha um horário futuro.`);
+        }
         const ocupados = await obterHorariosOcupados(p.data_agendamento, p.pedreira);
         if (ocupados.includes(p.horario_agendamento)) {
           throw new Error(`[${numPonto}º Carregamento] O horário ${p.horario_agendamento} já foi reservado na pedreira ${p.pedreira}. Escolha outro horário.`);
