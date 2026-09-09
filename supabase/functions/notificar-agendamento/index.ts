@@ -71,7 +71,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const ag = body.agendamento || body;
 
-    const emailDestino = Deno.env.get('EMAIL_NOTIFICACAO_DESTINO') || 'faturamento@vermontmineracao.com.br';
+    const emailDestino = Deno.env.get('EMAIL_NOTIFICACAO_DESTINO') || '';
     const protocolo = (ag.id || 'VT-' + Date.now()).substring(0, 8).toUpperCase();
     const dataFormatada = formatarDataBR(ag.data_agendamento);
     const dataHoraEnvio = obterDataHoraEnvioPTBR();
@@ -242,7 +242,7 @@ Deno.serve(async (req: Request) => {
                 Unidades Produtoras: Uruoca | Massapê | Sobral | São Gonçalo do Amarante - Ceará
               </p>
               <p style="margin: 0;">
-                Acesse: <a href="https://vermontmineracao.com.br" style="color: #4ade80; text-decoration: none; font-weight: 600;">www.vermontmineracao.com.br</a> | Faturamento: <a href="mailto:faturamento@vermontmineracao.com.br" style="color: #4ade80; text-decoration: none;">faturamento@vermontmineracao.com.br</a>
+                Acesse: <a href="https://vermontmineracao.com.br" style="color: #4ade80; text-decoration: none; font-weight: 600;">www.vermontmineracao.com.br</a>
               </p>
             </td>
           </tr>
@@ -307,7 +307,7 @@ Deno.serve(async (req: Request) => {
             'Authorization': `Bearer ${resendApiKey}`
           },
           body: JSON.stringify({
-            from: 'Vermont Mineração <faturamento@vermontmineracao.com.br>',
+            from: Deno.env.get('EMAIL_FROM') || 'Portal Vermont <notificacoes@sistema.local>',
             to: [emailDestino],
             subject: assuntoEmail,
             html: htmlEmail

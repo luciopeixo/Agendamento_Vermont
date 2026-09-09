@@ -65,7 +65,7 @@ Conformidade rigorosa com as normas de transporte de rochas e fiscalização rod
 ---
 
 ### 7. 📧 Notificações Automatizadas por E-mail
-* **Despacho Direto:** Notificação imediata para `faturamento@vermontmineracao.com.br`.
+* **Despacho Direto:** Notificação imediata para a equipe responsável por e-mail configurado no ambiente.
 * **Assunto Dinâmico Padronizado:**
   * Dias Úteis: `Agendamento - [Pedreira] - [Data DD/MM/AA] - [Nº do Bloco]` *(ex: Agendamento - Uruoca - 07/09/26 - VT-5502)*
   * Sábados: `Agendamento - [Pedreira] - Sábado - [Data DD/MM/AA] - [Nº do Bloco]` *(ex: Agendamento - Uruoca - Sábado - 12/09/26 - VT-5502)*
