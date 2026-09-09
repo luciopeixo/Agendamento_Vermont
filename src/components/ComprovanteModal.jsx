@@ -1,7 +1,7 @@
 import React from 'react';
-import { CheckCircle2, Printer, Share2, Truck, MapPin, FileText, X } from 'lucide-react';
+import { CheckCircle2, Printer, Share2, Truck, MapPin, FileText, X, AlertTriangle, Clock } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { formatarPlacasExibicao, formatarDataBR } from '../services/agendamentoService';
+import { formatarPlacasExibicao, formatarDataBR, AVISO_CONFIRMACAO_CLIENTE } from '../services/agendamentoService';
 
 export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
   if (!agendamento) return null;
@@ -28,6 +28,10 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
   // Lista de placas formatadas corretamente (Carreta simples se for 1 carreta, 1ª e 2ª se for Bitrem)
   const listaPlacas = formatarPlacasExibicao(agendamento);
 
+  const isCombinado = agendamento.is_combinado || (agendamento.observacoes && agendamento.observacoes.includes('[Carga Combinada'));
+  const ponto1 = agendamento.ponto1 || agendamento.pontos?.[0] || agendamento;
+  const ponto2 = agendamento.ponto2 || agendamento.pontos?.[1];
+
   // Formatação das placas para o texto do WhatsApp
   const placasFormatadasWhats = listaPlacas
     .map(p => `   🔹 *${p.label}:* ${p.placa}`)
@@ -35,7 +39,58 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
 
   // Mensagem oficial atrativa para WhatsApp
   const handleCompartilharWhatsApp = () => {
-    const textoWhats = 
+    let textoWhats = '';
+
+    if (isCombinado && ponto2) {
+      textoWhats = 
+`🏗️ *VERMONT MINERAÇÃO LTDA.* 🪨
+*AUTORIZAÇÃO OFICIAL DE AGENDAMENTO • CARGA COMBINADA*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 *PROTOCOLO:* #${protocolo}
+✅ *STATUS:* *AGENDAMENTO COMBINADO CONFIRMADO (2 PONTOS)*
+
+📍 *ROTEIRO DE CARREGAMENTO:*
+
+🔸 *1º PONTO DE CARREGAMENTO:*
+🏢 *Pedreira:* *${ponto1.pedreira}*
+🪨 *Material:* *${ponto1.material}*
+🏷️ *Nº do Bloco:* *${ponto1.numero_bloco}*
+📅 *Data:* *${formatarDataBR(ponto1.data_agendamento)}*
+⏰ *Horário:* *${ponto1.horario_agendamento}*
+
+🔸 *2º PONTO DE CARREGAMENTO:*
+🏢 *Pedreira:* *${ponto2.pedreira}*
+🪨 *Material:* *${ponto2.material}*
+🏷️ *Nº do Bloco:* *${ponto2.numero_bloco}*
+📅 *Data:* *${formatarDataBR(ponto2.data_agendamento)}*
+⏰ *Horário:* *${ponto2.horario_agendamento}*
+
+🚛 *DADOS DO TRANSPORTE:*
+🏢 *Transportadora:* *${agendamento.transportadora}*
+👤 *Motorista:* *${agendamento.motorista_nome}*
+🪪 *CPF:* ${agendamento.motorista_cpf}
+📱 *WhatsApp/Tel:* ${agendamento.motorista_telefone || 'Não informado'}
+🛣️ *Tipo de Veículo:* *${agendamento.tipo_veiculo}*
+⚖️ *Placas:*
+${placasFormatadasWhats}
+💼 *Cliente Destinatário:* *${agendamento.cliente}*
+${agendamento.observacoes ? `\n📌 *Observações:* _${agendamento.observacoes}_\n` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 *DOCUMENTOS OBRIGATÓRIOS NA PEDREIRA:*
+• Obrigatório apresentação de CRLVs do cavalo e carreta atualizados;
+• CNH compatível com o veículo;
+• Motorista deve possuir o curso de cargas indivisíveis;
+• Laudo de inspeção de rochas ou CSV dentro da validade.
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ *AVISO AO TRANSPORTADOR:*
+_O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte._
+
+_Essa confirmação é fundamental para evitar imprevistos, atrasos ou problemas durante o carregamento e o transporte._
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+ℹ️ *Apresente esta confirmação e os documentos na portaria de cada pedreira.*
+_Portal Oficial de Agendamentos • Vermont Mineração_`;
+    } else {
+      textoWhats = 
 `🏗️ *VERMONT MINERAÇÃO LTDA.* 🪨
 *AUTORIZAÇÃO OFICIAL DE AGENDAMENTO DE CARREGAMENTO*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -68,8 +123,14 @@ ${agendamento.observacoes ? `\n📌 *Observações:* _${agendamento.observacoes}
 • Motorista deve possuir o curso de cargas indivisíveis;
 • Laudo de inspeção de rochas ou CSV dentro da validade.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ *AVISO AO TRANSPORTADOR:*
+_O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte._
+
+_Essa confirmação é fundamental para evitar imprevistos, atrasos ou problemas durante o carregamento e o transporte._
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 ℹ️ *Apresente esta confirmação e os documentos na portaria da pedreira.*
 _Portal Oficial de Agendamentos • Vermont Mineração_`;
+    }
 
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(textoWhats)}`;
     window.open(url, '_blank');
@@ -91,10 +152,11 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
       padding: 16
     }}>
       <div 
+        id="comprovante-imprimir"
         className="glass-panel animate-fade"
         style={{
           width: '100%',
-          maxWidth: 620,
+          maxWidth: 640,
           maxHeight: '92vh',
           overflowY: 'auto',
           padding: '26px 30px',
@@ -142,10 +204,12 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
           </div>
 
           <h2 style={{ fontSize: '1.45rem', margin: '0 0 4px 0', color: '#fff' }}>
-            Agendamento Confirmado!
+            {isCombinado ? 'Agendamento Combinado Confirmado!' : 'Agendamento Confirmado!'}
           </h2>
           <p style={{ margin: 0, fontSize: '0.86rem', color: '#86efac' }}>
-            Autorização Oficial de Entrada & Carregamento • Vermont Mineração
+            {isCombinado 
+              ? 'Autorização Oficial de Entrada & Rota Combinada (2 Pedreiras) • Vermont Mineração' 
+              : 'Autorização Oficial de Entrada & Carregamento • Vermont Mineração'}
           </p>
 
           <div style={{
@@ -166,28 +230,109 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
 
         {/* Detalhes do Agendamento */}
         <div style={{ padding: '18px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Local e Data */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid rgba(255, 255, 255, 0.07)',
-            borderRadius: 10,
-            padding: 14
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80', marginBottom: 8 }}>
-              <MapPin size={18} />
-              <strong style={{ fontSize: '0.92rem' }}>Local & Horário de Carregamento</strong>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
-              <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }}>{agendamento.pedreira}</strong></div>
-              <div><span style={{ color: 'var(--slate-400)' }}>Data:</span> <strong>{formatarDataBR(agendamento.data_agendamento)}</strong></div>
-              <div>
-                <span style={{ color: 'var(--slate-400)' }}>Horário:</span>{' '}
-                <strong style={{ color: '#4ade80' }}>
-                  {agendamento.horario_agendamento} {agendamento.justificativa_outros ? `(${agendamento.justificativa_outros})` : ''}
-                </strong>
+          
+          {/* Se for Carga Combinada: Roteiro dos 2 Pontos */}
+          {isCombinado && ponto2 ? (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid var(--vermont-green-border)',
+              borderRadius: 10,
+              padding: 16
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80' }}>
+                  <MapPin size={18} />
+                  <strong style={{ fontSize: '0.96rem' }}>Roteiro de Carregamento (2 Pedreiras)</strong>
+                </div>
+                <span className="badge badge-vermont" style={{ fontSize: '0.72rem' }}>Carga Combinada</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {/* 1º Ponto */}
+                <div style={{
+                  background: 'rgba(0, 118, 44, 0.12)',
+                  border: '1px solid rgba(0, 118, 44, 0.35)',
+                  borderRadius: 8,
+                  padding: '10px 14px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#86efac', fontWeight: 700, fontSize: '0.85rem', marginBottom: 6 }}>
+                    <span style={{ background: '#00762c', color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>1</span>
+                    1º Ponto de Carregamento
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 6, fontSize: '0.86rem' }}>
+                    <div><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }}>{ponto1.pedreira}</strong></div>
+                    <div><span style={{ color: 'var(--slate-400)' }}>Material:</span> <strong style={{ color: '#86efac' }}>{ponto1.material}</strong></div>
+                    <div><span style={{ color: 'var(--slate-400)' }}>Bloco:</span> <strong style={{ color: '#fff' }}>{ponto1.numero_bloco}</strong></div>
+                    <div><span style={{ color: 'var(--slate-400)' }}>Data & Horário:</span> <strong style={{ color: '#4ade80' }}>{formatarDataBR(ponto1.data_agendamento)} às {ponto1.horario_agendamento}</strong></div>
+                  </div>
+                </div>
+
+                {/* 2º Ponto */}
+                <div style={{
+                  background: 'rgba(56, 189, 248, 0.10)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  borderRadius: 8,
+                  padding: '10px 14px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#38bdf8', fontWeight: 700, fontSize: '0.85rem', marginBottom: 6 }}>
+                    <span style={{ background: '#0284c7', color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>2</span>
+                    2º Ponto de Carregamento
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 6, fontSize: '0.86rem' }}>
+                    <div><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }}>{ponto2.pedreira}</strong></div>
+                    <div><span style={{ color: 'var(--slate-400)' }}>Material:</span> <strong style={{ color: '#38bdf8' }}>{ponto2.material}</strong></div>
+                    <div><span style={{ color: 'var(--slate-400)' }}>Bloco:</span> <strong style={{ color: '#fff' }}>{ponto2.numero_bloco}</strong></div>
+                    <div><span style={{ color: 'var(--slate-400)' }}>Data & Horário:</span> <strong style={{ color: '#38bdf8' }}>{formatarDataBR(ponto2.data_agendamento)} às {ponto2.horario_agendamento}</strong></div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Local e Data Simples */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.07)',
+                borderRadius: 10,
+                padding: 14
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80', marginBottom: 8 }}>
+                  <MapPin size={18} />
+                  <strong style={{ fontSize: '0.92rem' }}>Local & Horário de Carregamento</strong>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
+                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }}>{agendamento.pedreira}</strong></div>
+                  <div><span style={{ color: 'var(--slate-400)' }}>Data:</span> <strong>{formatarDataBR(agendamento.data_agendamento)}</strong></div>
+                  <div>
+                    <span style={{ color: 'var(--slate-400)' }}>Horário:</span>{' '}
+                    <strong style={{ color: '#4ade80' }}>
+                      {agendamento.horario_agendamento} {agendamento.justificativa_outros ? `(${agendamento.justificativa_outros})` : ''}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dados da Carga Simples */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.07)',
+                borderRadius: 10,
+                padding: 14
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fbbf24', marginBottom: 8 }}>
+                  <FileText size={18} />
+                  <strong style={{ fontSize: '0.92rem' }}>Informações do Bloco & Cliente</strong>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
+                  <div><span style={{ color: 'var(--slate-400)' }}>Bloco Nº:</span> <strong style={{ color: '#fff' }}>{agendamento.numero_bloco}</strong></div>
+                  <div><span style={{ color: 'var(--slate-400)' }}>Material Imputado:</span> <strong style={{ color: '#fff' }}>{agendamento.material}</strong></div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <span style={{ color: 'var(--slate-400)' }}>Cliente Destinatário:</span> <strong>{agendamento.cliente}</strong>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Dados do Transporte */}
           <div style={{
@@ -198,10 +343,11 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#38bdf8', marginBottom: 8 }}>
               <Truck size={18} />
-              <strong style={{ fontSize: '0.92rem' }}>Veículo & Motorista</strong>
+              <strong style={{ fontSize: '0.92rem' }}>Veículo, Motorista & Cliente</strong>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
               <div><span style={{ color: 'var(--slate-400)' }}>Transportadora:</span> <strong>{agendamento.transportadora}</strong></div>
+              <div><span style={{ color: 'var(--slate-400)' }}>Cliente:</span> <strong>{agendamento.cliente}</strong></div>
               <div><span style={{ color: 'var(--slate-400)' }}>Motorista:</span> <strong>{agendamento.motorista_nome}</strong></div>
               <div><span style={{ color: 'var(--slate-400)' }}>CPF:</span> <strong>{agendamento.motorista_cpf}</strong></div>
               <div><span style={{ color: 'var(--slate-400)' }}>Telefone:</span> <strong>{agendamento.motorista_telefone || 'Não informado'}</strong></div>
@@ -216,26 +362,6 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
                   <strong style={{ fontFamily: 'monospace', color: '#fff' }}>{item.placa}</strong>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Dados da Carga */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid rgba(255, 255, 255, 0.07)',
-            borderRadius: 10,
-            padding: 14
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fbbf24', marginBottom: 8 }}>
-              <FileText size={18} />
-              <strong style={{ fontSize: '0.92rem' }}>Informações do Bloco & Cliente</strong>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
-              <div><span style={{ color: 'var(--slate-400)' }}>Bloco Nº:</span> <strong style={{ color: '#fff' }}>{agendamento.numero_bloco}</strong></div>
-              <div><span style={{ color: 'var(--slate-400)' }}>Material Imputado:</span> <strong style={{ color: '#fff' }}>{agendamento.material}</strong></div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <span style={{ color: 'var(--slate-400)' }}>Cliente Destinatário:</span> <strong>{agendamento.cliente}</strong>
-              </div>
             </div>
           </div>
 
@@ -256,6 +382,30 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
               <li>Motorista deve possuir o curso de cargas indivisíveis;</li>
               <li>Laudo de inspeção de rochas ou CSV dentro da validade.</li>
             </ul>
+
+            {/* Alerta Operacional: Confirmação Prévia com Clientes */}
+            <div style={{
+              marginTop: 10,
+              padding: '8px 10px',
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 8,
+              color: '#fef3c7',
+              fontSize: '0.77rem',
+              lineHeight: '1.4'
+            }}>
+              <AlertTriangle size={16} color="#fbbf24" style={{ flexShrink: 0, marginTop: 2 }} />
+              <div>
+                <strong style={{ color: '#fde047' }}>Atenção Transportador:</strong>{' '}
+                O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte.
+                <div style={{ marginTop: 2, color: '#fde68a', fontWeight: 500, fontSize: '0.74rem' }}>
+                  Essa confirmação é fundamental para evitar imprevistos, atrasos ou problemas durante o carregamento e o transporte.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

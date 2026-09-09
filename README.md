@@ -75,7 +75,7 @@ Conformidade rigorosa com as normas de transporte de rochas e fiscalização rod
 ---
 
 ### 8. 🔒 Painel Administrativo de Gestão
-* **Acesso Restrito:** Autenticação protegida por credenciais de administrador com suporte a variáveis de ambiente (`VITE_ADMIN_USER` e `VITE_ADMIN_PASSWORD`).
+* **Acesso Restrito:** Autenticação corporativa segura integrada diretamente ao **Supabase Auth** (e-mail e senha criptografados), sem credenciais em texto puro no código ou variáveis públicas.
 * **Filtros Operacionais:** Consulta rápida por pedreira, data e status (Confirmado, Carregado, Cancelado).
 * **Gestão de Agendamentos:** Capacidade de atualizar status, cancelar registros com reabertura de horário e emitir relatório de romaneio para a balança.
 
@@ -125,10 +125,6 @@ Preencha as variáveis no arquivo `.env`:
 # Supabase
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_ANON_KEY=sua-chave-anon-publica-do-supabase
-
-# Acesso Administrativo
-VITE_ADMIN_USER=admin
-VITE_ADMIN_PASSWORD=sua-senha-segura-aqui
 ```
 
 > ⚠️ **Atenção:** O arquivo `.env` está configurado no `.gitignore` e nunca deve ser enviado ao controle de versão público.

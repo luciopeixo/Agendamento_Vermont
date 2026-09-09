@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, RefreshCw, Printer, CheckCircle, Clock, Truck, Mail, FileText, AlertCircle, Trash2
+  Search, RefreshCw, Printer, CheckCircle, CheckCircle2, Clock, Truck, Mail, FileText, AlertCircle, Trash2, ShieldCheck, ShieldAlert, RotateCcw
 } from 'lucide-react';
 import { 
   listarAgendamentos, 
@@ -10,14 +10,31 @@ import {
   formatarPlacasExibicao,
   formatarDataBR,
   PEDREIRAS_CEARA, 
-  EMAIL_NOTIFICACAO_DESTINO
+  EMAIL_NOTIFICACAO_DESTINO,
+  STATUS_AGENDAMENTO
 } from '../services/agendamentoService';
 
-export function PainelGestao({ onVisualizarComprovante }) {
+export function PainelGestao({ 
+  onVisualizarComprovante,
+  usuario = null,
+  isAdmin = false,
+  pedreiraOperador = null
+}) {
   const [agendamentos, setAgendamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoBusca, setTermoBusca] = useState('');
-  const [filtroPedreira, setFiltroPedreira] = useState('todas');
+  
+  // Se for operador de pedreira, fixa na sua unidade atribuída
+  const [filtroPedreira, setFiltroPedreira] = useState(() => {
+    return (!isAdmin && pedreiraOperador) ? pedreiraOperador : 'todas';
+  });
+
+  useEffect(() => {
+    if (!isAdmin && pedreiraOperador) {
+      setFiltroPedreira(pedreiraOperador);
+    }
+  }, [isAdmin, pedreiraOperador]);
+
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [filtroData, setFiltroData] = useState('');
   const [notificandoEmailId, setNotificandoEmailId] = useState(null);
@@ -51,6 +68,10 @@ export function PainelGestao({ onVisualizarComprovante }) {
   };
 
   const handleExcluir = async (ag) => {
+    if (!isAdmin) {
+      alert('Acesso negado: Apenas o Administrador Geral possui autorização para apagar agendamentos.');
+      return;
+    }
     const confirmou = window.confirm(
       `ATENÇÃO: Deseja realmente APAGAR o agendamento?\n\n` +
       `• Bloco: ${ag.numero_bloco}\n` +
@@ -173,15 +194,23 @@ export function PainelGestao({ onVisualizarComprovante }) {
         flexWrap: 'wrap',
         gap: 16
       }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h1 style={{ fontSize: '1.4rem', margin: 0 }}>Painel Operacional de Carregamentos</h1>
-            <span className="badge badge-vermont">Admin</span>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h1 style={{ fontSize: '1.4rem', margin: 0 }}>Painel Operacional de Carregamentos</h1>
+              {isAdmin ? (
+                <span className="badge badge-warning" style={{ fontSize: '0.75rem' }}>🛡️ Admin Geral</span>
+              ) : (
+                <span className="badge badge-vermont" style={{ fontSize: '0.75rem' }}>
+                  👷 Operador • {pedreiraOperador || 'Pedreira'}
+                </span>
+              )}
+            </div>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--slate-400)' }}>
+              {isAdmin 
+                ? 'Visão consolidada de todas as pedreiras, controle de slots e exclusão irrestrita' 
+                : `Visão operacional exclusiva da pedreira ${pedreiraOperador}. Permissão: visualização e baixa.`}
+            </p>
           </div>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--slate-400)' }}>
-            Fluxo de carregamentos, controle de slots, exclusão e gestão de vagas
-          </p>
-        </div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
@@ -272,48 +301,58 @@ export function PainelGestao({ onVisualizarComprovante }) {
       {/* Métricas Rápidas */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: 16,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: 14,
         marginBottom: 20
       }}>
-        <div className="glass-panel" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
+        <div className="glass-panel" style={{ padding: '16px 18px' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
             Total Registrado
           </span>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#fff', marginTop: 4 }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#fff', marginTop: 4 }}>
             {agendamentos.length}
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>Carregamentos no Sistema</span>
+          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Carregamentos no Sistema</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
+        <div className="glass-panel" style={{ padding: '16px 18px', borderLeft: '4px solid #4ade80' }}>
+          <span style={{ fontSize: '0.78rem', color: '#4ade80', textTransform: 'uppercase', fontWeight: 700 }}>
             Carregamentos Hoje
           </span>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#4ade80', marginTop: 4 }}>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#4ade80', marginTop: 4 }}>
             {agendamentosHoje.length}
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>Veículos previstos para hoje</span>
+          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Previstos para a data atual</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
-            Status Confirmados
+        <div className="glass-panel" style={{ padding: '16px 18px', borderLeft: '4px solid #f59e0b' }}>
+          <span style={{ fontSize: '0.78rem', color: '#fbbf24', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Clock size={13} /> Aguardando Liberação
           </span>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>
-            {agendamentos.filter(a => a.status === 'Confirmado').length}
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>
+            {agendamentos.filter(a => a.status === 'Aguardando Liberação').length}
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>Aguardando entrada/pesagem</span>
+          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Aguardando aval do Admin</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
-            Notificações por E-mail
+        <div className="glass-panel" style={{ padding: '16px 18px', borderLeft: '4px solid #22c55e' }}>
+          <span style={{ fontSize: '0.78rem', color: '#86efac', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <CheckCircle2 size={13} /> Liberados p/ Carregar
           </span>
-          <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--info)', marginTop: 8, wordBreak: 'break-all' }}>
-            {EMAIL_NOTIFICACAO_DESTINO}
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#86efac', marginTop: 4 }}>
+            {agendamentos.filter(a => a.status === 'Liberado para Carregar' || a.status === 'Confirmado').length}
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>Disparo automático ativo</span>
+          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Aprovados para expedição</span>
+        </div>
+
+        <div className="glass-panel" style={{ padding: '16px 18px', borderLeft: '4px solid #3b82f6' }}>
+          <span style={{ fontSize: '0.78rem', color: '#93c5fd', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Truck size={13} /> Carregados
+          </span>
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#93c5fd', marginTop: 4 }}>
+            {agendamentos.filter(a => a.status === 'Carregado').length}
+          </div>
+          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Carga e pesagem concluídas</span>
         </div>
       </div>
 
@@ -332,28 +371,46 @@ export function PainelGestao({ onVisualizarComprovante }) {
             />
           </div>
 
-          <div style={{ flex: '0 1 230px' }}>
-            <select
-              className="form-select"
-              value={filtroPedreira}
-              onChange={(e) => setFiltroPedreira(e.target.value)}
-            >
-              <option value="todas">Todas as Pedreiras</option>
-              {PEDREIRAS_CEARA.map(p => (
-                <option key={p.id} value={p.nome}>{p.nome}</option>
-              ))}
-            </select>
+          <div style={{ flex: '0 1 240px' }}>
+            {isAdmin ? (
+              <select
+                className="form-select"
+                value={filtroPedreira}
+                onChange={(e) => setFiltroPedreira(e.target.value)}
+              >
+                <option value="todas">Todas as Pedreiras (Geral)</option>
+                {PEDREIRAS_CEARA.map(p => (
+                  <option key={p.id} value={p.nome}>{p.nome}</option>
+                ))}
+              </select>
+            ) : (
+              <div style={{
+                padding: '9px 14px',
+                borderRadius: 8,
+                background: 'rgba(0, 118, 44, 0.18)',
+                border: '1px solid var(--vermont-green-border)',
+                color: '#4ade80',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }} title={`Filtro travado na sua unidade: ${pedreiraOperador}`}>
+                📍 {pedreiraOperador}
+              </div>
+            )}
           </div>
 
-          <div style={{ flex: '0 1 160px' }}>
+          <div style={{ flex: '0 1 190px' }}>
             <select
               className="form-select"
               value={filtroStatus}
               onChange={(e) => setFiltroStatus(e.target.value)}
             >
               <option value="todos">Todos os Status</option>
-              <option value="Confirmado">Confirmado</option>
-              <option value="Carregado">Carregado</option>
+              <option value="Aguardando Liberação">🟡 Aguardando Liberação</option>
+              <option value="Liberado para Carregar">🟢 Liberado p/ Carregar</option>
+              <option value="Carregado">🔵 Carregado</option>
               <option value="Cancelado">Cancelado</option>
             </select>
           </div>
@@ -445,6 +502,34 @@ export function PainelGestao({ onVisualizarComprovante }) {
                         <div style={{ fontSize: '0.82rem', color: '#86efac', fontWeight: 500 }}>
                           Material: {ag.material}
                         </div>
+                        {ag.observacoes?.includes('[Carga Combinada 1/2]') && (
+                          <span className="badge" style={{
+                            background: 'rgba(56, 189, 248, 0.15)',
+                            color: '#38bdf8',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            fontSize: '0.68rem',
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            display: 'inline-block',
+                            marginTop: 4
+                          }}>
+                            🔄 Carga Combinada (1/2)
+                          </span>
+                        )}
+                        {ag.observacoes?.includes('[Carga Combinada 2/2]') && (
+                          <span className="badge" style={{
+                            background: 'rgba(168, 85, 247, 0.15)',
+                            color: '#c084fc',
+                            border: '1px solid rgba(168, 85, 247, 0.3)',
+                            fontSize: '0.68rem',
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            display: 'inline-block',
+                            marginTop: 4
+                          }}>
+                            🔄 Carga Combinada (2/2)
+                          </span>
+                        )}
                       </td>
 
                       {/* Bloco / Cliente */}
@@ -480,12 +565,47 @@ export function PainelGestao({ onVisualizarComprovante }) {
 
                       {/* Status */}
                       <td style={{ padding: '14px 16px' }}>
-                        <span className={`badge ${
-                          ag.status === 'Confirmado' ? 'badge-success' :
-                          ag.status === 'Carregado' ? 'badge-info' : 'badge-danger'
-                        }`}>
-                          {ag.status}
-                        </span>
+                        {ag.status === 'Aguardando Liberação' && (
+                          <span className="badge" style={{
+                            background: 'rgba(245, 158, 11, 0.18)',
+                            color: '#fbbf24',
+                            border: '1px solid rgba(245, 158, 11, 0.45)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5
+                          }}>
+                            <Clock size={12} /> Aguardando Liberação
+                          </span>
+                        )}
+                        {(ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
+                          <span className="badge" style={{
+                            background: 'rgba(34, 197, 94, 0.18)',
+                            color: '#4ade80',
+                            border: '1px solid rgba(74, 222, 128, 0.45)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5
+                          }}>
+                            <CheckCircle2 size={12} /> Liberado p/ Carregar
+                          </span>
+                        )}
+                        {ag.status === 'Carregado' && (
+                          <span className="badge" style={{
+                            background: 'rgba(59, 130, 246, 0.18)',
+                            color: '#60a5fa',
+                            border: '1px solid rgba(59, 130, 246, 0.45)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5
+                          }}>
+                            <Truck size={12} /> Carregado
+                          </span>
+                        )}
+                        {ag.status !== 'Aguardando Liberação' && ag.status !== 'Liberado para Carregar' && ag.status !== 'Confirmado' && ag.status !== 'Carregado' && (
+                          <span className="badge badge-danger">
+                            {ag.status}
+                          </span>
+                        )}
                         {ag.email_notificado && (
                           <div style={{ fontSize: '0.7rem', color: '#86efac', marginTop: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
                             <Mail size={11} /> Notificado
@@ -493,9 +613,9 @@ export function PainelGestao({ onVisualizarComprovante }) {
                         )}
                       </td>
 
-                      {/* Ações Administrativas com Excluir */}
+                      {/* Ações Administrativas e Operacionais */}
                       <td style={{ padding: '14px 16px' }} className="no-print">
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                           <button
                             type="button"
                             onClick={() => onVisualizarComprovante(ag)}
@@ -507,16 +627,77 @@ export function PainelGestao({ onVisualizarComprovante }) {
                             Ver
                           </button>
 
-                          {ag.status !== 'Carregado' && (
+                          {/* BOTÃO EXCLUSIVO ADMIN: LIBERAR CARREGAMENTO */}
+                          {isAdmin && ag.status === 'Aguardando Liberação' && (
+                            <button
+                              type="button"
+                              onClick={() => handleMudarStatus(ag.id, 'Liberado para Carregar')}
+                              className="btn btn-vermont glow-effect"
+                              style={{ padding: '6px 12px', fontSize: '0.78rem', fontWeight: 700, gap: 5 }}
+                              title="Validar documentação e autorizar o carregamento na pedreira"
+                            >
+                              <ShieldCheck size={15} />
+                              Liberar
+                            </button>
+                          )}
+
+                          {/* BLOQUEIO OPERACIONAL QUANDO AGUARDANDO ADMIN (Visão do Operador) */}
+                          {!isAdmin && ag.status === 'Aguardando Liberação' && (
+                            <span 
+                              style={{
+                                padding: '5px 8px',
+                                background: 'rgba(245, 158, 11, 0.12)',
+                                border: '1px solid rgba(245, 158, 11, 0.35)',
+                                borderRadius: 6,
+                                color: '#fde047',
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4
+                              }}
+                              title="Aguardando liberação do Administrador Geral para poder iniciar o carregamento"
+                            >
+                              <ShieldAlert size={12} /> Aguarda Admin
+                            </span>
+                          )}
+
+                          {/* MARCAR COMO CARREGADO: Disponível apenas se já estiver liberado */}
+                          {(ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
                             <button
                               type="button"
                               onClick={() => handleMudarStatus(ag.id, 'Carregado')}
                               className="btn btn-success"
-                              style={{ padding: '6px 10px', fontSize: '0.78rem' }}
-                              title="Marcar como Carregado"
+                              style={{ padding: '6px 10px', fontSize: '0.78rem', fontWeight: 600 }}
+                              title="Registrar que o veículo foi carregado e pesado"
                             >
-                              <CheckCircle size={14} />
+                              <Truck size={14} />
                               Carregado
+                            </button>
+                          )}
+
+                          {/* ADMIN: Opção de reverter status se necessário */}
+                          {isAdmin && (ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
+                            <button
+                              type="button"
+                              onClick={() => handleMudarStatus(ag.id, 'Aguardando Liberação')}
+                              className="btn btn-secondary"
+                              style={{ padding: '6px 8px', fontSize: '0.78rem' }}
+                              title="Reverter para Aguardando Liberação (Segurar carregamento)"
+                            >
+                              <RotateCcw size={13} color="#f59e0b" />
+                            </button>
+                          )}
+
+                          {isAdmin && ag.status === 'Carregado' && (
+                            <button
+                              type="button"
+                              onClick={() => handleMudarStatus(ag.id, 'Liberado para Carregar')}
+                              className="btn btn-secondary"
+                              style={{ padding: '6px 8px', fontSize: '0.78rem' }}
+                              title="Reabrir status para Liberado para Carregar"
+                            >
+                              <RotateCcw size={13} color="#4ade80" />
                             </button>
                           )}
 
@@ -531,17 +712,19 @@ export function PainelGestao({ onVisualizarComprovante }) {
                             <Mail size={14} color="var(--info)" />
                           </button>
 
-                          {/* BOTÃO EXCLUIR AGENDAMENTO (ADMIN) */}
-                          <button
-                            type="button"
-                            onClick={() => handleExcluir(ag)}
-                            disabled={estaExcluindo}
-                            className="btn btn-danger"
-                            style={{ padding: '6px 8px', fontSize: '0.78rem' }}
-                            title="Apagar este agendamento e liberar o horário imediatamente"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {/* BOTÃO EXCLUIR AGENDAMENTO (Exclusivo para ADMIN GERAL) */}
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleExcluir(ag)}
+                              disabled={estaExcluindo}
+                              className="btn btn-danger"
+                              style={{ padding: '6px 8px', fontSize: '0.78rem' }}
+                              title="Apagar este agendamento e liberar o horário imediatamente (Apenas Admin)"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

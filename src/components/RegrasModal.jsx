@@ -1,6 +1,6 @@
 import React from 'react';
-import { X, Clock, MapPin, Mail, Shield, Truck, FileCheck } from 'lucide-react';
-import { PEDREIRAS_CEARA, EMAIL_NOTIFICACAO_DESTINO } from '../services/agendamentoService';
+import { X, Clock, MapPin, Mail, Shield, Truck, FileCheck, AlertTriangle } from 'lucide-react';
+import { PEDREIRAS_CEARA, EMAIL_NOTIFICACAO_DESTINO, AVISO_CONFIRMACAO_CLIENTE } from '../services/agendamentoService';
 
 export function RegrasModal({ aberto, onFechar }) {
   if (!aberto) return null;
@@ -196,6 +196,28 @@ export function RegrasModal({ aberto, onFechar }) {
             <li><strong>Motorista deve possuir o curso de cargas indivisíveis;</strong></li>
             <li><strong>Laudo de inspeção de rochas ou CSV dentro da validade.</strong></li>
           </ul>
+
+          <div style={{
+            marginTop: 12,
+            padding: '10px 14px',
+            background: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
+            borderRadius: 8,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10
+          }}>
+            <AlertTriangle size={18} color="#fbbf24" style={{ flexShrink: 0, marginTop: 2 }} />
+            <div style={{ fontSize: '0.82rem', color: '#fef3c7', lineHeight: '1.45' }}>
+              <strong style={{ color: '#fde047', display: 'block', marginBottom: 2 }}>Atenção Transportador:</strong>
+              <p style={{ margin: '0 0 4px 0' }}>
+                O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte.
+              </p>
+              <p style={{ margin: 0, color: '#fde68a', fontWeight: 500, fontSize: '0.80rem' }}>
+                Essa confirmação é fundamental para evitar imprevistos, atrasos ou problemas durante o carregamento e o transporte.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Seção 5: Notificação */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Truck, Calendar, Clock, MapPin, AlertTriangle, Send, Info, Mail, FileCheck
+  Truck, Calendar, Clock, MapPin, AlertTriangle, Send, Info, Mail, FileCheck, Layers, ArrowRight
 } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
@@ -10,17 +10,25 @@ import {
   obterOcupacaoSabado, 
   obterHorariosOcupados,
   salvarAgendamento,
+  salvarAgendamentoCombinado,
   isPedreiraUruoca,
   DOCUMENTOS_OBRIGATORIOS_PEDREIRA,
-  EMAIL_NOTIFICACAO_DESTINO
+  AVISO_CONFIRMACAO_CLIENTE,
+  EMAIL_NOTIFICACAO_DESTINO,
+  obterMateriaisPorPedreira
 } from '../services/agendamentoService';
 
 export function AgendamentoForm({ onAgendamentoSucesso }) {
   const hoje = new Date().toISOString().split('T')[0];
 
+  // Modo: 'simples' (1 Bloco) ou 'combinado' (2 Blocos em pedreiras diferentes)
+  const [tipoCarregamento, setTipoCarregamento] = useState('simples');
+
+  // Ponto 1 (ou Agendamento Simples)
+  const materiaisIniciaisPonto1 = obterMateriaisPorPedreira(PEDREIRAS_CEARA[0].nome);
   const [formData, setFormData] = useState({
     pedreira: PEDREIRAS_CEARA[0].nome,
-    material: '',
+    material: materiaisIniciaisPonto1[0] || '',
     numero_bloco: '',
     cliente: '',
     transportadora: '',
@@ -40,6 +48,23 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   const [tipoDia, setTipoDia] = useState('dia_util');
   const [ocupacaoSabado, setOcupacaoSabado] = useState({ total: 0, limite: 12, disponivel: 12, lotado: false });
   const [horariosOcupados, setHorariosOcupados] = useState([]);
+
+  // Ponto 2 (para Carregamento Combinado)
+  const pedreira2Inicial = PEDREIRAS_CEARA[1]?.nome || PEDREIRAS_CEARA[0].nome;
+  const materiaisIniciaisPonto2 = obterMateriaisPorPedreira(pedreira2Inicial);
+  const [ponto2, setPonto2] = useState({
+    pedreira: pedreira2Inicial,
+    material: materiaisIniciaisPonto2[0] || '',
+    numero_bloco: '',
+    data_agendamento: hoje,
+    horario_agendamento: '13:30',
+    justificativa_outros: ''
+  });
+
+  const [tipoDia2, setTipoDia2] = useState('dia_util');
+  const [ocupacaoSabado2, setOcupacaoSabado2] = useState({ total: 0, limite: 12, disponivel: 12, lotado: false });
+  const [horariosOcupados2, setHorariosOcupados2] = useState([]);
+
   const [carregandoOcupacao, setCarregandoOcupacao] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [mensagemErro, setMensagemErro] = useState('');
@@ -72,7 +97,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     return clean;
   };
 
-  // Avalia o tipo de dia e carrega vagas de sábado ou horários ocupados
+  // Avalia o tipo de dia e carrega vagas de sábado ou horários ocupados para o PONTO 1
   useEffect(() => {
     if (!formData.data_agendamento) return;
 
@@ -85,7 +110,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       setHorariosOcupados([]);
     } else if (diaSemana === 6) {
       setTipoDia('sabado');
-      verificarVagasSabado(formData.data_agendamento);
+      verificarVagasSabado(formData.data_agendamento, formData.pedreira);
       setHorariosOcupados([]);
     } else {
       setTipoDia('dia_util');
@@ -93,9 +118,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     }
   }, [formData.data_agendamento, formData.pedreira]);
 
-  const verificarVagasSabado = async (dataStr) => {
+  const verificarVagasSabado = async (dataStr, pedreiraNome) => {
     setCarregandoOcupacao(true);
-    const dadosOcupacao = await obterOcupacaoSabado(dataStr);
+    const dadosOcupacao = await obterOcupacaoSabado(dataStr, pedreiraNome);
     setOcupacaoSabado(dadosOcupacao);
     setCarregandoOcupacao(false);
   };
@@ -114,8 +139,64 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     }
   };
 
+  // Avalia o tipo de dia e carrega vagas de sábado ou horários ocupados para o PONTO 2 (se combinado)
+  useEffect(() => {
+    if (tipoCarregamento !== 'combinado' || !ponto2.data_agendamento) return;
+
+    const [ano, mes, dia] = ponto2.data_agendamento.split('-').map(Number);
+    const dataObj = new Date(ano, mes - 1, dia);
+    const diaSemana = dataObj.getDay();
+
+    if (diaSemana === 0) {
+      setTipoDia2('domingo');
+      setHorariosOcupados2([]);
+    } else if (diaSemana === 6) {
+      setTipoDia2('sabado');
+      obterOcupacaoSabado(ponto2.data_agendamento, ponto2.pedreira).then(setOcupacaoSabado2);
+      setHorariosOcupados2([]);
+    } else {
+      setTipoDia2('dia_util');
+      obterHorariosOcupados(ponto2.data_agendamento, ponto2.pedreira).then(ocupados => {
+        setHorariosOcupados2(ocupados);
+        if (ocupados.includes(ponto2.horario_agendamento)) {
+          const primeiroLivre = HORARIOS_SEMANA.find(h => h.id !== 'outros' && !ocupados.includes(h.id));
+          if (primeiroLivre) {
+            setPonto2(prev => ({ ...prev, horario_agendamento: primeiroLivre.id }));
+          }
+        }
+      });
+    }
+  }, [tipoCarregamento, ponto2.data_agendamento, ponto2.pedreira]);
+
   const handleChange = (campo, valor) => {
     setFormData(prev => ({ ...prev, [campo]: valor }));
+    if (mensagemErro) setMensagemErro('');
+  };
+
+  const handlePedreiraChange = (novaPedreira) => {
+    const novosMateriais = obterMateriaisPorPedreira(novaPedreira);
+    const materialValido = novosMateriais.includes(formData.material);
+    setFormData(prev => ({
+      ...prev,
+      pedreira: novaPedreira,
+      material: materialValido ? prev.material : (novosMateriais[0] || '')
+    }));
+    if (mensagemErro) setMensagemErro('');
+  };
+
+  const handlePonto2Change = (campo, valor) => {
+    setPonto2(prev => ({ ...prev, [campo]: valor }));
+    if (mensagemErro) setMensagemErro('');
+  };
+
+  const handlePedreira2Change = (novaPedreira) => {
+    const novosMateriais = obterMateriaisPorPedreira(novaPedreira);
+    const materialValido = novosMateriais.includes(ponto2.material);
+    setPonto2(prev => ({
+      ...prev,
+      pedreira: novaPedreira,
+      material: materialValido ? prev.material : (novosMateriais[0] || '')
+    }));
     if (mensagemErro) setMensagemErro('');
   };
 
@@ -123,28 +204,83 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     e.preventDefault();
     setMensagemErro('');
 
+    // Validações do 1º Ponto
     if (tipoDia === 'domingo') {
-      setMensagemErro('As pedreiras não realizam carregamentos aos domingos. Por favor, selecione outra data.');
+      setMensagemErro('As pedreiras não realizam carregamentos aos domingos. Por favor, selecione outra data para o 1º carregamento.');
       return;
     }
 
     if (tipoDia === 'sabado' && !isPedreiraUruoca(formData.pedreira)) {
-      setMensagemErro('Aos sábados, o carregamento opera exclusivamente na pedreira de URUOCA - CE (TAJ MAHAL). Por favor, selecione uma data entre segunda e sexta-feira ou altere para a pedreira de Uruoca.');
+      setMensagemErro('Aos sábados, o carregamento opera exclusivamente na pedreira de URUOCA - CE (TAJ MAHAL). Por favor, selecione uma data entre segunda e sexta-feira ou altere para a pedreira de Uruoca no 1º carregamento.');
       return;
     }
 
     if (tipoDia === 'sabado' && ocupacaoSabado.lotado) {
-      setMensagemErro('O limite máximo de 12 veículos para este sábado na pedreira de Uruoca foi atingido. Escolha outra data.');
+      setMensagemErro('O limite máximo de 12 veículos para este sábado na pedreira de Uruoca foi atingido (1º carregamento). Escolha outra data.');
       return;
     }
 
     if (tipoDia === 'dia_util' && formData.horario_agendamento !== 'outros' && horariosOcupados.includes(formData.horario_agendamento)) {
-      setMensagemErro(`O horário ${formData.horario_agendamento} já foi reservado nesta pedreira. Por favor, selecione outro horário disponível.`);
+      setMensagemErro(`O horário ${formData.horario_agendamento} já foi reservado nesta pedreira (1º carregamento). Por favor, selecione outro horário disponível.`);
       return;
     }
 
-    if (!formData.material.trim()) {
-      setMensagemErro('Informe o material da pedreira.');
+    if (!formData.material || !formData.material.trim()) {
+      setMensagemErro('Selecione o material correspondente à pedreira (1º carregamento).');
+      return;
+    }
+
+    if (!formData.numero_bloco.trim()) {
+      setMensagemErro('Informe a numeração do bloco (1º carregamento).');
+      return;
+    }
+
+    // Validações do 2º Ponto (se for carga combinada)
+    if (tipoCarregamento === 'combinado') {
+      if (tipoDia2 === 'domingo') {
+        setMensagemErro('As pedreiras não realizam carregamentos aos domingos. Por favor, selecione outra data para o 2º carregamento.');
+        return;
+      }
+
+      if (tipoDia2 === 'sabado' && !isPedreiraUruoca(ponto2.pedreira)) {
+        setMensagemErro('Aos sábados, o carregamento opera exclusivamente na pedreira de URUOCA - CE (TAJ MAHAL). Por favor, selecione uma data entre segunda e sexta-feira para o 2º carregamento.');
+        return;
+      }
+
+      if (tipoDia2 === 'sabado' && ocupacaoSabado2.lotado) {
+        setMensagemErro('O limite máximo de 12 veículos para este sábado na pedreira de Uruoca foi atingido (2º carregamento). Escolha outra data.');
+        return;
+      }
+
+      if (tipoDia2 === 'dia_util' && ponto2.horario_agendamento !== 'outros' && horariosOcupados2.includes(ponto2.horario_agendamento)) {
+        setMensagemErro(`O horário ${ponto2.horario_agendamento} já foi reservado nesta pedreira (2º carregamento). Por favor, selecione outro horário disponível.`);
+        return;
+      }
+
+      if (!ponto2.material || !ponto2.material.trim()) {
+        setMensagemErro('Selecione o material do 2º carregamento.');
+        return;
+      }
+
+      if (!ponto2.numero_bloco.trim()) {
+        setMensagemErro('Informe a numeração do bloco do 2º carregamento.');
+        return;
+      }
+
+      if (
+        formData.pedreira === ponto2.pedreira &&
+        formData.data_agendamento === ponto2.data_agendamento &&
+        formData.horario_agendamento === ponto2.horario_agendamento &&
+        formData.horario_agendamento !== 'outros'
+      ) {
+        setMensagemErro('Para a mesma pedreira e mesma data, selecione horários distintos para cada um dos blocos.');
+        return;
+      }
+    }
+
+    // Validações comuns de Transporte & Motorista
+    if (!formData.cliente.trim()) {
+      setMensagemErro('Informe o nome do cliente destinatário.');
       return;
     }
 
@@ -178,49 +314,78 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return;
     }
 
-    if (!formData.numero_bloco.trim()) {
-      setMensagemErro('Informe a numeração do bloco.');
-      return;
-    }
-
-    if (!formData.cliente.trim()) {
-      setMensagemErro('Informe o nome do cliente destinatário.');
-      return;
-    }
-
     if (tipoDia === 'dia_util' && formData.horario_agendamento === 'outros' && !formData.justificativa_outros.trim()) {
-      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros".');
+      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 1º carregamento.');
+      return;
+    }
+
+    if (tipoCarregamento === 'combinado' && tipoDia2 === 'dia_util' && ponto2.horario_agendamento === 'outros' && !ponto2.justificativa_outros.trim()) {
+      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 2º carregamento.');
       return;
     }
 
     setEnviando(true);
 
-    const dadosParaSalvar = {
-      ...formData,
-      tipo_dia: tipoDia,
-      horario_agendamento: tipoDia === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : formData.horario_agendamento
-    };
+    let resultado;
 
-    const resultado = await salvarAgendamento(dadosParaSalvar);
+    if (tipoCarregamento === 'combinado') {
+      resultado = await salvarAgendamentoCombinado({
+        ponto1: {
+          pedreira: formData.pedreira,
+          material: formData.material,
+          numero_bloco: formData.numero_bloco,
+          data_agendamento: formData.data_agendamento,
+          tipo_dia: tipoDia,
+          horario_agendamento: tipoDia === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : formData.horario_agendamento,
+          justificativa_outros: formData.justificativa_outros
+        },
+        ponto2: {
+          pedreira: ponto2.pedreira,
+          material: ponto2.material,
+          numero_bloco: ponto2.numero_bloco,
+          data_agendamento: ponto2.data_agendamento,
+          tipo_dia: tipoDia2,
+          horario_agendamento: tipoDia2 === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : ponto2.horario_agendamento,
+          justificativa_outros: ponto2.justificativa_outros
+        },
+        veiculo: {
+          cliente: formData.cliente,
+          transportadora: formData.transportadora,
+          motorista_nome: formData.motorista_nome,
+          motorista_cpf: formData.motorista_cpf,
+          motorista_telefone: formData.motorista_telefone,
+          placa_cavalo: formData.placa_cavalo,
+          placa_carreta: formData.placa_carreta,
+          placa_carreta_2: formData.placa_carreta_2,
+          tipo_veiculo: formData.tipo_veiculo,
+          observacoes: formData.observacoes
+        }
+      });
+    } else {
+      const dadosParaSalvar = {
+        ...formData,
+        tipo_dia: tipoDia,
+        horario_agendamento: tipoDia === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : formData.horario_agendamento
+      };
+      resultado = await salvarAgendamento(dadosParaSalvar);
+    }
 
     setEnviando(false);
 
     if (resultado.success) {
       onAgendamentoSucesso(resultado.agendamento);
     } else {
-      setMensagemErro(resultado.error || 'Erro ao processar agendamento. Tente novamente.');
+      setMensagemErro(resultado.error || 'Ocorreu um erro ao salvar o agendamento. Tente novamente.');
     }
   };
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '16px 0' }}>
-      {/* Banner Superior Limpo e Sofisticado */}
+    <div style={{ maxWidth: 940, margin: '0 auto', padding: '10px 0 40px 0' }}>
+      
+      {/* Topo do Formulário */}
       <div className="glass-panel" style={{
-        padding: '22px 26px',
+        padding: '24px 28px',
         marginBottom: 20,
-        background: 'linear-gradient(135deg, rgba(16, 24, 20, 0.95) 0%, rgba(10, 15, 13, 0.98) 100%)',
-        border: '1px solid var(--vermont-green-border)',
-        boxShadow: 'var(--vermont-green-glow)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -258,6 +423,73 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         </div>
       </div>
 
+      {/* SELETOR: Modo de Carregamento (Simples vs Carga Combinada) */}
+      <div style={{
+        display: 'flex',
+        gap: 10,
+        marginBottom: 20,
+        background: 'rgba(20, 28, 24, 0.7)',
+        padding: 6,
+        borderRadius: 14,
+        border: '1px solid var(--vermont-green-border)'
+      }}>
+        <button
+          type="button"
+          onClick={() => {
+            setTipoCarregamento('simples');
+            setMensagemErro('');
+          }}
+          style={{
+            flex: 1,
+            padding: '12px 16px',
+            borderRadius: 10,
+            border: 'none',
+            background: tipoCarregamento === 'simples' ? 'var(--vermont-green-light)' : 'transparent',
+            color: tipoCarregamento === 'simples' ? '#000' : 'var(--slate-300)',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            fontSize: '0.94rem',
+            transition: 'all 0.2s',
+            boxShadow: tipoCarregamento === 'simples' ? '0 4px 14px rgba(74, 222, 128, 0.3)' : 'none'
+          }}
+        >
+          <Truck size={19} />
+          Carregamento Simples (1 Bloco)
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setTipoCarregamento('combinado');
+            setMensagemErro('');
+          }}
+          style={{
+            flex: 1,
+            padding: '12px 16px',
+            borderRadius: 10,
+            border: 'none',
+            background: tipoCarregamento === 'combinado' ? 'var(--vermont-green-light)' : 'transparent',
+            color: tipoCarregamento === 'combinado' ? '#000' : 'var(--slate-300)',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            fontSize: '0.94rem',
+            transition: 'all 0.2s',
+            boxShadow: tipoCarregamento === 'combinado' ? '0 4px 14px rgba(74, 222, 128, 0.3)' : 'none'
+          }}
+        >
+          <Layers size={19} />
+          Carga Combinada (2 Blocos / Pedreiras)
+        </button>
+      </div>
+
       {mensagemErro && (
         <div className="animate-fade" style={{
           background: 'var(--danger-bg)',
@@ -278,84 +510,451 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         
-        {/* BLOCO 1: Destino e Material (Campo Aberto) */}
-        <div className="glass-panel" style={{ padding: 24 }}>
+        {/* ======================================================== */}
+        {/* CASO 1: CARREGAMENTO SIMPLES (1 BLOCO)                   */}
+        {/* ======================================================== */}
+        {tipoCarregamento === 'simples' && (
+          <>
+            {/* BLOCO 1: Destino e Material */}
+            <div className="glass-panel animate-fade" style={{ padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
+                <MapPin size={20} color="var(--vermont-green-light)" />
+                <h2 style={{ fontSize: '1.15rem', margin: 0 }}>1. Localização, Material & Bloco</h2>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+                {/* Escolha da Pedreira */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Pedreira de Carregamento</label>
+                  <select
+                    className="form-select"
+                    value={formData.pedreira}
+                    onChange={(e) => handlePedreiraChange(e.target.value)}
+                    required
+                  >
+                    {PEDREIRAS_CEARA.map(p => (
+                      <option key={p.id} value={p.nome}>
+                        {p.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Material da Pedreira */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Material da Pedreira</label>
+                  <select
+                    className="form-select"
+                    value={formData.material}
+                    onChange={(e) => handleChange('material', e.target.value)}
+                    required
+                  >
+                    <option value="">Selecione o material...</option>
+                    {obterMateriaisPorPedreira(formData.pedreira).map(mat => (
+                      <option key={mat} value={mat}>
+                        {mat}
+                      </option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>
+                    Materiais oficiais disponíveis na pedreira selecionada
+                  </span>
+                </div>
+
+                {/* Numeração do Bloco */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Numeração do Bloco</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ex: VT-2026/089 ou 4512"
+                    value={formData.numero_bloco}
+                    onChange={(e) => handleChange('numero_bloco', e.target.value)}
+                    required
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* BLOCO 2: Data & Horário (Simples) */}
+            <div className="glass-panel animate-fade" style={{ padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
+                <Calendar size={20} color="var(--vermont-green-light)" />
+                <h2 style={{ fontSize: '1.15rem', margin: 0 }}>2. Data & Horário de Carregamento</h2>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+                {/* Seletor de Data */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Data do Agendamento</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    min={hoje}
+                    value={formData.data_agendamento}
+                    onChange={(e) => handleChange('data_agendamento', e.target.value)}
+                    required
+                    style={{ colorScheme: 'dark' }}
+                  />
+                </div>
+
+                {/* Horários Dia Útil */}
+                {tipoDia === 'dia_util' && (
+                  <div className="form-group animate-fade">
+                    <label className="form-label form-label-required">
+                      Horário de Carregamento
+                      {horariosOcupados.length > 0 && (
+                        <span style={{ fontSize: '0.74rem', color: '#fca5a5', fontWeight: 500, marginLeft: 6, textTransform: 'none' }}>
+                          ({horariosOcupados.length} horário{horariosOcupados.length > 1 ? 's' : ''} já reservado{horariosOcupados.length > 1 ? 's' : ''})
+                        </span>
+                      )}
+                    </label>
+                    <select
+                      className="form-select"
+                      value={formData.horario_agendamento}
+                      onChange={(e) => handleChange('horario_agendamento', e.target.value)}
+                      required
+                    >
+                      <optgroup label="Turno Manhã (07:40 às 12:00 - Intervalos de 20 min)">
+                        {HORARIOS_SEMANA.filter(h => h.turno === 'manha').map(h => {
+                          const ocupado = horariosOcupados.includes(h.id);
+                          return (
+                            <option key={h.id} value={h.id} disabled={ocupado}>
+                              {h.id} {ocupado ? '— [INDISPONÍVEL / OCUPADO]' : '— Disponível'}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                      <optgroup label="Turno Tarde (13:30 às 15:30 - Intervalos de 20 min)">
+                        {HORARIOS_SEMANA.filter(h => h.turno === 'tarde').map(h => {
+                          const ocupado = horariosOcupados.includes(h.id);
+                          return (
+                            <option key={h.id} value={h.id} disabled={ocupado}>
+                              {h.id} {ocupado ? '— [INDISPONÍVEL / OCUPADO]' : '— Disponível'}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                      <optgroup label="Opção Especial">
+                        <option value="outros">Outros (Especificar Horário / Justificativa)</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                )}
+
+                {/* Sábado Uruoca */}
+                {tipoDia === 'sabado' && isPedreiraUruoca(formData.pedreira) && (
+                  <div className="animate-fade" style={{
+                    gridColumn: '1 / -1',
+                    background: ocupacaoSabado.lotado ? 'var(--danger-bg)' : 'var(--vermont-green-subtle)',
+                    border: `1px solid ${ocupacaoSabado.lotado ? 'var(--danger-border)' : 'var(--vermont-green-border)'}`,
+                    borderRadius: 12,
+                    padding: 16
+                  }}>
+                    <strong style={{ color: ocupacaoSabado.lotado ? '#fca5a5' : '#4ade80' }}>
+                      {ocupacaoSabado.lotado ? '🚨 Limite de 12 Veículos Atingido para este Sábado' : `✅ Vagas Disponíveis para Sábado (${ocupacaoSabado.disponivel} de 12 vagas)`}
+                    </strong>
+                  </div>
+                )}
+
+                {/* Sábado Não Uruoca */}
+                {tipoDia === 'sabado' && !isPedreiraUruoca(formData.pedreira) && (
+                  <div className="animate-fade" style={{
+                    gridColumn: '1 / -1',
+                    background: 'var(--warning-bg)',
+                    border: '1px solid var(--warning-border)',
+                    borderRadius: 12,
+                    padding: 14,
+                    color: '#fef3c7'
+                  }}>
+                    A operação aos sábados é <strong>exclusiva para a pedreira de URUOCA - CE (TAJ MAHAL)</strong>. Demais pedreiras operam de segunda a sexta-feira.
+                  </div>
+                )}
+              </div>
+
+              {/* Justificativa outros */}
+              {tipoDia === 'dia_util' && formData.horario_agendamento === 'outros' && (
+                <div className="form-group animate-fade" style={{ marginTop: 16 }}>
+                  <label className="form-label form-label-required">Especificação de Horário & Justificativa (Outros)</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    placeholder="Informe o horário pretendido e a justificativa..."
+                    value={formData.justificativa_outros}
+                    onChange={(e) => handleChange('justificativa_outros', e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ======================================================== */}
+        {/* CASO 2: CARREGAMENTO COMBINADO (2 BLOCOS / PEDREIRAS)    */}
+        {/* ======================================================== */}
+        {tipoCarregamento === 'combinado' && (
+          <>
+            {/* PONTO 1 DE CARREGAMENTO */}
+            <div className="glass-panel animate-fade" style={{
+              padding: 24,
+              borderLeft: '4px solid #4ade80'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{
+                    background: '#00762c',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    width: 26,
+                    height: 26,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    fontSize: '0.85rem'
+                  }}>1</span>
+                  <h2 style={{ fontSize: '1.15rem', margin: 0, color: '#4ade80' }}>1º Ponto de Carregamento</h2>
+                </div>
+                <span className="badge badge-vermont" style={{ fontSize: '0.72rem' }}>Primeira Coleta</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+                {/* Pedreira 1 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Pedreira (1º Ponto)</label>
+                  <select
+                    className="form-select"
+                    value={formData.pedreira}
+                    onChange={(e) => handlePedreiraChange(e.target.value)}
+                    required
+                  >
+                    {PEDREIRAS_CEARA.map(p => (
+                      <option key={p.id} value={p.nome}>{p.nome}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Material 1 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Material (1º Ponto)</label>
+                  <select
+                    className="form-select"
+                    value={formData.material}
+                    onChange={(e) => handleChange('material', e.target.value)}
+                    required
+                  >
+                    <option value="">Selecione o material...</option>
+                    {obterMateriaisPorPedreira(formData.pedreira).map(mat => (
+                      <option key={mat} value={mat}>{mat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Bloco 1 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Nº do 1º Bloco</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ex: VT-1020"
+                    value={formData.numero_bloco}
+                    onChange={(e) => handleChange('numero_bloco', e.target.value)}
+                    required
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+
+                {/* Data 1 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Data (1º Ponto)</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    min={hoje}
+                    value={formData.data_agendamento}
+                    onChange={(e) => handleChange('data_agendamento', e.target.value)}
+                    required
+                    style={{ colorScheme: 'dark' }}
+                  />
+                </div>
+
+                {/* Horário 1 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Horário (1º Ponto)</label>
+                  <select
+                    className="form-select"
+                    value={formData.horario_agendamento}
+                    onChange={(e) => handleChange('horario_agendamento', e.target.value)}
+                    required
+                  >
+                    {HORARIOS_SEMANA.map(h => (
+                      <option key={h.id} value={h.id} disabled={horariosOcupados.includes(h.id)}>
+                        {h.id} {horariosOcupados.includes(h.id) ? '— [OCUPADO]' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* PONTO 2 DE CARREGAMENTO */}
+            <div className="glass-panel animate-fade" style={{
+              padding: 24,
+              borderLeft: '4px solid #38bdf8'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{
+                    background: '#0284c7',
+                    color: '#fff',
+                    borderRadius: '50%',
+                    width: 26,
+                    height: 26,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    fontSize: '0.85rem'
+                  }}>2</span>
+                  <h2 style={{ fontSize: '1.15rem', margin: 0, color: '#38bdf8' }}>2º Ponto de Carregamento</h2>
+                </div>
+                <span className="badge" style={{
+                  background: 'rgba(56, 189, 248, 0.15)',
+                  color: '#38bdf8',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  fontSize: '0.72rem'
+                }}>Segunda Coleta</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+                {/* Pedreira 2 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Pedreira (2º Ponto)</label>
+                  <select
+                    className="form-select"
+                    value={ponto2.pedreira}
+                    onChange={(e) => handlePedreira2Change(e.target.value)}
+                    required
+                  >
+                    {PEDREIRAS_CEARA.map(p => (
+                      <option key={p.id} value={p.nome}>{p.nome}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Material 2 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Material (2º Ponto)</label>
+                  <select
+                    className="form-select"
+                    value={ponto2.material}
+                    onChange={(e) => handlePonto2Change('material', e.target.value)}
+                    required
+                  >
+                    <option value="">Selecione o material...</option>
+                    {obterMateriaisPorPedreira(ponto2.pedreira).map(mat => (
+                      <option key={mat} value={mat}>{mat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Bloco 2 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Nº do 2º Bloco</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ex: VT-3040"
+                    value={ponto2.numero_bloco}
+                    onChange={(e) => handlePonto2Change('numero_bloco', e.target.value)}
+                    required
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+
+                {/* Data 2 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Data (2º Ponto)</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    min={hoje}
+                    value={ponto2.data_agendamento}
+                    onChange={(e) => handlePonto2Change('data_agendamento', e.target.value)}
+                    required
+                    style={{ colorScheme: 'dark' }}
+                  />
+                </div>
+
+                {/* Horário 2 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Horário (2º Ponto)</label>
+                  <select
+                    className="form-select"
+                    value={ponto2.horario_agendamento}
+                    onChange={(e) => handlePonto2Change('horario_agendamento', e.target.value)}
+                    required
+                  >
+                    {HORARIOS_SEMANA.map(h => (
+                      <option key={h.id} value={h.id} disabled={horariosOcupados2.includes(h.id)}>
+                        {h.id} {horariosOcupados2.includes(h.id) ? '— [OCUPADO]' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Dica de deslocamento se for na mesma data */}
+              {formData.data_agendamento === ponto2.data_agendamento && (
+                <div style={{
+                  marginTop: 14,
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  background: 'rgba(56, 189, 248, 0.08)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  fontSize: '0.8rem',
+                  color: '#93c5fd',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}>
+                  <Info size={16} style={{ flexShrink: 0 }} />
+                  <span>
+                    <strong>Deslocamento entre pedreiras:</strong> Certifique-se de prever tempo suficiente de trânsito entre o 1º horário ({formData.horario_agendamento}) e o 2º horário ({ponto2.horario_agendamento}).
+                  </span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ======================================================== */}
+        {/* BLOCO COMUM: Dados do Transporte, Veículo & Cliente       */}
+        {/* ======================================================== */}
+        <div className="glass-panel animate-fade" style={{ padding: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
-            <MapPin size={20} color="var(--vermont-green-light)" />
-            <h2 style={{ fontSize: '1.15rem', margin: 0 }}>1. Localização, Material & Bloco</h2>
+            <Truck size={20} color="var(--vermont-green-light)" />
+            <h2 style={{ fontSize: '1.15rem', margin: 0 }}>
+              {tipoCarregamento === 'combinado' ? '3. Veículo, Motorista & Cliente (Compartilhado)' : '3. Dados do Transporte & Veículo'}
+            </h2>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-            {/* Escolha da Pedreira - Nomenclatura Exata */}
-            <div className="form-group">
-              <label className="form-label form-label-required">Pedreira de Carregamento</label>
-              <select
-                className="form-select"
-                value={formData.pedreira}
-                onChange={(e) => handleChange('pedreira', e.target.value)}
-                required
-              >
-                {PEDREIRAS_CEARA.map(p => (
-                  <option key={p.id} value={p.nome}>
-                    {p.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Material da Pedreira - CAMPO ABERTO IMPUTADO */}
-            <div className="form-group">
-              <label className="form-label form-label-required">Material da Pedreira</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Digite o material da pedreira (campo livre)"
-                value={formData.material}
-                onChange={(e) => handleChange('material', e.target.value)}
-                required
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>
-                Informação aberta imputada conforme romaneio ou pedido
-              </span>
-            </div>
-
-            {/* Numeração do Bloco */}
-            <div className="form-group">
-              <label className="form-label form-label-required">Numeração do Bloco</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Ex: VT-2026/089 ou 4512"
-                value={formData.numero_bloco}
-                onChange={(e) => handleChange('numero_bloco', e.target.value)}
-                required
-                style={{ textTransform: 'uppercase' }}
-              />
-            </div>
-
-            {/* Cliente */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+            {/* Cliente Destinatário */}
             <div className="form-group">
               <label className="form-label form-label-required">Cliente / Destinatário</label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="Nome da empresa ou cliente do bloco"
+                placeholder="Nome da empresa ou cliente final"
                 value={formData.cliente}
                 onChange={(e) => handleChange('cliente', e.target.value)}
                 required
               />
             </div>
-          </div>
-        </div>
 
-        {/* BLOCO 2: Dados do Transporte & Veículo */}
-        <div className="glass-panel" style={{ padding: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
-            <Truck size={20} color="var(--vermont-green-light)" />
-            <h2 style={{ fontSize: '1.15rem', margin: 0 }}>2. Dados do Transporte & Veículo</h2>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
             {/* Nome da Transportadora */}
             <div className="form-group">
               <label className="form-label form-label-required">Nome da Transportadora</label>
@@ -444,7 +1043,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               />
             </div>
 
-            {/* Carreta (apenas se não for Truck/Bitruck) */}
+            {/* 1ª Carreta */}
             {configPlacas.exigeCarreta1 && (
               <div className="form-group animate-fade">
                 <label className="form-label form-label-required">{configPlacas.labelCarreta1}</label>
@@ -461,7 +1060,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               </div>
             )}
 
-            {/* 2ª Carreta (apenas se for Bitrem ou Rodotrem) */}
+            {/* 2ª Carreta */}
             {configPlacas.exigeCarreta2 && (
               <div className="form-group animate-fade">
                 <label className="form-label form-label-required">{configPlacas.labelCarreta2}</label>
@@ -480,196 +1079,10 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           </div>
         </div>
 
-        {/* BLOCO 3: Data e Horário com Bloqueio de Horários Utilizados */}
-        <div className="glass-panel" style={{ padding: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
-            <Calendar size={20} color="var(--vermont-green-light)" />
-            <h2 style={{ fontSize: '1.15rem', margin: 0 }}>3. Data & Horário</h2>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-            {/* Seletor de Data */}
-            <div className="form-group">
-              <label className="form-label form-label-required">Data do Agendamento</label>
-              <input
-                type="date"
-                className="form-input"
-                min={hoje}
-                value={formData.data_agendamento}
-                onChange={(e) => handleChange('data_agendamento', e.target.value)}
-                required
-                style={{ colorScheme: 'dark' }}
-              />
-            </div>
-
-            {/* Horários com Indisponibilização em Tempo Real */}
-            {tipoDia === 'dia_util' && (
-              <div className="form-group animate-fade">
-                <label className="form-label form-label-required">
-                  Horário de Carregamento
-                  {horariosOcupados.length > 0 && (
-                    <span style={{ fontSize: '0.74rem', color: '#fca5a5', fontWeight: 500, marginLeft: 6, textTransform: 'none' }}>
-                      ({horariosOcupados.length} horário{horariosOcupados.length > 1 ? 's' : ''} já reservado{horariosOcupados.length > 1 ? 's' : ''} nesta data)
-                    </span>
-                  )}
-                </label>
-                <select
-                  className="form-select"
-                  value={formData.horario_agendamento}
-                  onChange={(e) => handleChange('horario_agendamento', e.target.value)}
-                  required
-                >
-                  <optgroup label="Turno Manhã (07:40 às 12:00 - Intervalos de 20 min)">
-                    {HORARIOS_SEMANA.filter(h => h.turno === 'manha').map(h => {
-                      const ocupado = horariosOcupados.includes(h.id);
-                      return (
-                        <option key={h.id} value={h.id} disabled={ocupado}>
-                          {h.id} {ocupado ? '— [INDISPONÍVEL / OCUPADO]' : '— Disponível'}
-                        </option>
-                      );
-                    })}
-                  </optgroup>
-                  <optgroup label="Turno Tarde (13:30 às 15:30 - Intervalos de 20 min)">
-                    {HORARIOS_SEMANA.filter(h => h.turno === 'tarde').map(h => {
-                      const ocupado = horariosOcupados.includes(h.id);
-                      return (
-                        <option key={h.id} value={h.id} disabled={ocupado}>
-                          {h.id} {ocupado ? '— [INDISPONÍVEL / OCUPADO]' : '— Disponível'}
-                        </option>
-                      );
-                    })}
-                  </optgroup>
-                  <optgroup label="Opção Especial">
-                    <option value="outros">Outros (Especificar Horário / Justificativa)</option>
-                  </optgroup>
-                </select>
-
-                <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>
-                  Horários já agendados para a pedreira e data selecionadas ficam bloqueados automaticamente
-                </span>
-              </div>
-            )}
-
-            {/* Sábado: Exclusivo para Uruoca - Cota Máxima de 12 Veículos */}
-            {tipoDia === 'sabado' && isPedreiraUruoca(formData.pedreira) && (
-              <div className="form-group animate-fade" style={{ gridColumn: '1 / -1' }}>
-                <div style={{
-                  background: ocupacaoSabado.lotado ? 'var(--danger-bg)' : 'rgba(0, 118, 44, 0.1)',
-                  border: ocupacaoSabado.lotado ? '1px solid var(--danger-border)' : '1px solid var(--vermont-green-border)',
-                  padding: 16,
-                  borderRadius: 12
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Clock size={18} color={ocupacaoSabado.lotado ? '#ef4444' : '#4ade80'} />
-                      <strong style={{ color: '#fff', fontSize: '0.95rem' }}>
-                        Regra de Sábado (Uruoca): Quantidade Máxima de 12 Veículos
-                      </strong>
-                    </div>
-
-                    <span className={`badge ${ocupacaoSabado.lotado ? 'badge-danger' : 'badge-vermont'}`}>
-                      {carregandoOcupacao ? 'Consultando vagas...' : `${ocupacaoSabado.total} / 12 VAGAS UTILIZADAS`}
-                    </span>
-                  </div>
-
-                  <p style={{ margin: '4px 0 10px 0', fontSize: '0.84rem', color: 'var(--slate-300)' }}>
-                    Aos sábados não há horários fracionados: os 12 veículos cadastrados são atendidos por ordem de chegada no turno do sábado.
-                  </p>
-
-                  <div style={{
-                    width: '100%',
-                    height: 10,
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    borderRadius: 999,
-                    overflow: 'hidden'
-                  }}>
-                    <div style={{
-                      width: `${Math.min(100, (ocupacaoSabado.total / 12) * 100)}%`,
-                      height: '100%',
-                      background: ocupacaoSabado.lotado ? '#ef4444' : 'linear-gradient(90deg, #10b981 0%, #00762c 70%, #f59e0b 100%)',
-                      transition: 'width 0.4s ease'
-                    }} />
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: '0.78rem', color: 'var(--slate-400)' }}>
-                    <span>0 veículos</span>
-                    <strong style={{ color: ocupacaoSabado.disponivel <= 2 ? '#f87171' : '#4ade80' }}>
-                      {ocupacaoSabado.disponivel} vagas restantes
-                    </strong>
-                    <span>Máximo: 12</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Sábado: Bloqueado para pedreiras que NÃO sejam Uruoca */}
-            {tipoDia === 'sabado' && !isPedreiraUruoca(formData.pedreira) && (
-              <div className="animate-fade" style={{
-                gridColumn: '1 / -1',
-                background: 'var(--warning-bg)',
-                border: '1px solid var(--warning-border)',
-                borderRadius: 12,
-                padding: 16,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                color: '#fef3c7'
-              }}>
-                <AlertTriangle size={24} color="var(--warning)" style={{ flexShrink: 0 }} />
-                <div>
-                  <strong style={{ display: 'block', fontSize: '0.96rem', color: '#fbbf24' }}>
-                    Carregamento Aos Sábados Indisponível nesta Pedreira
-                  </strong>
-                  <span style={{ fontSize: '0.84rem' }}>
-                    A operação aos sábados é <strong>exclusiva para a pedreira de URUOCA - CE (TAJ MAHAL)</strong>. As pedreiras de Massapê, Sobral e São Gonçalo do Amarante operam exclusivamente de segunda a sexta-feira. Selecione uma data de segunda a sexta ou altere a pedreira para Uruoca.
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Domingo */}
-            {tipoDia === 'domingo' && (
-              <div className="animate-fade" style={{
-                gridColumn: '1 / -1',
-                background: 'var(--warning-bg)',
-                border: '1px solid var(--warning-border)',
-                borderRadius: 12,
-                padding: 16,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                color: '#fef3c7'
-              }}>
-                <AlertTriangle size={24} color="var(--warning)" style={{ flexShrink: 0 }} />
-                <div>
-                  <strong style={{ display: 'block', fontSize: '0.95rem' }}>Pedreiras Fechadas aos Domingos</strong>
-                  <span style={{ fontSize: '0.84rem' }}>
-                    Não há carregamento aos domingos. Selecione uma data de segunda a sábado.
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Campo condicional para opção "Outros" */}
-          {tipoDia === 'dia_util' && formData.horario_agendamento === 'outros' && (
-            <div className="form-group animate-fade" style={{ marginTop: 16 }}>
-              <label className="form-label form-label-required">
-                Especificação de Horário & Justificativa (Outros)
-              </label>
-              <textarea
-                className="form-textarea"
-                rows={2}
-                placeholder="Informe o horário pretendido e a justificativa para carregamento fora das janelas de 20 minutos..."
-                value={formData.justificativa_outros}
-                onChange={(e) => handleChange('justificativa_outros', e.target.value)}
-                required
-              />
-            </div>
-          )}
-
+        {/* Observações, Notificação & Documentos Obrigatórios */}
+        <div className="glass-panel animate-fade" style={{ padding: 24 }}>
           {/* Observações Gerais */}
-          <div className="form-group" style={{ marginTop: 16 }}>
+          <div className="form-group">
             <label className="form-label">Observações Adicionais (Opcional)</label>
             <textarea
               className="form-textarea"
@@ -680,7 +1093,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             />
           </div>
 
-          {/* NOVO POSICIONAMENTO: Texto de Confirmação de E-mail APÓS as Observações Adicionais */}
+          {/* Notificação por E-mail */}
           <div style={{
             marginTop: 18,
             padding: '12px 16px',
@@ -698,7 +1111,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             </span>
           </div>
 
-          {/* Card Oficial: Documentos Obrigatórios na Pedreira */}
+          {/* Documentos Obrigatórios */}
           <div style={{
             marginTop: 18,
             padding: '16px 18px',
@@ -713,7 +1126,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               </strong>
             </div>
             <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: 'var(--slate-400)' }}>
-              O motorista deverá portar e apresentar obrigatoriamente na portaria:
+              O motorista deverá portar e apresentar obrigatoriamente na portaria de cada pedreira:
             </p>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.84rem', color: '#e2e8f0', lineHeight: '1.6' }}>
               <li><strong>Obrigatório apresentação de CRLVs do cavalo e carreta atualizados;</strong></li>
@@ -721,6 +1134,31 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               <li><strong>Motorista deve possuir o curso de cargas indivisíveis;</strong></li>
               <li><strong>Laudo de inspeção de rochas ou CSV dentro da validade.</strong></li>
             </ul>
+
+            {/* Alerta Operacional: Confirmação Prévia de Blocos com Clientes */}
+            <div style={{
+              marginTop: 14,
+              padding: '12px 14px',
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.45)',
+              borderRadius: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <AlertTriangle size={20} color="#fbbf24" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '0.84rem', color: '#fef3c7', lineHeight: '1.5' }}>
+                <strong style={{ color: '#fde047', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'block', marginBottom: 4 }}>
+                  Aviso Importante ao Transportador:
+                </strong>
+                <p style={{ margin: '0 0 6px 0' }}>
+                  O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte.
+                </p>
+                <p style={{ margin: 0, color: '#fde68a', fontSize: '0.81rem', fontWeight: 500 }}>
+                  Essa confirmação é fundamental para evitar imprevistos, atrasos ou problemas durante o carregamento e o transporte.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -731,19 +1169,25 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             disabled={
               enviando || 
               tipoDia === 'domingo' || 
-              (tipoDia === 'sabado' && (!isPedreiraUruoca(formData.pedreira) || ocupacaoSabado.lotado))
+              (tipoDia === 'sabado' && (!isPedreiraUruoca(formData.pedreira) || ocupacaoSabado.lotado)) ||
+              (tipoCarregamento === 'combinado' && (
+                tipoDia2 === 'domingo' || 
+                (tipoDia2 === 'sabado' && (!isPedreiraUruoca(ponto2.pedreira) || ocupacaoSabado2.lotado))
+              ))
             }
             className="btn btn-vermont glow-effect"
-            style={{ padding: '14px 34px', fontSize: '1.05rem', minWidth: 260 }}
+            style={{ padding: '14px 34px', fontSize: '1.05rem', minWidth: 280 }}
           >
             {enviando ? (
               <>
-                <span className="spinner" /> Gravando dados...
+                <span className="spinner" /> Gravando agendamento...
               </>
             ) : (
               <>
                 <Send size={20} />
-                Confirmar Agendamento
+                {tipoCarregamento === 'combinado' 
+                  ? 'Confirmar Agendamento Combinado (2 Pedreiras)' 
+                  : 'Confirmar Agendamento de Carregamento'}
               </>
             )}
           </button>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, ShieldCheck, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export function AdminLogin({ onLoginSucesso, onVoltar }) {
   const [usuario, setUsuario] = useState('');
@@ -8,37 +9,68 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
 
-  // Credenciais padrão de administrador da Vermont Mineração
-  // Aceita 'admin', 'faturamento@vermontmineracao.com.br' ou 'vermont'
-  const handleSubmit = (e) => {
+  // Autenticação Segura via Supabase Auth
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErro('');
     setCarregando(true);
 
-    setTimeout(() => {
-      const userLimpo = usuario.trim().toLowerCase();
+    try {
+      let login = usuario.trim().toLowerCase();
+      // Remove qualquer @ se o usuário tiver digitado por hábito
+      if (login.includes('@')) {
+        login = login.split('@')[0];
+      }
+
+      // Mapeamento amigável de nomes das pedreiras e admin para login direto
+      const mapaLogins = {
+        'admin': 'admin',
+        'uruoca': 'uruoca',
+        'tajmahal': 'uruoca',
+        'negresco': 'massape.negresco',
+        'massape': 'massape.negresco',
+        'massape.negresco': 'massape.negresco',
+        'delmare': 'massape.delmare',
+        'massape.delmare': 'massape.delmare',
+        'sobral': 'jaibaras',
+        'jaibaras': 'jaibaras',
+        'serrote': 'serrote',
+        'saogoncalo': 'serrote',
+        'sao_goncalo': 'serrote',
+        'beberibe': 'beberibe'
+      };
+
+      const loginFinal = mapaLogins[login] || login;
+      const emailAutenticacao = `${loginFinal}@sistema.local`;
       const senhaLimpa = senha.trim();
 
-      const adminUserConfig = (import.meta.env.VITE_ADMIN_USER || 'admin').toLowerCase();
-      const adminPassConfig = import.meta.env.VITE_ADMIN_PASSWORD || 'vermont@2026';
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: emailAutenticacao,
+        password: senhaLimpa
+      });
 
-      const usuarioValido = userLimpo === adminUserConfig || 
-                            userLimpo === 'admin' || 
-                            userLimpo === 'vermont';
+      if (authError) {
+        setCarregando(false);
+        const msg = authError.message.toLowerCase();
+        if (msg.includes('invalid') && (msg.includes('credentials') || msg.includes('grant'))) {
+          setErro('Login ou senha incorretos. Verifique suas credenciais de acesso.');
+        } else {
+          setErro(`Falha na autenticação: ${authError.message}`);
+        }
+        return;
+      }
 
-      const senhaValida = senhaLimpa === adminPassConfig || 
-                          senhaLimpa === 'vermont@2026';
-
-      if (usuarioValido && senhaValida) {
-        sessionStorage.setItem('vermont_admin_auth', 'true');
-        sessionStorage.setItem('vermont_admin_user', userLimpo);
+      if (data?.session) {
         setCarregando(false);
         onLoginSucesso();
       } else {
         setCarregando(false);
-        setErro('Credenciais inválidas. Verifique o usuário e a senha de acesso administrativo.');
+        setErro('Sessão não estabelecida. Verifique o status da sua conta no Supabase.');
       }
-    }, 400);
+    } catch (err) {
+      setCarregando(false);
+      setErro('Erro de comunicação com o servidor de autenticação do Supabase.');
+    }
   };
 
   return (
@@ -99,11 +131,11 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
 
         <form onSubmit={handleSubmit} style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'left' }}>
           <div className="form-group">
-            <label className="form-label form-label-required">Usuário de Acesso</label>
+            <label className="form-label form-label-required">Login</label>
             <input
               type="text"
               className="form-input"
-              placeholder="Digite seu usuário"
+              placeholder="Login"
               value={usuario}
               onChange={(e) => setUsuario(e.target.value)}
               required

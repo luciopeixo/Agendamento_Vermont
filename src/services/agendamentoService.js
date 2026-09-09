@@ -26,8 +26,85 @@ export const PEDREIRAS_CEARA = [
     id: 'serrote',
     nome: 'SÃO GONÇALO DO AMARANTE - CE (SERROTE)',
     cidade: 'São Gonçalo do Amarante - CE'
+  },
+  {
+    id: 'beberibe',
+    nome: 'BEBERIBE - CE',
+    cidade: 'Beberibe - CE'
   }
 ];
+
+// Mapeamento oficial de materiais por pedreira da Vermont Mineração
+export const MATERIAIS_POR_PEDREIRA = {
+  uruoca: [
+    'Taj Mahal'
+  ],
+  massape_negresco: [
+    'Infinity Brown',
+    'Infinity Black',
+    'Negresco',
+    'Brownie',
+    'Brown Strings',
+    'Kouros',
+    'JJ Brown'
+  ],
+  massape_delmare: [
+    'Del Mare',
+    'Chateau Blanc',
+    'Breccia Viola',
+    'Evora'
+  ],
+  sobral_jaibaras: [
+    'Breccia Imperiale',
+    'Zitan',
+    'Scenario'
+  ],
+  serrote: [
+    'Blue Deep',
+    'Panettone',
+    'Roma Imperiale',
+    'Tellus Blue',
+    'Atlantic Blue',
+    'Illusion',
+    'Blue Mare',
+    'Blue Roma'
+  ],
+  beberibe: [
+    'Raffinato',
+    'Naurika',
+    'Guiness',
+    'Nouveau'
+  ]
+};
+
+/**
+ * Retorna os materiais disponíveis para a pedreira selecionada
+ */
+export function obterMateriaisPorPedreira(pedreiraOuId = '') {
+  if (!pedreiraOuId) return [];
+  const maiusc = pedreiraOuId.toUpperCase();
+  
+  if (maiusc === 'URUOCA' || maiusc.includes('URUOCA')) {
+    return MATERIAIS_POR_PEDREIRA.uruoca;
+  }
+  if (maiusc === 'MASSAPE_NEGRESCO' || maiusc.includes('NEGRESCO')) {
+    return MATERIAIS_POR_PEDREIRA.massape_negresco;
+  }
+  if (maiusc === 'MASSAPE_DELMARE' || maiusc.includes('DEL MARE') || maiusc.includes('DELMARE')) {
+    return MATERIAIS_POR_PEDREIRA.massape_delmare;
+  }
+  if (maiusc === 'SOBRAL_JAIBARAS' || maiusc.includes('JAIBARAS') || (maiusc.includes('SOBRAL') && !maiusc.includes('MASSAPÊ'))) {
+    return MATERIAIS_POR_PEDREIRA.sobral_jaibaras;
+  }
+  if (maiusc === 'SERROTE' || maiusc.includes('SERROTE') || maiusc.includes('SÃO GONÇALO') || maiusc.includes('SAO GONCALO')) {
+    return MATERIAIS_POR_PEDREIRA.serrote;
+  }
+  if (maiusc === 'BEBERIBE' || maiusc.includes('BEBERIBE')) {
+    return MATERIAIS_POR_PEDREIRA.beberibe;
+  }
+
+  return [];
+}
 
 // Horários com espaçamento de 20 minutos
 export const HORARIOS_SEMANA = [
@@ -72,7 +149,7 @@ export const TIPOS_VEICULO = [
   'Outro'
 ];
 
-export const EMAIL_NOTIFICACAO_DESTINO = 'faturamento@vermontmineracao.com.br';
+export const EMAIL_NOTIFICACAO_DESTINO = import.meta.env.VITE_EMAIL_NOTIFICACAO_DESTINO || 'faturamento@vermontmineracao.com.br';
 
 /**
  * Verifica se a pedreira é Uruoca (única que opera aos sábados)
@@ -92,6 +169,17 @@ export const DOCUMENTOS_OBRIGATORIOS_PEDREIRA = [
   'Laudo de inspeção de rochas ou CSV dentro da validade.'
 ];
 
+export const AVISO_CONFIRMACAO_CLIENTE = 'O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte. Essa confirmação é fundamental para evitar imprevistos, atrasos ou problemas durante o carregamento e o transporte.';
+
+export const STATUS_AGENDAMENTO = {
+  AGUARDANDO: 'Aguardando Liberação',
+  LIBERADO: 'Liberado para Carregar',
+  CARREGADO: 'Carregado',
+  CANCELADO: 'Cancelado'
+};
+
+
+
 /**
  * Retorna o nome amigável e resumido da pedreira para o título
  */
@@ -104,6 +192,7 @@ export function formatarNomePedreiraCurto(pedreira = '') {
   if (maiusc.includes('MASSAPÊ') || maiusc.includes('MASSAPE')) return 'Massapê';
   if (maiusc.includes('JAIBARAS') || maiusc.includes('SOBRAL')) return 'Sobral (Jaibaras)';
   if (maiusc.includes('SERROTE') || maiusc.includes('SÃO GONÇALO') || maiusc.includes('SAO GONCALO')) return 'São Gonçalo do Amarante (Serrote)';
+  if (maiusc.includes('BEBERIBE')) return 'Beberibe';
   return pedreira.split('-')[0].trim();
 }
 
@@ -126,10 +215,13 @@ export function gerarAssuntoEmail(agendamento) {
     }
   }
 
+  const isCombinado = agendamento.is_combinado || (agendamento.observacoes && agendamento.observacoes.includes('CARGA COMBINADA'));
+  const tagCombinado = isCombinado ? ' [Carga Combinada]' : '';
+
   if (isSabado) {
-    return `Agendamento - ${pedreiraCurta} - Sábado - ${dataFormatada} - ${bloco}`;
+    return `Agendamento${tagCombinado} - ${pedreiraCurta} - Sábado - ${dataFormatada} - ${bloco}`;
   }
-  return `Agendamento - ${pedreiraCurta} - ${dataFormatada} - ${bloco}`;
+  return `Agendamento${tagCombinado} - ${pedreiraCurta} - ${dataFormatada} - ${bloco}`;
 }
 
 /**
@@ -274,7 +366,11 @@ export async function listarAgendamentos(filtros = {}) {
     }
 
     if (filtros.status && filtros.status !== 'todos') {
-      query = query.eq('status', filtros.status);
+      if (filtros.status === 'Liberado para Carregar') {
+        query = query.in('status', ['Liberado para Carregar', 'Confirmado']);
+      } else {
+        query = query.eq('status', filtros.status);
+      }
     }
 
     if (filtros.data) {
@@ -346,81 +442,117 @@ export function formatarDataBR(dataStr) {
 }
 
 /**
+// Cache em memória para evitar disparos concorrentes ou em duplicidade para o mesmo agendamento
+const disparosEmAndamento = new Set();
+
+/**
  * Dispara notificação por e-mail no formato Português-BR limpo (sem underscores)
  * e com layout corporativo inspirado em vermontmineracao.com.br
+ * Executa envio único via Edge Function (com FormSubmit backend) e ativa FormSubmit frontend apenas como contingência.
  */
 export async function dispararEmailConfirmacao(agendamento) {
-  const listaPlacas = formatarPlacasExibicao(agendamento);
-  const textoPlacasEmail = listaPlacas.map(p => `${p.label}: ${p.placa}`).join(' | ');
+  if (!agendamento) return { success: false, error: 'Dados de agendamento não fornecidos.' };
 
-  const protocolo = (agendamento.id || 'VT-' + Date.now()).substring(0, 8).toUpperCase();
-  const dataFormatada = formatarDataBR(agendamento.data_agendamento);
-  const assunto = gerarAssuntoEmail(agendamento);
+  // Evitar disparo duplo concorrente para o mesmo registro
+  const chaveDisparo = agendamento.id || `${agendamento.pedreira}_${agendamento.numero_bloco}_${agendamento.data_agendamento}`;
+  if (disparosEmAndamento.has(chaveDisparo)) {
+    console.log(`Disparo de e-mail já em processamento para [${chaveDisparo}]. Ignorando duplicação.`);
+    return { success: true, deduplicado: true };
+  }
+  disparosEmAndamento.add(chaveDisparo);
 
-  // 1. Envio Direto via FormSubmit com campos em Português-BR limpos e elegantes
   try {
-    const dataHoraEnvio = new Intl.DateTimeFormat('pt-BR', {
-      dateStyle: 'full',
-      timeStyle: 'short',
-      timeZone: 'America/Fortaleza'
-    }).format(new Date());
+    const listaPlacas = formatarPlacasExibicao(agendamento);
+    const textoPlacasEmail = listaPlacas.map(p => `${p.label}: ${p.placa}`).join(' | ');
 
-    const payloadPtBr = {
-      _subject: assunto,
-      _template: 'table',
-      _captcha: 'false',
-      'Protocolo do Agendamento': `#${protocolo}`,
-      'Pedreira de Carregamento': agendamento.pedreira,
-      'Data do Carregamento': dataFormatada,
-      'Horário Agendado': `${agendamento.horario_agendamento} ${agendamento.justificativa_outros ? `(Justificativa: ${agendamento.justificativa_outros})` : ''}`,
-      'Material da Pedreira': agendamento.material,
-      'Número do Bloco': agendamento.numero_bloco,
-      'Cliente Destinatário': agendamento.cliente,
-      'Nome da Transportadora': agendamento.transportadora,
-      'Nome do Motorista': agendamento.motorista_nome,
-      'CPF do Motorista': agendamento.motorista_cpf,
-      'Telefone / WhatsApp': agendamento.motorista_telefone || 'Não informado',
-      'Tipo do Veículo': agendamento.tipo_veiculo,
-      'Placas do Veículo': textoPlacasEmail,
-      'Observações Operacionais': agendamento.observacoes || 'Nenhuma observação informada.',
-      'Documentos Exigidos': 'CRLV cavalo/carreta atualizados, CNH compatível, Curso de cargas indivisíveis e Laudo de rochas/CSV vigente.',
-      'Data e Horário de Envio': dataHoraEnvio
+    const protocolo = (agendamento.id || 'VT-' + Date.now()).substring(0, 8).toUpperCase();
+    const dataFormatada = formatarDataBR(agendamento.data_agendamento);
+    const assunto = gerarAssuntoEmail(agendamento);
+
+    let enviado = false;
+
+    // 1. Envio Principal: Edge Function do Supabase (layout corporativo HTML, backend seguro)
+    try {
+      const { data, error } = await supabase.functions.invoke('notificar-agendamento', {
+        body: { agendamento }
+      });
+      if (!error && data && data.success) {
+        enviado = true;
+      } else {
+        console.warn('Edge Function retornou erro/aviso, acionando fallback direto:', error || data);
+      }
+    } catch (eEdge) {
+      console.warn('Falha na invocação da Edge Function, ativando fallback direto:', eEdge);
+    }
+
+    // 2. Fallback de Contingência: Acionado SOMENTE se a Edge Function não tiver concluído o envio
+    if (!enviado) {
+      try {
+        const dataHoraEnvio = new Intl.DateTimeFormat('pt-BR', {
+          dateStyle: 'full',
+          timeStyle: 'short',
+          timeZone: 'America/Fortaleza'
+        }).format(new Date());
+
+        const payloadPtBr = {
+          _subject: assunto,
+          _template: 'table',
+          _captcha: 'false',
+          'Protocolo do Agendamento': `#${protocolo}`,
+          'Pedreira de Carregamento': agendamento.pedreira,
+          'Data do Carregamento': dataFormatada,
+          'Horário Agendado': `${agendamento.horario_agendamento} ${agendamento.justificativa_outros ? `(Justificativa: ${agendamento.justificativa_outros})` : ''}`,
+          'Material da Pedreira': agendamento.material,
+          'Número do Bloco': agendamento.numero_bloco,
+          'Cliente Destinatário': agendamento.cliente,
+          'Nome da Transportadora': agendamento.transportadora,
+          'Nome do Motorista': agendamento.motorista_nome,
+          'CPF do Motorista': agendamento.motorista_cpf,
+          'Telefone / WhatsApp': agendamento.motorista_telefone || 'Não informado',
+          'Tipo do Veículo': agendamento.tipo_veiculo,
+          'Placas do Veículo': textoPlacasEmail,
+          'Observações Operacionais': agendamento.observacoes || 'Nenhuma observação informada.',
+          'Documentos Exigidos': 'CRLV cavalo/carreta atualizados, CNH compatível, Curso de cargas indivisíveis e Laudo de rochas/CSV vigente.',
+          'Aviso ao Transportador': AVISO_CONFIRMACAO_CLIENTE,
+          'Data e Horário de Envio': dataHoraEnvio
+        };
+
+        const res = await fetch(`https://formsubmit.co/ajax/${EMAIL_NOTIFICACAO_DESTINO}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Origin': 'https://vermontmineracao.com.br',
+            'Referer': 'https://vermontmineracao.com.br/'
+          },
+          body: JSON.stringify(payloadPtBr)
+        });
+
+        if (res.ok) {
+          enviado = true;
+        }
+      } catch (eFs) {
+        console.warn('Alerta envio FormSubmit fallback:', eFs);
+      }
+    }
+
+    if (agendamento.id) {
+      await supabase
+        .from('agendamentos_pedreira')
+        .update({ email_notificado: true })
+        .eq('id', agendamento.id);
+    }
+
+    return {
+      success: true,
+      email: EMAIL_NOTIFICACAO_DESTINO
     };
-
-    await fetch(`https://formsubmit.co/ajax/${EMAIL_NOTIFICACAO_DESTINO}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Origin': 'https://vermontmineracao.com.br',
-        'Referer': 'https://vermontmineracao.com.br/'
-      },
-      body: JSON.stringify(payloadPtBr)
-    }).catch(e => console.warn('FormSubmit envio:', e));
-  } catch (eFs) {
-    console.warn('Alerta envio FormSubmit:', eFs);
+  } finally {
+    // Mantém trava por 4 segundos para evitar re-disparos acidentais
+    setTimeout(() => {
+      disparosEmAndamento.delete(chaveDisparo);
+    }, 4000);
   }
-
-  // 2. Envio via Edge Function do Supabase (com layout HTML de alto padrão)
-  try {
-    await supabase.functions.invoke('notificar-agendamento', {
-      body: { agendamento }
-    }).catch(e => console.warn('Alerta Edge Function:', e));
-  } catch (eEdge) {
-    console.warn('Erro Edge Function:', eEdge);
-  }
-
-  if (agendamento.id) {
-    await supabase
-      .from('agendamentos_pedreira')
-      .update({ email_notificado: true })
-      .eq('id', agendamento.id);
-  }
-
-  return {
-    success: true,
-    email: EMAIL_NOTIFICACAO_DESTINO
-  };
 }
 
 /**
@@ -474,7 +606,7 @@ export async function salvarAgendamento(dados) {
         horario_agendamento: dados.horario_agendamento,
         justificativa_outros: dados.justificativa_outros || null,
         observacoes: dados.observacoes || null,
-        status: 'Confirmado',
+        status: STATUS_AGENDAMENTO.AGUARDANDO,
         email_notificado: false
       }])
       .select()
@@ -487,6 +619,140 @@ export async function salvarAgendamento(dados) {
     return { success: true, agendamento: data };
   } catch (err) {
     console.error('Erro ao gravar agendamento:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Cria dois agendamentos vinculados para carga combinada (dois blocos em pedreiras diferentes)
+ */
+export async function salvarAgendamentoCombinado({ ponto1, ponto2, veiculo }) {
+  try {
+    // 1. Validação Ponto 1
+    if (ponto1.tipo_dia === 'sabado') {
+      if (!isPedreiraUruoca(ponto1.pedreira)) {
+        throw new Error(`[1º Carregamento] Aos sábados, o carregamento está disponível exclusivamente para a pedreira de URUOCA - CE (TAJ MAHAL).`);
+      }
+      const { lotado } = await obterOcupacaoSabado(ponto1.data_agendamento, ponto1.pedreira);
+      if (lotado) {
+        throw new Error(`[1º Carregamento] Limite máximo de 12 veículos para o sábado (${ponto1.data_agendamento}) na pedreira de Uruoca já foi atingido.`);
+      }
+    } else if (ponto1.tipo_dia === 'dia_util' && ponto1.horario_agendamento !== 'outros') {
+      const ocupados1 = await obterHorariosOcupados(ponto1.data_agendamento, ponto1.pedreira);
+      if (ocupados1.includes(ponto1.horario_agendamento)) {
+        throw new Error(`[1º Carregamento] O horário ${ponto1.horario_agendamento} já foi reservado na pedreira ${ponto1.pedreira}. Escolha outro horário.`);
+      }
+    }
+
+    // 2. Validação Ponto 2
+    if (ponto2.tipo_dia === 'sabado') {
+      if (!isPedreiraUruoca(ponto2.pedreira)) {
+        throw new Error(`[2º Carregamento] Aos sábados, o carregamento está disponível exclusivamente para a pedreira de URUOCA - CE (TAJ MAHAL).`);
+      }
+      const { lotado } = await obterOcupacaoSabado(ponto2.data_agendamento, ponto2.pedreira);
+      if (lotado) {
+        throw new Error(`[2º Carregamento] Limite máximo de 12 veículos para o sábado (${ponto2.data_agendamento}) na pedreira de Uruoca já foi atingido.`);
+      }
+    } else if (ponto2.tipo_dia === 'dia_util' && ponto2.horario_agendamento !== 'outros') {
+      const ocupados2 = await obterHorariosOcupados(ponto2.data_agendamento, ponto2.pedreira);
+      if (ocupados2.includes(ponto2.horario_agendamento)) {
+        throw new Error(`[2º Carregamento] O horário ${ponto2.horario_agendamento} já foi reservado na pedreira ${ponto2.pedreira}. Escolha outro horário.`);
+      }
+    }
+
+    const configPlacas = obterConfigPlacas(veiculo.tipo_veiculo);
+    const placaCavaloLimpa = veiculo.placa_cavalo ? veiculo.placa_cavalo.toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+    const placaCarretaLimpa = configPlacas.exigeCarreta1 && veiculo.placa_carreta
+      ? veiculo.placa_carreta.toUpperCase().replace(/[^A-Z0-9]/g, '')
+      : null;
+    const placaCarreta2Limpa = configPlacas.exigeCarreta2 && veiculo.placa_carreta_2
+      ? veiculo.placa_carreta_2.toUpperCase().replace(/[^A-Z0-9]/g, '')
+      : null;
+
+    const obsBase = veiculo.observacoes ? veiculo.observacoes.trim() : '';
+
+    // Obs cruzada para identificação pelas equipes de expedição e balança
+    const obsPonto1 = `[Carga Combinada 1/2] 2º Ponto: ${ponto2.pedreira} | Bloco: ${ponto2.numero_bloco.toUpperCase()} | Data: ${ponto2.data_agendamento} às ${ponto2.horario_agendamento}${obsBase ? ` | Obs: ${obsBase}` : ''}`;
+    const obsPonto2 = `[Carga Combinada 2/2] 1º Ponto: ${ponto1.pedreira} | Bloco: ${ponto1.numero_bloco.toUpperCase()} | Data: ${ponto1.data_agendamento} às ${ponto1.horario_agendamento}${obsBase ? ` | Obs: ${obsBase}` : ''}`;
+
+    const registro1Payload = {
+      pedreira: ponto1.pedreira,
+      material: ponto1.material.trim(),
+      numero_bloco: ponto1.numero_bloco.toUpperCase().trim(),
+      cliente: veiculo.cliente.toUpperCase().trim(),
+      transportadora: veiculo.transportadora.toUpperCase().trim(),
+      motorista_nome: veiculo.motorista_nome.toUpperCase().trim(),
+      motorista_cpf: veiculo.motorista_cpf.trim(),
+      motorista_telefone: veiculo.motorista_telefone ? veiculo.motorista_telefone.trim() : null,
+      placa_cavalo: placaCavaloLimpa,
+      placa_carreta: placaCarretaLimpa,
+      placa_carreta_2: placaCarreta2Limpa,
+      tipo_veiculo: veiculo.tipo_veiculo,
+      data_agendamento: ponto1.data_agendamento,
+      tipo_dia: ponto1.tipo_dia,
+      horario_agendamento: ponto1.horario_agendamento,
+      justificativa_outros: ponto1.justificativa_outros || null,
+      observacoes: obsPonto1,
+      status: STATUS_AGENDAMENTO.AGUARDANDO,
+      email_notificado: false
+    };
+
+    const registro2Payload = {
+      pedreira: ponto2.pedreira,
+      material: ponto2.material.trim(),
+      numero_bloco: ponto2.numero_bloco.toUpperCase().trim(),
+      cliente: veiculo.cliente.toUpperCase().trim(),
+      transportadora: veiculo.transportadora.toUpperCase().trim(),
+      motorista_nome: veiculo.motorista_nome.toUpperCase().trim(),
+      motorista_cpf: veiculo.motorista_cpf.trim(),
+      motorista_telefone: veiculo.motorista_telefone ? veiculo.motorista_telefone.trim() : null,
+      placa_cavalo: placaCavaloLimpa,
+      placa_carreta: placaCarretaLimpa,
+      placa_carreta_2: placaCarreta2Limpa,
+      tipo_veiculo: veiculo.tipo_veiculo,
+      data_agendamento: ponto2.data_agendamento,
+      tipo_dia: ponto2.tipo_dia,
+      horario_agendamento: ponto2.horario_agendamento,
+      justificativa_outros: ponto2.justificativa_outros || null,
+      observacoes: obsPonto2,
+      status: STATUS_AGENDAMENTO.AGUARDANDO,
+      email_notificado: false
+    };
+
+    const { data: data1, error: err1 } = await supabase
+      .from('agendamentos_pedreira')
+      .insert([registro1Payload])
+      .select()
+      .single();
+
+    if (err1) throw err1;
+
+    const { data: data2, error: err2 } = await supabase
+      .from('agendamentos_pedreira')
+      .insert([registro2Payload])
+      .select()
+      .single();
+
+    if (err2) throw err2;
+
+    // Disparar notificações por e-mail para ambos os agendamentos
+    await Promise.allSettled([
+      dispararEmailConfirmacao(data1),
+      dispararEmailConfirmacao(data2)
+    ]);
+
+    return {
+      success: true,
+      agendamento: {
+        ...data1,
+        is_combinado: true,
+        ponto1: data1,
+        ponto2: data2,
+        pontos: [data1, data2]
+      }
+    };
+  } catch (err) {
+    console.error('Erro ao gravar agendamento combinado:', err);
     return { success: false, error: err.message };
   }
 }

@@ -71,7 +71,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const ag = body.agendamento || body;
 
-    const emailDestino = 'faturamento@vermontmineracao.com.br';
+    const emailDestino = Deno.env.get('EMAIL_NOTIFICACAO_DESTINO') || 'faturamento@vermontmineracao.com.br';
     const protocolo = (ag.id || 'VT-' + Date.now()).substring(0, 8).toUpperCase();
     const dataFormatada = formatarDataBR(ag.data_agendamento);
     const dataHoraEnvio = obterDataHoraEnvioPTBR();
@@ -218,8 +218,15 @@ Deno.serve(async (req: Request) => {
                 </tbody>
               </table>
 
+              <!-- Alerta de Confirmação Prévia de Blocos -->
+              <div style="margin-top: 18px; padding: 12px 16px; background-color: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; border-radius: 8px; color: #92400e; font-size: 13px; line-height: 1.5;">
+                <strong style="color: #b45309; display: block; margin-bottom: 4px;">⚠️ Atenção ao Transportador:</strong>
+                O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte.<br />
+                <span style="font-size: 12px; color: #78350f; font-weight: 600;">Essa confirmação é fundamental para evitar imprevistos, atrasos ou problemas durante o carregamento e o transporte.</span>
+              </div>
+
               <!-- Data de Envio em Português-BR -->
-              <div style="margin-top: 18px; text-align: right; font-size: 12px; color: #64748b;">
+              <div style="margin-top: 14px; text-align: right; font-size: 12px; color: #64748b;">
                 🕒 <em>Enviado em ${dataHoraEnvio}</em>
               </div>
             </td>
@@ -269,6 +276,7 @@ Deno.serve(async (req: Request) => {
         'Placas do Veículo': placasTexto,
         'Observações Operacionais': ag.observacoes || 'Nenhuma observação informada.',
         'Documentos Exigidos': 'CRLV cavalo/carreta atualizados, CNH compatível, Curso de cargas indivisíveis e Laudo de rochas/CSV vigente.',
+        'Aviso ao Transportador': 'O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte. Essa confirmação é fundamental para evitar imprevistos, atrasos ou problemas durante o carregamento e o transporte.',
         'Data e Horário de Envio': dataHoraEnvio
       };
 
