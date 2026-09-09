@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, RefreshCw, Printer, CheckCircle, CheckCircle2, Clock, Truck, Mail, FileText, 
   AlertCircle, Trash2, ShieldCheck, ShieldAlert, RotateCcw, Edit3, CheckCheck, PlayCircle,
-  FileSpreadsheet, Download, History, MessageCircle
+  FileSpreadsheet, Download, History, Bell, BellRing, Volume2, VolumeX, Eye, Check, X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -12,7 +12,6 @@ import {
   dispararEmailConfirmacao,
   formatarPlacasExibicao,
   formatarDataBR,
-  abrirNotificacaoWhatsAppAdmin,
   PEDREIRAS_CEARA, 
   EMAIL_NOTIFICACAO_DESTINO,
   STATUS_AGENDAMENTO
@@ -20,6 +19,51 @@ import {
 import { ModalEditarAgendamento } from './ModalEditarAgendamento';
 import { ModalHistoricoStatus } from './ModalHistoricoStatus';
 import { ModalConfirmarStatus } from './ModalConfirmarStatus';
+
+/**
+ * Emite som harmônico suave usando a Web Audio API (sem arquivos externos)
+ */
+export function tocarAlertaSonoro() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    
+    // Tom 1 (agudo suave)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc1.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12); // A5
+
+    gain1.gain.setValueAtTime(0.01, ctx.currentTime);
+    gain1.gain.linearRampToValueAtTime(0.25, ctx.currentTime + 0.03);
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.35);
+
+    // Tom 2 (eco harmônico)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+    osc2.frequency.exponentialRampToValueAtTime(1174.66, ctx.currentTime + 0.3); // D6
+
+    gain2.gain.setValueAtTime(0.01, ctx.currentTime + 0.12);
+    gain2.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.16);
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.55);
+
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(ctx.currentTime + 0.12);
+    osc2.stop(ctx.currentTime + 0.55);
+  } catch (e) {
+    console.warn('Alerta sonoro:', e);
+  }
+}
 
 export function PainelGestao({ 
   onVisualizarComprovante,
@@ -59,6 +103,20 @@ export function PainelGestao({
   const [testandoEmail, setTestandoEmail] = useState(false);
   const [statusEmailTeste, setStatusEmailTeste] = useState(null);
 
+  // Estados do Sistema de Sino, Alertas e Auto-Atualização a cada 1 minuto (60s)
+  const [notificacoes, setNotificacoes] = useState([]);
+  const [painelNotificacoesAberto, setPainelNotificacoesAberto] = useState(false);
+  const [somAtivado, setSomAtivado] = useState(true);
+  const [desktopPermitido, setDesktopPermitido] = useState(() => {
+    return typeof Notification !== 'undefined' && Notification.permission === 'granted';
+  });
+  const [bannerAlerta, setBannerAlerta] = useState(null);
+  const [segundosRestantes, setSegundosRestantes] = useState(60);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState(new Date());
+
+  const statusAnterioresMapRef = useRef(new Map());
+  const isPrimeiraCargaRef = useRef(true);
+
   // Estado para o modal de edição de agendamento e modal de histórico
   const [agendamentoParaEditar, setAgendamentoParaEditar] = useState(null);
   const [agendamentoParaHistorico, setAgendamentoParaHistorico] = useState(null);
@@ -67,20 +125,115 @@ export function PainelGestao({
   const [mudancaStatusPendente, setMudancaStatusPendente] = useState(null); // { agendamento, novoStatus }
   const [processandoMudancaStatus, setProcessandoMudancaStatus] = useState(false);
 
-  const carregarDados = async () => {
-    setCarregando(true);
-    const lista = await listarAgendamentos({
-      pedreira: filtroPedreira,
-      status: filtroStatus,
-      data: filtroData || null
-    });
-    setAgendamentos(lista);
-    setCarregando(false);
+  // Solicita permissão para notificações na área de trabalho do navegador
+  const solicitarPermissaoDesktop = async () => {
+    if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+      try {
+        const perm = await Notification.requestPermission();
+        setDesktopPermitido(perm === 'granted');
+      } catch (e) {}
+    }
   };
 
+  /**
+   * Consulta os dados (com suporte a silent refresh sem congelar a tela)
+   */
+  const carregarDados = async (isManual = true) => {
+    if (isManual) setCarregando(true);
+    try {
+      const lista = await listarAgendamentos({
+        pedreira: filtroPedreira,
+        status: filtroStatus,
+        data: filtroData || null
+      });
+
+      const mapaAnterior = statusAnterioresMapRef.current;
+      const novosCarregamentos = [];
+
+      lista.forEach(ag => {
+        const statusAntigo = mapaAnterior.get(ag.id);
+        // Se mudou para 'Carregando' em relação à checagem anterior:
+        if (!isPrimeiraCargaRef.current && statusAntigo && statusAntigo !== 'Carregando' && ag.status === 'Carregando') {
+          novosCarregamentos.push(ag);
+        }
+        mapaAnterior.set(ag.id, ag.status);
+      });
+
+      if (isPrimeiraCargaRef.current) {
+        isPrimeiraCargaRef.current = false;
+      }
+
+      // Dispara alerta se algum veículo entrou em Carregando
+      if (novosCarregamentos.length > 0) {
+        if (somAtivado) {
+          tocarAlertaSonoro();
+        }
+
+        novosCarregamentos.forEach(ag => {
+          const novaNotif = {
+            id: `notif_${Date.now()}_${ag.id}`,
+            tipo: 'carregando',
+            titulo: '🚨 Início de Carregamento!',
+            mensagem: `Bloco ${ag.numero_bloco} (${ag.material}) entrou em carregamento na pedreira ${ag.pedreira}. Motorista: ${ag.motorista_nome || 'Não informado'} (Placa: ${ag.placa_cavalo || '-'})`,
+            agendamento: ag,
+            dataHora: new Date(),
+            lida: false
+          };
+
+          setNotificacoes(prev => [novaNotif, ...prev]);
+          setBannerAlerta(novaNotif);
+          setTimeout(() => setBannerAlerta(null), 10000);
+
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            try {
+              new Notification('🚨 Vermont Mineração - Carregamento Iniciado', {
+                body: `Bloco ${ag.numero_bloco} em ${ag.pedreira}. Motorista: ${ag.motorista_nome}`,
+                icon: '/favicon.ico'
+              });
+            } catch (e) {}
+          }
+        });
+      }
+
+      setAgendamentos(lista);
+      setUltimaAtualizacao(new Date());
+      setSegundosRestantes(60);
+    } catch (err) {
+      console.error('Erro ao consultar agendamentos:', err);
+    } finally {
+      if (isManual) setCarregando(false);
+    }
+  };
+
+  // Carrega ao mudar filtros
   useEffect(() => {
-    carregarDados();
+    carregarDados(true);
   }, [filtroPedreira, filtroStatus, filtroData]);
+
+  // Intervalo de Auto-Atualização a cada 1 minuto (60 segundos) com contador em tempo real
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSegundosRestantes(prev => {
+        if (prev <= 1) {
+          carregarDados(false);
+          return 60;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [filtroPedreira, filtroStatus, filtroData, somAtivado]);
+
+  const notificacoesNaoLidas = notificacoes.filter(n => !n.lida);
+
+  const marcarTodasLidas = () => {
+    setNotificacoes(prev => prev.map(n => ({ ...n, lida: true })));
+  };
+
+  const limparNotificacoes = () => {
+    setNotificacoes([]);
+  };
 
   const handleExportarExcel = () => {
     if (agendamentosFiltrados.length === 0) {
@@ -371,7 +524,147 @@ export function PainelGestao({
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          
+          {/* Sino de Notificações / Alertas */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => {
+                setPainelNotificacoesAberto(!painelNotificacoesAberto);
+                solicitarPermissaoDesktop();
+              }}
+              className="btn btn-secondary"
+              style={{
+                padding: '9px 14px',
+                fontWeight: 600,
+                gap: 6,
+                position: 'relative',
+                background: notificacoesNaoLidas.length > 0 ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                borderColor: notificacoesNaoLidas.length > 0 ? '#38bdf8' : 'rgba(255, 255, 255, 0.12)',
+                color: notificacoesNaoLidas.length > 0 ? '#38bdf8' : 'var(--slate-300)'
+              }}
+              title="Central de Notificações e Alertas em Tempo Real"
+            >
+              {notificacoesNaoLidas.length > 0 ? <BellRing size={18} /> : <Bell size={18} />}
+              <span>Alertas</span>
+              {notificacoesNaoLidas.length > 0 && (
+                <span style={{
+                  background: '#ef4444',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  width: 18,
+                  height: 18,
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: 2
+                }}>
+                  {notificacoesNaoLidas.length}
+                </span>
+              )}
+            </button>
+
+            {/* Dropdown Menu do Sino de Notificações */}
+            {painelNotificacoesAberto && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 8px)',
+                right: 0,
+                zIndex: 500,
+                width: 360,
+                maxWidth: '90vw',
+                background: '#0e1613',
+                border: '1px solid var(--vermont-green-border)',
+                borderRadius: 12,
+                boxShadow: '0 20px 50px rgba(0,0,0,0.85), var(--vermont-green-glow)',
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: 8 }}>
+                  <strong style={{ fontSize: '0.9rem', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Bell size={16} color="#38bdf8" /> Central de Alertas ({notificacoes.length})
+                  </strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      onClick={() => setSomAtivado(!somAtivado)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: somAtivado ? '#4ade80' : 'var(--slate-500)',
+                        cursor: 'pointer',
+                        padding: 4
+                      }}
+                      title={somAtivado ? 'Som de alerta ativado (Clique para silenciar)' : 'Som de alerta silenciado (Clique para ativar)'}
+                    >
+                      {somAtivado ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                    </button>
+                    {notificacoes.length > 0 && (
+                      <button
+                        onClick={marcarTodasLidas}
+                        style={{ background: 'transparent', border: 'none', color: '#38bdf8', fontSize: '0.74rem', cursor: 'pointer' }}
+                      >
+                        Marcar lidas
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Lista de Notificações */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
+                  {notificacoes.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--slate-400)', fontSize: '0.8rem' }}>
+                      Nenhum alerta recente. O sistema avisará automaticamente aqui sempre que um novo veículo entrar em carregamento.
+                    </div>
+                  ) : (
+                    notificacoes.map(n => (
+                      <div key={n.id} style={{
+                        background: n.lida ? 'rgba(255, 255, 255, 0.02)' : 'rgba(56, 189, 248, 0.08)',
+                        border: n.lida ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid rgba(56, 189, 248, 0.3)',
+                        borderRadius: 8,
+                        padding: '10px 12px',
+                        fontSize: '0.78rem'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <strong style={{ color: '#38bdf8' }}>{n.titulo}</strong>
+                          <span style={{ color: 'var(--slate-400)', fontSize: '0.7rem' }}>
+                            {n.dataHora.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p style={{ margin: '0 0 6px 0', color: '#e2e8f0', lineHeight: '1.3' }}>{n.mensagem}</p>
+                        {n.agendamento && (
+                          <button
+                            onClick={() => {
+                              onVisualizarComprovante(n.agendamento);
+                              setPainelNotificacoesAberto(false);
+                            }}
+                            style={{ background: 'transparent', border: 'none', color: '#86efac', fontSize: '0.72rem', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                          >
+                            Ver Comprovante
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {notificacoes.length > 0 && (
+                  <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={limparNotificacoes}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--slate-400)', fontSize: '0.74rem', cursor: 'pointer' }}
+                    >
+                      Limpar histórico
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={handleExportarExcel}
             className="btn btn-secondary"
@@ -381,6 +674,7 @@ export function PainelGestao({
             <FileSpreadsheet size={18} />
             Exportar Excel
           </button>
+
           <button
             onClick={() => window.print()}
             className="btn btn-secondary"
@@ -390,17 +684,104 @@ export function PainelGestao({
             <Printer size={18} />
             Imprimir Relatório
           </button>
+
+          {/* Indicador de Auto-Atualização a cada 1 minuto */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            background: 'rgba(0, 0, 0, 0.35)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: 8,
+            padding: '8px 12px',
+            fontSize: '0.76rem',
+            color: 'var(--slate-300)'
+          }}>
+            <span style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: '#22c55e',
+              boxShadow: '0 0 8px #22c55e'
+            }} />
+            <span>Atualiza em <strong>{segundosRestantes}s</strong></span>
+          </div>
+
           <button
-            onClick={carregarDados}
+            onClick={() => carregarDados(true)}
             className="btn btn-vermont"
             disabled={carregando}
             style={{ padding: '9px 18px', fontWeight: 600, gap: 8 }}
+            title="Atualizar lista de carregamentos agora"
           >
             <RefreshCw size={18} className={carregando ? 'spin' : ''} />
             Atualizar
           </button>
         </div>
       </div>
+
+      {/* Banner Flutuante de Alerta Imediato para Novos Carregamentos */}
+      {bannerAlerta && (
+        <div className="animate-fade no-print" style={{
+          position: 'fixed',
+          top: 24,
+          right: 24,
+          zIndex: 1000,
+          maxWidth: 420,
+          background: '#0d1914',
+          border: '2px solid #38bdf8',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.85), 0 0 25px rgba(56, 189, 248, 0.35)',
+          borderRadius: 12,
+          padding: '16px 18px',
+          color: '#fff',
+          display: 'flex',
+          gap: 12,
+          alignItems: 'flex-start'
+        }}>
+          <div style={{
+            width: 38,
+            height: 38,
+            borderRadius: '50%',
+            background: 'rgba(56, 189, 248, 0.2)',
+            border: '1px solid #38bdf8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#38bdf8',
+            flexShrink: 0
+          }}>
+            <BellRing size={20} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 4 }}>
+              <strong style={{ fontSize: '0.95rem', color: '#38bdf8' }}>{bannerAlerta.titulo}</strong>
+              <button
+                onClick={() => setBannerAlerta(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--slate-400)', cursor: 'pointer', padding: 2 }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: '#e2e8f0', lineHeight: '1.4' }}>
+              {bannerAlerta.mensagem}
+            </p>
+            {bannerAlerta.agendamento && (
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button
+                  onClick={() => {
+                    onVisualizarComprovante(bannerAlerta.agendamento);
+                    setBannerAlerta(null);
+                  }}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.75rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+                >
+                  Ver Agendamento
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {mensagemAviso && (
         <div className="animate-fade no-print" style={{
@@ -1005,16 +1386,6 @@ export function PainelGestao({
                             title="Reenviar e-mail de notificação para a logística"
                           >
                             <Mail size={14} color="var(--info)" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => abrirNotificacaoWhatsAppAdmin(ag, usuarioInfo)}
-                            className="btn btn-secondary"
-                            style={{ padding: '6px 8px', fontSize: '0.78rem', color: '#4ade80', borderColor: 'rgba(74, 222, 128, 0.35)' }}
-                            title="Disparar/Testar Notificação no WhatsApp do Admin"
-                          >
-                            <MessageCircle size={14} />
                           </button>
 
                           {/* BOTÃO EXCLUIR AGENDAMENTO (Exclusivo para ADMIN GERAL) */}

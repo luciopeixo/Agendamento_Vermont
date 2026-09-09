@@ -126,7 +126,7 @@ export function ModalConfirmarStatus({
       case 'Finalizado':
         return 'Ao confirmar como Finalizado, você valida que o bloco foi carregado no veículo e a operação física na pedreira foi concluída.';
       case 'Carregando':
-        return 'Ao confirmar como Carregando, o sistema indicará em tempo real que o veículo já está posicionado e em processo de carregamento.';
+        return 'Ao confirmar como Carregando, o sistema indicará em tempo real que o veículo já está posicionado e em processo de carregamento, emitindo alerta para a administração.';
       case 'Liberado para Carregar':
         return 'Ao confirmar como Liberado para Carregar, a pedreira autoriza o motorista a entrar e iniciar o procedimento.';
       case 'Aguardando Liberação':
@@ -138,21 +138,8 @@ export function ModalConfirmarStatus({
     }
   };
 
+  const isCancelamento = novoStatus === 'Cancelado';
   const isCarregando = novoStatus === 'Carregando';
-  const [enviarWhats, setEnviarWhats] = useState(true);
-  const [telefoneWhats, setTelefoneWhats] = useState(WHATSAPP_ADMIN_PADRAO || '');
-  const [mostrarPreviewWhats, setMostrarPreviewWhats] = useState(false);
-
-  const handleTestarWhatsAgora = () => {
-    abrirNotificacaoWhatsAppAdmin(agendamento, usuarioInfo, telefoneWhats);
-  };
-
-  const handleConfirmarComWhats = () => {
-    if (isCarregando && enviarWhats) {
-      abrirNotificacaoWhatsAppAdmin(agendamento, usuarioInfo, telefoneWhats);
-    }
-    onConfirmar();
-  };
 
   return (
     <div style={{
@@ -173,10 +160,10 @@ export function ModalConfirmarStatus({
         className="glass-panel animate-fade"
         style={{
           width: '100%',
-          maxWidth: isCarregando ? 620 : 560,
+          maxWidth: 560,
           background: '#0d1411',
-          border: isCancelamento ? '1px solid rgba(239, 68, 68, 0.5)' : isCarregando ? '1px solid rgba(34, 197, 94, 0.45)' : '1px solid rgba(245, 158, 11, 0.45)',
-          boxShadow: isCancelamento ? '0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(239, 68, 68, 0.2)' : isCarregando ? '0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(34, 197, 94, 0.2)' : '0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(245, 158, 11, 0.2)',
+          border: isCancelamento ? '1px solid rgba(239, 68, 68, 0.5)' : isCarregando ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid rgba(245, 158, 11, 0.45)',
+          boxShadow: isCancelamento ? '0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(239, 68, 68, 0.2)' : isCarregando ? '0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(56, 189, 248, 0.25)' : '0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(245, 158, 11, 0.2)',
           borderRadius: 16,
           overflow: 'hidden'
         }}
@@ -184,7 +171,7 @@ export function ModalConfirmarStatus({
         {/* Cabeçalho de Atenção */}
         <div style={{
           padding: '18px 24px',
-          background: isCancelamento ? 'rgba(239, 68, 68, 0.12)' : isCarregando ? 'rgba(0, 118, 44, 0.15)' : 'rgba(245, 158, 11, 0.12)',
+          background: isCancelamento ? 'rgba(239, 68, 68, 0.12)' : isCarregando ? 'rgba(56, 189, 248, 0.12)' : 'rgba(245, 158, 11, 0.12)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           alignItems: 'center',
@@ -195,9 +182,9 @@ export function ModalConfirmarStatus({
               width: 42,
               height: 42,
               borderRadius: 10,
-              background: isCancelamento ? 'rgba(239, 68, 68, 0.2)' : isCarregando ? 'rgba(0, 118, 44, 0.25)' : 'rgba(245, 158, 11, 0.2)',
-              border: isCancelamento ? '1px solid rgba(239, 68, 68, 0.5)' : isCarregando ? '1px solid #009e3b' : '1px solid rgba(245, 158, 11, 0.5)',
-              color: isCancelamento ? '#f87171' : isCarregando ? '#4ade80' : '#fbbf24',
+              background: isCancelamento ? 'rgba(239, 68, 68, 0.2)' : isCarregando ? 'rgba(56, 189, 248, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+              border: isCancelamento ? '1px solid rgba(239, 68, 68, 0.5)' : isCarregando ? '1px solid rgba(56, 189, 248, 0.5)' : '1px solid rgba(245, 158, 11, 0.5)',
+              color: isCancelamento ? '#f87171' : isCarregando ? '#38bdf8' : '#fbbf24',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -209,7 +196,7 @@ export function ModalConfirmarStatus({
                 {isCarregando ? 'Confirmar Início de Carregamento' : 'Atenção: Confirmar Alteração de Status'}
               </h3>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--slate-400)' }}>
-                {isCarregando ? 'Inicia o processo operacional e notifica a administração' : 'Certifique-se antes de atualizar o status operacional'}
+                {isCarregando ? 'Atualiza a operação em tempo real no painel' : 'Certifique-se antes de atualizar o status operacional'}
               </p>
             </div>
           </div>
@@ -298,102 +285,20 @@ export function ModalConfirmarStatus({
             </div>
           </div>
 
-          {/* Módulo Especial: Notificação WhatsApp para Status CARREGANDO */}
-          {isCarregando && (
-            <div style={{
-              background: 'rgba(34, 197, 94, 0.08)',
-              border: '1px solid rgba(34, 197, 94, 0.35)',
-              borderRadius: 10,
-              padding: '14px 16px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: '#86efac', fontWeight: 700, fontSize: '0.88rem' }}>
-                  <input
-                    type="checkbox"
-                    checked={enviarWhats}
-                    onChange={(e) => setEnviarWhats(e.target.checked)}
-                    style={{ width: 17, height: 17, accentColor: '#009e3b' }}
-                  />
-                  <span>📱 Enviar Notificação WhatsApp para Administração</span>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setMostrarPreviewWhats(!mostrarPreviewWhats)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#38bdf8',
-                    cursor: 'pointer',
-                    fontSize: '0.78rem',
-                    textDecoration: 'underline'
-                  }}
-                >
-                  {mostrarPreviewWhats ? 'Ocultar Texto' : 'Ver Mensagem Formatada'}
-                </button>
-              </div>
-
-              {enviarWhats && (
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: 200 }}>
-                    <input
-                      type="text"
-                      placeholder="WhatsApp do Admin (ex: 85999999999 ou deixe vazio p/ escolher contato)"
-                      value={telefoneWhats}
-                      onChange={(e) => setTelefoneWhats(e.target.value)}
-                      className="form-input"
-                      style={{ padding: '6px 12px', fontSize: '0.82rem', height: 'auto' }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleTestarWhatsAgora}
-                    className="btn btn-success"
-                    style={{ padding: '6px 14px', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                  >
-                    <Send size={14} /> Testar Envio Agora
-                  </button>
-                </div>
-              )}
-
-              {mostrarPreviewWhats && (
-                <pre style={{
-                  background: 'rgba(0, 0, 0, 0.6)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: 8,
-                  padding: 12,
-                  fontSize: '0.74rem',
-                  color: '#e2e8f0',
-                  whiteSpace: 'pre-wrap',
-                  maxHeight: 150,
-                  overflowY: 'auto',
-                  margin: 0,
-                  fontFamily: 'monospace'
-                }}>
-                  {gerarMensagemWhatsAppCarregando(agendamento, usuarioInfo)}
-                </pre>
-              )}
-            </div>
-          )}
-
           {/* Mensagem Explicativa de Impacto */}
-          {!isCarregando && (
-            <div style={{
-              background: isCancelamento ? 'rgba(239, 68, 68, 0.08)' : 'rgba(56, 189, 248, 0.08)',
-              border: isCancelamento ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(56, 189, 248, 0.25)',
-              borderRadius: 10,
-              padding: '12px 16px',
-              fontSize: '0.84rem',
-              color: '#e2e8f0',
-              lineHeight: 1.4
-            }}>
-              <p style={{ margin: 0 }}>
-                {getExplicacaoStatus(novoStatus)}
-              </p>
-            </div>
-          )}
+          <div style={{
+            background: isCancelamento ? 'rgba(239, 68, 68, 0.08)' : isCarregando ? 'rgba(56, 189, 248, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+            border: isCancelamento ? '1px solid rgba(239, 68, 68, 0.25)' : isCarregando ? '1px solid rgba(56, 189, 248, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)',
+            borderRadius: 10,
+            padding: '12px 16px',
+            fontSize: '0.84rem',
+            color: '#e2e8f0',
+            lineHeight: 1.4
+          }}>
+            <p style={{ margin: 0 }}>
+              {getExplicacaoStatus(novoStatus)}
+            </p>
+          </div>
 
           {/* Trilha de Auditoria Informada */}
           <div style={{
@@ -433,9 +338,9 @@ export function ModalConfirmarStatus({
 
             <button
               type="button"
-              onClick={handleConfirmarComWhats}
+              onClick={onConfirmar}
               disabled={processando}
-              className={`btn ${isCancelamento ? 'btn-danger' : 'btn-vermont'}`}
+              className={`btn ${isCancelamento ? 'btn-danger' : isCarregando ? 'btn-vermont' : 'btn-vermont'}`}
               style={{
                 padding: '10px 24px',
                 fontSize: '0.88rem',
