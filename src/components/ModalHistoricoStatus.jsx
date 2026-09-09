@@ -27,7 +27,7 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
         return { bg: 'rgba(245, 158, 11, 0.18)', border: 'rgba(245, 158, 11, 0.45)', text: '#fbbf24', dot: '#f59e0b' };
       case 'Liberado para Carregar':
       case 'Confirmado':
-        return { bg: 'rgba(34, 197, 94, 0.18)', border: 'rgba(74, 222, 128, 0.45)', text: '#4ade80', dot: '#22c55e' };
+        return { bg: 'rgba(168, 85, 247, 0.18)', border: 'rgba(192, 132, 252, 0.45)', text: '#c084fc', dot: '#a855f7' };
       case 'Carregando':
         return { bg: 'rgba(56, 189, 248, 0.18)', border: 'rgba(56, 189, 248, 0.45)', text: '#38bdf8', dot: '#0284c7' };
       case 'Finalizado':

@@ -39,9 +39,9 @@ export function ModalConfirmarStatus({
       case 'Confirmado':
         return (
           <span style={{
-            background: 'rgba(34, 197, 94, 0.2)',
-            border: '1px solid rgba(74, 222, 128, 0.5)',
-            color: '#4ade80',
+            background: 'rgba(168, 85, 247, 0.2)',
+            border: '1px solid rgba(192, 132, 252, 0.5)',
+            color: '#c084fc',
             padding: '6px 12px',
             borderRadius: 8,
             fontSize: '0.85rem',

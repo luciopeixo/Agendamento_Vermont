@@ -261,7 +261,7 @@ export function ModalEditarAgendamento({
                   className="form-select"
                   value={formData.status}
                   onChange={(e) => handleChange('status', e.target.value)}
-                  style={{ fontWeight: 700, color: formData.status === 'Finalizado' ? '#4ade80' : formData.status === 'Carregando' ? '#60a5fa' : formData.status === 'Liberado para Carregar' ? '#86efac' : '#fbbf24' }}
+                  style={{ fontWeight: 700, color: formData.status === 'Finalizado' ? '#34d399' : formData.status === 'Carregando' ? '#38bdf8' : formData.status === 'Liberado para Carregar' ? '#c084fc' : formData.status === 'Cancelado' ? '#f87171' : '#fbbf24' }}
                 >
                   {isAdmin ? (
                     <option value="Aguardando Liberação">🟡 Aguardando Liberação</option>
@@ -270,10 +270,10 @@ export function ModalEditarAgendamento({
                       <option value="Aguardando Liberação" disabled>🟡 Aguardando Liberação (Status Atual - Bloqueado p/ Reatribuir)</option>
                     )
                   )}
-                  <option value="Liberado para Carregar">🟢 Liberado para Carregar</option>
+                  <option value="Liberado para Carregar">🟣 Liberado para Carregar</option>
                   <option value="Carregando">🔵 Carregando</option>
-                  <option value="Finalizado">✅ Finalizado</option>
-                  <option value="Cancelado">❌ Cancelado</option>
+                  <option value="Finalizado">🟢 Finalizado</option>
+                  <option value="Cancelado">🔴 Cancelado</option>
                 </select>
                 {!isAdmin && (
                   <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)', marginTop: 2 }}>

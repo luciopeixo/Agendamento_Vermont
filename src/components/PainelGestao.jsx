@@ -886,11 +886,11 @@ export function PainelGestao({
           <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Aguardando aval</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #22c55e' }}>
-          <span style={{ fontSize: '0.74rem', color: '#86efac', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #a855f7' }}>
+          <span style={{ fontSize: '0.74rem', color: '#c084fc', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
             <CheckCircle2 size={13} /> Liberados p/ Carregar
           </span>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#86efac', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#c084fc', marginTop: 4 }}>
             {agendamentos.filter(a => a.status === 'Liberado para Carregar' || a.status === 'Confirmado').length}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Aprovados p/ pátio</span>
@@ -970,7 +970,7 @@ export function PainelGestao({
             >
               <option value="todos">Todos os Status</option>
               <option value="Aguardando Liberação">🟡 Aguardando Liberação</option>
-              <option value="Liberado para Carregar">🟢 Liberados p/ Carregar</option>
+              <option value="Liberado para Carregar">🟣 Liberados p/ Carregar</option>
               <option value="Carregando">🔵 Carregando</option>
               <option value="Finalizado">✅ Finalizados</option>
               <option value="Cancelado">❌ Cancelados</option>
@@ -1184,9 +1184,9 @@ export function PainelGestao({
                         )}
                         {(ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
                           <span className="badge" style={{
-                            background: 'rgba(34, 197, 94, 0.18)',
-                            color: '#4ade80',
-                            border: '1px solid rgba(74, 222, 128, 0.45)',
+                            background: 'rgba(168, 85, 247, 0.18)',
+                            color: '#c084fc',
+                            border: '1px solid rgba(192, 132, 252, 0.45)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 5,
@@ -1268,8 +1268,8 @@ export function PainelGestao({
                                   🟡 Aguardando Liberação
                                 </option>
                               )}
-                              <option value="Liberado para Carregar" style={{ background: '#111915', color: '#4ade80' }}>
-                                🟢 Liberado p/ Carregar
+                              <option value="Liberado para Carregar" style={{ background: '#111915', color: '#c084fc' }}>
+                                🟣 Liberado p/ Carregar
                               </option>
                               <option value="Carregando" style={{ background: '#111915', color: '#38bdf8' }}>
                                 🔵 Carregando
