@@ -334,6 +334,114 @@ export function salvarAgendamentoLocal(registro) {
 }
 
 /**
+ * Rótulos amigáveis para campos auditados
+ */
+export const ROTULOS_CAMPOS_AUDITORIA = {
+  numero_bloco: 'Nº do Bloco',
+  tipo_veiculo: 'Tipo de Veículo',
+  pedreira: 'Pedreira',
+  material: 'Material',
+  cliente: 'Cliente',
+  transportadora: 'Transportadora',
+  motorista_nome: 'Motorista',
+  motorista_cpf: 'CPF do Motorista',
+  motorista_telefone: 'WhatsApp / Telefone',
+  placa_cavalo: 'Placa Cavalo',
+  placa_carreta: 'Placa Carreta',
+  placa_carreta_2: 'Placa 2ª Carreta',
+  data_agendamento: 'Data do Agendamento',
+  horario_agendamento: 'Horário Agendado',
+  observacoes: 'Observações / Balança',
+  justificativa_outros: 'Justificativa Horário'
+};
+
+/**
+ * Detecta alterações entre o agendamento atual e o novo objeto editado
+ */
+export function detectarAlteracoesCampos(itemAtual = {}, itemNovo = {}) {
+  const alteracoes = [];
+  
+  for (const [campo, label] of Object.entries(ROTULOS_CAMPOS_AUDITORIA)) {
+    let valorAntigo = itemAtual[campo] !== undefined && itemAtual[campo] !== null ? String(itemAtual[campo]).trim() : '';
+    let valorNovo = itemNovo[campo] !== undefined && itemNovo[campo] !== null ? String(itemNovo[campo]).trim() : '';
+
+    if (campo === 'data_agendamento') {
+      if (valorAntigo !== valorNovo && (valorAntigo || valorNovo)) {
+        alteracoes.push({
+          campo,
+          label,
+          de: formatarDataBR(valorAntigo) || valorAntigo || '(não informado)',
+          para: formatarDataBR(valorNovo) || valorNovo || '(não informado)'
+        });
+      }
+      continue;
+    }
+
+    if (valorAntigo !== valorNovo) {
+      if (!valorAntigo && !valorNovo) continue;
+      alteracoes.push({
+        campo,
+        label,
+        de: valorAntigo || '(vazio)',
+        para: valorNovo || '(vazio)'
+      });
+    }
+  }
+
+  return alteracoes;
+}
+
+/**
+ * Registra um evento de histórico de alteração de campos e status combinados
+ */
+export function registrarHistoricoEdicao(itemAtual = {}, itemAtualizado = {}, usuarioInfo = {}) {
+  const alteracoes = detectarAlteracoesCampos(itemAtual, itemAtualizado);
+  const statusMudou = itemAtualizado.status && itemAtual.status && itemAtualizado.status !== itemAtual.status;
+
+  let historicoBase = Array.isArray(itemAtualizado.historico_status) 
+    ? [...itemAtualizado.historico_status]
+    : (Array.isArray(itemAtual.historico_status) ? [...itemAtual.historico_status] : []);
+
+  const dataHora = new Date().toISOString();
+  const usuarioNome = usuarioInfo.nome || usuarioInfo.email?.split('@')[0]?.toUpperCase() || 'SISTEMA';
+  const usuarioEmail = usuarioInfo.email || '';
+  const usuarioRole = usuarioInfo.role || (usuarioInfo.isAdmin ? 'Administrador Geral' : 'Operador Pedreira');
+
+  // Se houve alteração de campos cadastrais (ex: bloco, veículo, placas, motorista, etc.)
+  if (alteracoes.length > 0) {
+    const resumoAlteracoes = alteracoes.map(a => a.label).join(', ');
+    const novaEntradaEdicao = {
+      id: `hist_edit_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      tipo: 'edicao_dados',
+      descricao: `Alteração em: ${resumoAlteracoes}`,
+      alteracoes: alteracoes,
+      usuario_nome: usuarioNome,
+      usuario_email: usuarioEmail,
+      usuario_role: usuarioRole,
+      data_hora: dataHora
+    };
+    historicoBase.unshift(novaEntradaEdicao);
+  }
+
+  // Se houve mudança de status simultânea
+  if (statusMudou) {
+    const novaEntradaStatus = {
+      id: `hist_status_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      tipo: 'mudanca_status',
+      status_anterior: itemAtual.status || 'Aguardando Liberação',
+      status_novo: itemAtualizado.status,
+      usuario_nome: usuarioNome,
+      usuario_email: usuarioEmail,
+      usuario_role: usuarioRole,
+      data_hora: dataHora
+    };
+    historicoBase.unshift(novaEntradaStatus);
+  }
+
+  return historicoBase;
+}
+
+/**
  * Registra um evento de histórico de alteração de status
  */
 export function registrarHistoricoStatus(agendamentoAtual, novoStatus, usuarioInfo = {}) {
@@ -344,6 +452,7 @@ export function registrarHistoricoStatus(agendamentoAtual, novoStatus, usuarioIn
 
   const novaEntrada = {
     id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    tipo: 'mudanca_status',
     status_anterior: statusAnterior,
     status_novo: novoStatus,
     usuario_nome: usuarioInfo.nome || usuarioInfo.email?.split('@')[0]?.toUpperCase() || 'SISTEMA',
@@ -381,10 +490,7 @@ export function atualizarAgendamentoLocalCompleto(agendamentoAtualizado, usuario
     const index = lista.findIndex(item => item.id === agendamentoAtualizado.id);
     if (index !== -1) {
       const itemAtual = lista[index];
-      let historico = agendamentoAtualizado.historico_status || itemAtual.historico_status || [];
-      if (agendamentoAtualizado.status && agendamentoAtualizado.status !== itemAtual.status) {
-        historico = registrarHistoricoStatus(itemAtual, agendamentoAtualizado.status, usuarioInfo);
-      }
+      const historico = agendamentoAtualizado.historico_status || registrarHistoricoEdicao(itemAtual, agendamentoAtualizado, usuarioInfo);
       lista[index] = { 
         ...lista[index], 
         ...agendamentoAtualizado, 
@@ -412,10 +518,7 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
 
     const listaLocal = obterAgendamentosLocais();
     const itemAtual = listaLocal.find(item => item.id === agendamentoAtualizado.id) || {};
-    let historicoAtualizado = agendamentoAtualizado.historico_status || itemAtual.historico_status || [];
-    if (agendamentoAtualizado.status && agendamentoAtualizado.status !== itemAtual.status) {
-      historicoAtualizado = registrarHistoricoStatus(itemAtual, agendamentoAtualizado.status, usuarioInfo);
-    }
+    const historicoAtualizado = registrarHistoricoEdicao(itemAtual, agendamentoAtualizado, usuarioInfo);
     agendamentoAtualizado.historico_status = historicoAtualizado;
 
     const payloadBase = {

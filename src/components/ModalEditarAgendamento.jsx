@@ -458,7 +458,7 @@ export function ModalEditarAgendamento({
             />
           </div>
 
-          {/* Seção 5: Registro de Auditoria / Histórico de Status */}
+          {/* Seção 5: Registro de Auditoria / Histórico de Alterações */}
           {Array.isArray(agendamento.historico_status) && agendamento.historico_status.length > 0 && (
             <div style={{
               background: 'rgba(15, 23, 42, 0.65)',
@@ -467,33 +467,46 @@ export function ModalEditarAgendamento({
               padding: '14px 18px'
             }}>
               <label className="form-label" style={{ color: '#38bdf8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <History size={15} /> Histórico de Alterações de Status ({agendamento.historico_status.length})
+                <History size={15} /> Histórico de Alterações ({agendamento.historico_status.length})
               </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 120, overflowY: 'auto' }}>
-                {agendamento.historico_status.slice(0, 5).map((h, i) => (
-                  <div key={h.id || i} style={{
-                    fontSize: '0.74rem',
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    padding: '6px 10px',
-                    borderRadius: 6,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: 6
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ color: 'var(--slate-400)' }}>{h.status_anterior}</span>
-                      <ArrowRight size={11} color="var(--slate-500)" />
-                      <span style={{ color: '#4ade80', fontWeight: 600 }}>{h.status_novo}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
+                {agendamento.historico_status.slice(0, 6).map((h, i) => {
+                  const isEdicao = h.tipo === 'edicao_dados' || (Array.isArray(h.alteracoes) && h.alteracoes.length > 0);
+
+                  return (
+                    <div key={h.id || i} style={{
+                      fontSize: '0.74rem',
+                      background: isEdicao ? 'rgba(56, 189, 248, 0.05)' : 'rgba(255, 255, 255, 0.03)',
+                      border: isEdicao ? '1px solid rgba(56, 189, 248, 0.2)' : '1px solid rgba(255, 255, 255, 0.05)',
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 6
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {isEdicao ? (
+                          <>
+                            <span style={{ color: '#38bdf8', fontWeight: 600 }}>✏️ {h.descricao || 'Alteração Cadastral'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span style={{ color: 'var(--slate-400)' }}>{h.status_anterior}</span>
+                            <ArrowRight size={11} color="var(--slate-500)" />
+                            <span style={{ color: '#4ade80', fontWeight: 600 }}>{h.status_novo}</span>
+                          </>
+                        )}
+                      </div>
+                      <div style={{ color: 'var(--slate-400)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span><strong>{h.usuario_nome}</strong> ({h.usuario_role})</span>
+                        <span>•</span>
+                        <span>{h.data_hora ? new Date(h.data_hora).toLocaleString('pt-BR') : ''}</span>
+                      </div>
                     </div>
-                    <div style={{ color: 'var(--slate-400)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span><strong>{h.usuario_nome}</strong> ({h.usuario_role})</span>
-                      <span>•</span>
-                      <span>{h.data_hora ? new Date(h.data_hora).toLocaleString('pt-BR') : ''}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

@@ -118,7 +118,13 @@ export function PainelGestao({
       const histTexto = Array.isArray(ag.historico_status) && ag.historico_status.length > 0
         ? ag.historico_status.map(h => {
             const dataFmt = h.data_hora ? new Date(h.data_hora).toLocaleString('pt-BR') : '';
-            return `[${dataFmt}] De "${h.status_anterior}" para "${h.status_novo}" por ${h.usuario_nome} (${h.usuario_role})`;
+            if (h.tipo === 'edicao_dados' || (Array.isArray(h.alteracoes) && h.alteracoes.length > 0)) {
+              const mudancas = Array.isArray(h.alteracoes) 
+                ? h.alteracoes.map(a => `${a.label || a.campo}: ${a.de} -> ${a.para}`).join(', ')
+                : (h.descricao || 'Alteração de dados');
+              return `[${dataFmt}] Alteração Cadastral: [${mudancas}] por ${h.usuario_nome} (${h.usuario_role})`;
+            }
+            return `[${dataFmt}] Status: "${h.status_anterior}" -> "${h.status_novo}" por ${h.usuario_nome} (${h.usuario_role})`;
           }).join(' | ')
         : 'Sem alterações registradas';
 

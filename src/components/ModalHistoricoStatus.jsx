@@ -176,8 +176,10 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
               }} />
 
               {historico.map((item, index) => {
+                const isEdicaoCampos = item.tipo === 'edicao_dados' || (Array.isArray(item.alteracoes) && item.alteracoes.length > 0);
                 const corAnt = getCorStatus(item.status_anterior);
                 const corNov = getCorStatus(item.status_novo);
+                const dotColor = isEdicaoCampos ? '#38bdf8' : corNov.dot;
 
                 return (
                   <div key={item.id || index} style={{
@@ -192,21 +194,21 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                       width: 16,
                       height: 16,
                       borderRadius: '50%',
-                      background: corNov.dot,
+                      background: dotColor,
                       border: '3px solid #0d1311',
-                      boxShadow: `0 0 10px ${corNov.dot}`
+                      boxShadow: `0 0 10px ${dotColor}`
                     }} />
 
                     {/* Card do Evento */}
                     <div style={{
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      background: isEdicaoCampos ? 'rgba(56, 189, 248, 0.04)' : 'rgba(255, 255, 255, 0.03)',
+                      border: isEdicaoCampos ? '1px solid rgba(56, 189, 248, 0.25)' : '1px solid rgba(255, 255, 255, 0.08)',
                       borderRadius: 10,
                       padding: '12px 16px'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <User size={15} color="#4ade80" />
+                          <User size={15} color={isEdicaoCampos ? "#38bdf8" : "#4ade80"} />
                           <strong style={{ color: '#fff', fontSize: '0.88rem' }}>
                             {item.usuario_nome || 'Usuário'}
                           </strong>
@@ -215,6 +217,17 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                               {item.usuario_role}
                             </span>
                           )}
+                          <span style={{
+                            fontSize: '0.68rem',
+                            padding: '1px 7px',
+                            borderRadius: 4,
+                            fontWeight: 600,
+                            background: isEdicaoCampos ? 'rgba(56, 189, 248, 0.15)' : 'rgba(74, 222, 128, 0.15)',
+                            border: isEdicaoCampos ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid rgba(74, 222, 128, 0.4)',
+                            color: isEdicaoCampos ? '#38bdf8' : '#4ade80'
+                          }}>
+                            {isEdicaoCampos ? '✏️ Alteração Cadastral' : '🔄 Mudança de Status'}
+                          </span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--slate-400)', fontSize: '0.78rem' }}>
                           <Clock size={13} />
@@ -228,46 +241,101 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                         </div>
                       )}
 
+                      {/* Exibição de Alterações de Campos */}
+                      {isEdicaoCampos && Array.isArray(item.alteracoes) && (
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 6,
+                          background: 'rgba(0, 0, 0, 0.35)',
+                          border: '1px solid rgba(56, 189, 248, 0.15)',
+                          borderRadius: 8,
+                          padding: '10px 12px'
+                        }}>
+                          <div style={{ fontSize: '0.75rem', color: '#7dd3fc', fontWeight: 600, marginBottom: 2 }}>
+                            Campos alterados nesta edição:
+                          </div>
+                          {item.alteracoes.map((alt, idx) => (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              fontSize: '0.8rem',
+                              flexWrap: 'wrap',
+                              borderBottom: idx === item.alteracoes.length - 1 ? 'none' : '1px dashed rgba(255, 255, 255, 0.06)',
+                              paddingBottom: idx === item.alteracoes.length - 1 ? 0 : 4
+                            }}>
+                              <strong style={{ color: '#cbd5e1', minWidth: 140 }}>
+                                • {alt.label || alt.campo}:
+                              </strong>
+                              <span style={{
+                                color: '#fca5a5',
+                                textDecoration: 'line-through',
+                                background: 'rgba(239, 68, 68, 0.12)',
+                                padding: '1px 6px',
+                                borderRadius: 4,
+                                fontSize: '0.76rem'
+                              }}>
+                                {alt.de}
+                              </span>
+                              <ArrowRight size={13} color="var(--slate-400)" />
+                              <span style={{
+                                color: '#86efac',
+                                fontWeight: 700,
+                                background: 'rgba(34, 197, 94, 0.15)',
+                                padding: '1px 6px',
+                                borderRadius: 4,
+                                fontSize: '0.76rem'
+                              }}>
+                                {alt.para}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Transição de Status */}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        background: 'rgba(0, 0, 0, 0.35)',
-                        border: '1px solid rgba(255, 255, 255, 0.05)',
-                        borderRadius: 6,
-                        padding: '6px 10px',
-                        fontSize: '0.8rem',
-                        flexWrap: 'wrap'
-                      }}>
-                        <span style={{ color: 'var(--slate-400)', fontSize: '0.75rem' }}>De:</span>
-                        <span style={{
-                          background: corAnt.bg,
-                          border: `1px solid ${corAnt.border}`,
-                          color: corAnt.text,
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          fontWeight: 600,
-                          fontSize: '0.75rem'
+                      {!isEdicaoCampos && item.status_anterior && item.status_novo && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          background: 'rgba(0, 0, 0, 0.35)',
+                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          borderRadius: 6,
+                          padding: '6px 10px',
+                          fontSize: '0.8rem',
+                          flexWrap: 'wrap'
                         }}>
-                          {item.status_anterior}
-                        </span>
+                          <span style={{ color: 'var(--slate-400)', fontSize: '0.75rem' }}>De:</span>
+                          <span style={{
+                            background: corAnt.bg,
+                            border: `1px solid ${corAnt.border}`,
+                            color: corAnt.text,
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                            fontWeight: 600,
+                            fontSize: '0.75rem'
+                          }}>
+                            {item.status_anterior}
+                          </span>
 
-                        <ArrowRight size={14} color="var(--slate-500)" />
+                          <ArrowRight size={14} color="var(--slate-500)" />
 
-                        <span style={{ color: 'var(--slate-400)', fontSize: '0.75rem' }}>Para:</span>
-                        <span style={{
-                          background: corNov.bg,
-                          border: `1px solid ${corNov.border}`,
-                          color: corNov.text,
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          fontWeight: 700,
-                          fontSize: '0.75rem'
-                        }}>
-                          {item.status_novo}
-                        </span>
-                      </div>
+                          <span style={{ color: 'var(--slate-400)', fontSize: '0.75rem' }}>Para:</span>
+                          <span style={{
+                            background: corNov.bg,
+                            border: `1px solid ${corNov.border}`,
+                            color: corNov.text,
+                            padding: '2px 8px',
+                            borderRadius: 4,
+                            fontWeight: 700,
+                            fontSize: '0.75rem'
+                          }}>
+                            {item.status_novo}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
