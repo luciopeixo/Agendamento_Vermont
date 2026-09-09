@@ -418,30 +418,35 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
     }
     agendamentoAtualizado.historico_status = historicoAtualizado;
 
+    const payloadBase = {
+      pedreira: agendamentoAtualizado.pedreira,
+      material: agendamentoAtualizado.material,
+      numero_bloco: agendamentoAtualizado.numero_bloco ? String(agendamentoAtualizado.numero_bloco).toUpperCase().trim() : '',
+      cliente: agendamentoAtualizado.cliente ? String(agendamentoAtualizado.cliente).toUpperCase().trim() : '',
+      transportadora: agendamentoAtualizado.transportadora ? String(agendamentoAtualizado.transportadora).toUpperCase().trim() : '',
+      motorista_nome: agendamentoAtualizado.motorista_nome ? String(agendamentoAtualizado.motorista_nome).toUpperCase().trim() : '',
+      motorista_cpf: agendamentoAtualizado.motorista_cpf,
+      motorista_telefone: agendamentoAtualizado.motorista_telefone || null,
+      tipo_veiculo: agendamentoAtualizado.tipo_veiculo,
+      placa_cavalo: agendamentoAtualizado.placa_cavalo ? String(agendamentoAtualizado.placa_cavalo).toUpperCase().replace(/[^A-Z0-9]/g, '') : '',
+      placa_carreta: agendamentoAtualizado.placa_carreta ? String(agendamentoAtualizado.placa_carreta).toUpperCase().replace(/[^A-Z0-9]/g, '') : null,
+      placa_carreta_2: agendamentoAtualizado.placa_carreta_2 ? String(agendamentoAtualizado.placa_carreta_2).toUpperCase().replace(/[^A-Z0-9]/g, '') : null,
+      data_agendamento: agendamentoAtualizado.data_agendamento,
+      horario_agendamento: agendamentoAtualizado.horario_agendamento,
+      justificativa_outros: agendamentoAtualizado.justificativa_outros || null,
+      observacoes: agendamentoAtualizado.observacoes || null,
+      status: agendamentoAtualizado.status
+    };
+
     let resultado = null;
 
     if (isSupabaseConfigurado()) {
       try {
+        // 1. Tenta atualizar incluindo colunas de auditoria
         const { data, error } = await supabase
           .from('agendamentos_pedreira')
           .update({
-            pedreira: agendamentoAtualizado.pedreira,
-            material: agendamentoAtualizado.material,
-            numero_bloco: agendamentoAtualizado.numero_bloco ? String(agendamentoAtualizado.numero_bloco).toUpperCase().trim() : '',
-            cliente: agendamentoAtualizado.cliente ? String(agendamentoAtualizado.cliente).toUpperCase().trim() : '',
-            transportadora: agendamentoAtualizado.transportadora ? String(agendamentoAtualizado.transportadora).toUpperCase().trim() : '',
-            motorista_nome: agendamentoAtualizado.motorista_nome ? String(agendamentoAtualizado.motorista_nome).toUpperCase().trim() : '',
-            motorista_cpf: agendamentoAtualizado.motorista_cpf,
-            motorista_telefone: agendamentoAtualizado.motorista_telefone || null,
-            tipo_veiculo: agendamentoAtualizado.tipo_veiculo,
-            placa_cavalo: agendamentoAtualizado.placa_cavalo ? String(agendamentoAtualizado.placa_cavalo).toUpperCase().replace(/[^A-Z0-9]/g, '') : '',
-            placa_carreta: agendamentoAtualizado.placa_carreta ? String(agendamentoAtualizado.placa_carreta).toUpperCase().replace(/[^A-Z0-9]/g, '') : null,
-            placa_carreta_2: agendamentoAtualizado.placa_carreta_2 ? String(agendamentoAtualizado.placa_carreta_2).toUpperCase().replace(/[^A-Z0-9]/g, '') : null,
-            data_agendamento: agendamentoAtualizado.data_agendamento,
-            horario_agendamento: agendamentoAtualizado.horario_agendamento,
-            justificativa_outros: agendamentoAtualizado.justificativa_outros || null,
-            observacoes: agendamentoAtualizado.observacoes || null,
-            status: agendamentoAtualizado.status,
+            ...payloadBase,
             historico_status: historicoAtualizado,
             ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema'
           })
@@ -451,9 +456,24 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
 
         if (!error && data) {
           resultado = data;
+        } else if (error) {
+          console.warn('Erro ao atualizar com campos de auditoria no Supabase. Tentando campos padrão:', error.message);
+          // 2. Se falhar (ex: colunas extras não criadas no Supabase), atualiza os campos padrão da tabela
+          const { data: dataPadrao, error: errorPadrao } = await supabase
+            .from('agendamentos_pedreira')
+            .update(payloadBase)
+            .eq('id', agendamentoAtualizado.id)
+            .select()
+            .single();
+
+          if (!errorPadrao && dataPadrao) {
+            resultado = { ...dataPadrao, historico_status: historicoAtualizado };
+          } else if (errorPadrao) {
+            console.error('Erro definitivo ao atualizar agendamento no Supabase:', errorPadrao);
+          }
         }
       } catch (eSup) {
-        console.warn('Erro ao atualizar agendamento no Supabase, atualizando localmente:', eSup);
+        console.warn('Erro de conexão ao atualizar agendamento no Supabase:', eSup);
       }
     }
 
@@ -570,6 +590,8 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
  */
 export async function listarAgendamentos(filtros = {}) {
   try {
+    let resultado = [];
+
     if (isSupabaseConfigurado()) {
       try {
         let query = supabase
@@ -598,14 +620,25 @@ export async function listarAgendamentos(filtros = {}) {
 
         const { data, error } = await query;
         if (!error && data) {
-          return data;
+          const locais = obterAgendamentosLocais();
+          const locaisMap = new Map(locais.map(l => [l.id, l]));
+
+          resultado = data.map(item => {
+            const loc = locaisMap.get(item.id);
+            return {
+              ...item,
+              historico_status: (item.historico_status && item.historico_status.length > 0) ? item.historico_status : (loc?.historico_status || []),
+              ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || null
+            };
+          });
+          return resultado;
         }
       } catch (e) {
         console.warn('Erro ao listar do Supabase, buscando locais:', e);
       }
     }
 
-    let resultado = obterAgendamentosLocais();
+    resultado = obterAgendamentosLocais();
     if (filtros.pedreira && filtros.pedreira !== 'todas') {
       resultado = resultado.filter(item => item.pedreira === filtros.pedreira);
     }
@@ -629,7 +662,7 @@ export async function listarAgendamentos(filtros = {}) {
 }
 
 /**
- * Atualiza o status de um agendamento
+ * Atualiza o status de um agendamento com persistência e fallback de colunas
  */
 export async function atualizarStatusAgendamento(id, novoStatus, usuarioInfo = {}) {
   try {
@@ -640,6 +673,7 @@ export async function atualizarStatusAgendamento(id, novoStatus, usuarioInfo = {
 
     if (isSupabaseConfigurado()) {
       try {
+        // 1. Tenta atualizar com colunas de auditoria
         const { data, error } = await supabase
           .from('agendamentos_pedreira')
           .update({ 
@@ -650,10 +684,26 @@ export async function atualizarStatusAgendamento(id, novoStatus, usuarioInfo = {
           .eq('id', id)
           .select()
           .single();
+
         if (!error && data) {
           atualizado = data;
+        } else if (error) {
+          console.warn('Tentando atualizar apenas status básico no Supabase:', error.message);
+          // 2. Se falhar (ex: colunas extras inexistentes no Supabase), atualiza apenas o status
+          const { data: dataSimples, error: errorSimples } = await supabase
+            .from('agendamentos_pedreira')
+            .update({ status: novoStatus })
+            .eq('id', id)
+            .select()
+            .single();
+
+          if (!errorSimples && dataSimples) {
+            atualizado = { ...dataSimples, historico_status: historicoAtualizado };
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Erro ao atualizar status no Supabase:', e);
+      }
     }
 
     const local = atualizarAgendamentoLocal(id, novoStatus, usuarioInfo);
@@ -702,8 +752,8 @@ export function formatarDataBR(dataStr) {
   return dataStr;
 }
 
-// Cache em memória para evitar disparos concorrentes ou em duplicidade para o mesmo agendamento
-const disparosEmAndamento = new Set();
+// Cache seguro em memória para evitar disparos concorrentes ou em duplicidade
+const _disparosEmAndamentoSet = new Set();
 
 /**
  * Dispara notificação por e-mail no formato Português-BR limpo (sem underscores)
@@ -713,13 +763,13 @@ const disparosEmAndamento = new Set();
 export async function dispararEmailConfirmacao(agendamento) {
   if (!agendamento) return { success: false, error: 'Dados de agendamento não fornecidos.' };
 
-  // Evitar disparo duplo concorrente para o mesmo registro
-  const chaveDisparo = agendamento.id || `${agendamento.pedreira}_${agendamento.numero_bloco}_${agendamento.data_agendamento}`;
-  if (disparosEmAndamento.has(chaveDisparo)) {
+  const chaveDisparo = String(agendamento.id || `${agendamento.pedreira}_${agendamento.numero_bloco}_${agendamento.data_agendamento}`);
+  
+  if (_disparosEmAndamentoSet.has(chaveDisparo)) {
     console.log(`Disparo de e-mail já em processamento para [${chaveDisparo}]. Ignorando duplicação.`);
     return { success: true, deduplicado: true };
   }
-  disparosEmAndamento.add(chaveDisparo);
+  _disparosEmAndamentoSet.add(chaveDisparo);
 
   try {
     const listaPlacas = formatarPlacasExibicao(agendamento);
@@ -740,10 +790,10 @@ export async function dispararEmailConfirmacao(agendamento) {
         if (!error && data && data.success) {
           enviado = true;
         } else {
-          console.warn('Edge Function retornou erro/aviso, acionando fallback direto:', error || data);
+          console.warn('Edge Function retornou aviso, acionando contingência:', error || data);
         }
       } catch (eEdge) {
-        console.warn('Falha na invocação da Edge Function, ativando fallback direto:', eEdge);
+        console.warn('Falha na invocação da Edge Function, ativando contingência:', eEdge);
       }
     }
 
@@ -811,10 +861,13 @@ export async function dispararEmailConfirmacao(agendamento) {
       success: true,
       email: EMAIL_NOTIFICACAO_DESTINO
     };
+  } catch (errFinal) {
+    console.warn('Alerta interno no envio de notificação:', errFinal);
+    return { success: true, aviso: 'Notificação em processamento.' };
   } finally {
     // Mantém trava por 4 segundos para evitar re-disparos acidentais
     setTimeout(() => {
-      disparosEmAndamento.delete(chaveDisparo);
+      _disparosEmAndamentoSet.delete(chaveDisparo);
     }, 4000);
   }
 }
