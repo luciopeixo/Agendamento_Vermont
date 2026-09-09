@@ -64,6 +64,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     pedreira: pedreira2Inicial,
     material: materiaisIniciaisPonto2[0] || '',
     numero_bloco: '',
+    cliente: '',
     data_agendamento: hoje,
     horario_agendamento: horarioInicial,
     justificativa_outros: ''
@@ -83,6 +84,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     pedreira: pedreira3Inicial,
     material: materiaisIniciaisPonto3[0] || '',
     numero_bloco: '',
+    cliente: '',
     data_agendamento: hoje,
     horario_agendamento: horarioInicial,
     justificativa_outros: ''
@@ -282,6 +284,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     setPonto2(prev => ({
       ...prev,
       numero_bloco: (blocos[1] || '').toUpperCase(),
+      cliente: prev.cliente || formData.cliente,
       pedreira: formData.pedreira,
       material: formData.material,
       data_agendamento: formData.data_agendamento,
@@ -291,6 +294,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       setPonto3(prev => ({
         ...prev,
         numero_bloco: (blocos[2] || '').toUpperCase(),
+        cliente: prev.cliente || formData.cliente,
         pedreira: formData.pedreira,
         material: formData.material,
         data_agendamento: formData.data_agendamento,
@@ -351,6 +355,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return;
     }
 
+    if (!formData.cliente || !formData.cliente.trim()) {
+      setMensagemErro(tipoCarregamento === 'combinado' ? 'Informe o cliente destinatário do 1º carregamento.' : 'Informe o nome do cliente destinatário.');
+      return;
+    }
+
     // Validações do 2º Ponto (se for carga combinada)
     if (tipoCarregamento === 'combinado') {
       const analiseB1 = detectarMultiplosBlocos(formData.numero_bloco);
@@ -402,6 +411,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         return;
       }
 
+      if (!ponto2.cliente || !ponto2.cliente.trim()) {
+        setMensagemErro('Informe o cliente destinatário do 2º carregamento.');
+        return;
+      }
+
       // Validações do 3º Ponto (se for carga combinada de 3 blocos)
       if (qtdBlocosCombinados === 3) {
         if (tipoDia3 === 'domingo') {
@@ -446,15 +460,15 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           setMensagemErro(`Informe apenas 1 número de bloco no 3º carregamento (você digitou: ${ponto3.numero_bloco}).`);
           return;
         }
+
+        if (!ponto3.cliente || !ponto3.cliente.trim()) {
+          setMensagemErro('Informe o cliente destinatário do 3º carregamento.');
+          return;
+        }
       }
     }
 
     // Validações comuns de Transporte & Motorista
-    if (!formData.cliente.trim()) {
-      setMensagemErro('Informe o nome do cliente destinatário.');
-      return;
-    }
-
     if (!formData.transportadora.trim()) {
       setMensagemErro('Informe o nome da transportadora.');
       return;
@@ -485,18 +499,22 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return;
     }
 
-    if (tipoDia === 'dia_util' && formData.horario_agendamento === 'outros' && !formData.justificativa_outros.trim()) {
-      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 1º carregamento.');
+    // Validações de Justificativa para "Outros" (aceita justificativa específica ou observações gerais)
+    const justificativaPonto1 = (formData.justificativa_outros || formData.observacoes || '').trim();
+    if (tipoDia === 'dia_util' && formData.horario_agendamento === 'outros' && !justificativaPonto1) {
+      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 1º carregamento (ou no campo de Observações).');
       return;
     }
 
-    if (tipoCarregamento === 'combinado' && tipoDia2 === 'dia_util' && ponto2.horario_agendamento === 'outros' && !ponto2.justificativa_outros.trim()) {
-      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 2º carregamento.');
+    const justificativaPonto2 = (ponto2.justificativa_outros || formData.observacoes || '').trim();
+    if (tipoCarregamento === 'combinado' && tipoDia2 === 'dia_util' && ponto2.horario_agendamento === 'outros' && !justificativaPonto2) {
+      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 2º carregamento (ou no campo de Observações).');
       return;
     }
 
-    if (tipoCarregamento === 'combinado' && qtdBlocosCombinados === 3 && tipoDia3 === 'dia_util' && ponto3.horario_agendamento === 'outros' && !ponto3.justificativa_outros.trim()) {
-      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 3º carregamento.');
+    const justificativaPonto3 = (ponto3.justificativa_outros || formData.observacoes || '').trim();
+    if (tipoCarregamento === 'combinado' && qtdBlocosCombinados === 3 && tipoDia3 === 'dia_util' && ponto3.horario_agendamento === 'outros' && !justificativaPonto3) {
+      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 3º carregamento (ou no campo de Observações).');
       return;
     }
 
@@ -510,28 +528,31 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           pedreira: formData.pedreira,
           material: formData.material,
           numero_bloco: formData.numero_bloco,
+          cliente: formData.cliente,
           data_agendamento: formData.data_agendamento,
           tipo_dia: tipoDia,
           horario_agendamento: tipoDia === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : formData.horario_agendamento,
-          justificativa_outros: formData.justificativa_outros
+          justificativa_outros: formData.justificativa_outros || formData.observacoes || null
         },
         ponto2: {
           pedreira: ponto2.pedreira,
           material: ponto2.material,
           numero_bloco: ponto2.numero_bloco,
+          cliente: ponto2.cliente || formData.cliente,
           data_agendamento: ponto2.data_agendamento,
           tipo_dia: tipoDia2,
           horario_agendamento: tipoDia2 === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : ponto2.horario_agendamento,
-          justificativa_outros: ponto2.justificativa_outros
+          justificativa_outros: ponto2.justificativa_outros || formData.observacoes || null
         },
         ponto3: qtdBlocosCombinados === 3 ? {
           pedreira: ponto3.pedreira,
           material: ponto3.material,
           numero_bloco: ponto3.numero_bloco,
+          cliente: ponto3.cliente || formData.cliente,
           data_agendamento: ponto3.data_agendamento,
           tipo_dia: tipoDia3,
           horario_agendamento: tipoDia3 === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : ponto3.horario_agendamento,
-          justificativa_outros: ponto3.justificativa_outros
+          justificativa_outros: ponto3.justificativa_outros || formData.observacoes || null
         } : null,
         veiculo: {
           cliente: formData.cliente,
@@ -550,7 +571,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       const dadosParaSalvar = {
         ...formData,
         tipo_dia: tipoDia,
-        horario_agendamento: tipoDia === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : formData.horario_agendamento
+        horario_agendamento: tipoDia === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : formData.horario_agendamento,
+        justificativa_outros: formData.justificativa_outros || formData.observacoes || null
       };
       resultado = await salvarAgendamento(dadosParaSalvar);
     }
@@ -1066,6 +1088,19 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   )}
                 </div>
 
+                {/* Cliente 1 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Cliente / Destinatário (1º Bloco)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Nome da empresa ou cliente do 1º bloco"
+                    value={formData.cliente}
+                    onChange={(e) => handleChange('cliente', e.target.value)}
+                    required
+                  />
+                </div>
+
                 {/* Data 1 */}
                 <div className="form-group">
                   <label className="form-label form-label-required">Data (1º Ponto)</label>
@@ -1103,6 +1138,21 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   </select>
                 </div>
               </div>
+
+              {/* Justificativa outros Ponto 1 */}
+              {formData.horario_agendamento === 'outros' && (
+                <div className="form-group animate-fade" style={{ marginTop: 16 }}>
+                  <label className="form-label form-label-required">Especificação de Horário & Justificativa (1º Ponto - Outros)</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    placeholder="Informe o horário pretendido e a justificativa para o 1º carregamento..."
+                    value={formData.justificativa_outros}
+                    onChange={(e) => handleChange('justificativa_outros', e.target.value)}
+                    required
+                  />
+                </div>
+              )}
             </div>
 
             {/* PONTO 2 DE CARREGAMENTO */}
@@ -1185,6 +1235,19 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   )}
                 </div>
 
+                {/* Cliente 2 */}
+                <div className="form-group">
+                  <label className="form-label form-label-required">Cliente / Destinatário (2º Bloco)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Nome da empresa ou cliente do 2º bloco"
+                    value={ponto2.cliente}
+                    onChange={(e) => handlePonto2Change('cliente', e.target.value)}
+                    required
+                  />
+                </div>
+
                 {/* Data 2 */}
                 <div className="form-group">
                   <label className="form-label form-label-required">Data (2º Ponto)</label>
@@ -1222,6 +1285,21 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   </select>
                 </div>
               </div>
+
+              {/* Justificativa outros Ponto 2 */}
+              {ponto2.horario_agendamento === 'outros' && (
+                <div className="form-group animate-fade" style={{ marginTop: 16 }}>
+                  <label className="form-label form-label-required">Especificação de Horário & Justificativa (2º Ponto - Outros)</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={2}
+                    placeholder="Informe o horário pretendido e a justificativa para o 2º carregamento..."
+                    value={ponto2.justificativa_outros}
+                    onChange={(e) => handlePonto2Change('justificativa_outros', e.target.value)}
+                    required
+                  />
+                </div>
+              )}
 
               {/* Dica contextual de mesma pedreira ou deslocamento */}
               {formData.data_agendamento === ponto2.data_agendamento && (
@@ -1346,6 +1424,19 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     )}
                   </div>
 
+                  {/* Cliente 3 */}
+                  <div className="form-group">
+                    <label className="form-label form-label-required">Cliente / Destinatário (3º Bloco)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Nome da empresa ou cliente do 3º bloco"
+                      value={ponto3.cliente}
+                      onChange={(e) => handlePonto3Change('cliente', e.target.value)}
+                      required
+                    />
+                  </div>
+
                   {/* Data 3 */}
                   <div className="form-group">
                     <label className="form-label form-label-required">Data (3º Ponto)</label>
@@ -1384,6 +1475,21 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   </div>
                 </div>
 
+                {/* Justificativa outros Ponto 3 */}
+                {ponto3.horario_agendamento === 'outros' && (
+                  <div className="form-group animate-fade" style={{ marginTop: 16 }}>
+                    <label className="form-label form-label-required">Especificação de Horário & Justificativa (3º Ponto - Outros)</label>
+                    <textarea
+                      className="form-textarea"
+                      rows={2}
+                      placeholder="Informe o horário pretendido e a justificativa para o 3º carregamento..."
+                      value={ponto3.justificativa_outros}
+                      onChange={(e) => handlePonto3Change('justificativa_outros', e.target.value)}
+                      required
+                    />
+                  </div>
+                )}
+
                 {/* Dica contextual de mesma pedreira para o 3º ponto */}
                 {ponto3.data_agendamento === formData.data_agendamento && ponto3.pedreira === formData.pedreira && (
                   <div style={{
@@ -1416,23 +1522,25 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
             <Truck size={20} color="var(--vermont-green-light)" />
             <h2 style={{ fontSize: '1.15rem', margin: 0 }}>
-              {tipoCarregamento === 'combinado' ? '3. Veículo, Motorista & Cliente (Compartilhado)' : '3. Dados do Transporte & Veículo'}
+              {tipoCarregamento === 'combinado' ? '3. Dados do Transporte & Veículo (Compartilhado)' : '3. Dados do Transporte & Veículo'}
             </h2>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-            {/* Cliente Destinatário */}
-            <div className="form-group">
-              <label className="form-label form-label-required">Cliente / Destinatário</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Nome da empresa ou cliente final"
-                value={formData.cliente}
-                onChange={(e) => handleChange('cliente', e.target.value)}
-                required
-              />
-            </div>
+            {/* Cliente Destinatário (Apenas modo Simples) */}
+            {tipoCarregamento === 'simples' && (
+              <div className="form-group">
+                <label className="form-label form-label-required">Cliente / Destinatário</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Nome da empresa ou cliente final"
+                  value={formData.cliente}
+                  onChange={(e) => handleChange('cliente', e.target.value)}
+                  required
+                />
+              </div>
+            )}
 
             {/* Nome da Transportadora */}
             <div className="form-group">

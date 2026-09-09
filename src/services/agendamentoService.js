@@ -1422,7 +1422,7 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
         pedreira: p.pedreira,
         material: p.material.trim(),
         numero_bloco: p.numero_bloco.toUpperCase().trim(),
-        cliente: veiculo.cliente.toUpperCase().trim(),
+        cliente: (p.cliente || veiculo.cliente || '').toUpperCase().trim(),
         transportadora: veiculo.transportadora.toUpperCase().trim(),
         motorista_nome: veiculo.motorista_nome.toUpperCase().trim(),
         motorista_cpf: veiculo.motorista_cpf.trim(),
