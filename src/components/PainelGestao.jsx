@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Search, RefreshCw, Printer, CheckCircle, CheckCircle2, Clock, Truck, Mail, FileText, AlertCircle, Trash2, ShieldCheck, ShieldAlert, RotateCcw
+  Search, RefreshCw, Printer, CheckCircle, CheckCircle2, Clock, Truck, Mail, FileText, 
+  AlertCircle, Trash2, ShieldCheck, ShieldAlert, RotateCcw, Edit3, CheckCheck, PlayCircle,
+  FileSpreadsheet, Download, History
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { 
   listarAgendamentos, 
   atualizarStatusAgendamento, 
@@ -13,6 +16,9 @@ import {
   EMAIL_NOTIFICACAO_DESTINO,
   STATUS_AGENDAMENTO
 } from '../services/agendamentoService';
+import { ModalEditarAgendamento } from './ModalEditarAgendamento';
+import { ModalHistoricoStatus } from './ModalHistoricoStatus';
+import { ModalConfirmarStatus } from './ModalConfirmarStatus';
 
 export function PainelGestao({ 
   onVisualizarComprovante,
@@ -20,6 +26,15 @@ export function PainelGestao({
   isAdmin = false,
   pedreiraOperador = null
 }) {
+  const hojeStr = new Date().toISOString().split('T')[0];
+
+  const usuarioInfo = {
+    nome: usuario?.user_metadata?.nome || (usuario?.email ? usuario.email.split('@')[0].toUpperCase() : (isAdmin ? 'ADMINISTRADOR GERAL' : 'OPERADOR PEDREIRA')),
+    email: usuario?.email || '',
+    role: isAdmin ? 'Administrador Geral' : `Operador (${pedreiraOperador || 'Pedreira'})`,
+    isAdmin
+  };
+
   const [agendamentos, setAgendamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [termoBusca, setTermoBusca] = useState('');
@@ -36,12 +51,20 @@ export function PainelGestao({
   }, [isAdmin, pedreiraOperador]);
 
   const [filtroStatus, setFiltroStatus] = useState('todos');
-  const [filtroData, setFiltroData] = useState('');
+  const [filtroData, setFiltroData] = useState(() => hojeStr);
   const [notificandoEmailId, setNotificandoEmailId] = useState(null);
   const [excluindoId, setExcluindoId] = useState(null);
   const [mensagemAviso, setMensagemAviso] = useState('');
   const [testandoEmail, setTestandoEmail] = useState(false);
   const [statusEmailTeste, setStatusEmailTeste] = useState(null);
+
+  // Estado para o modal de edição de agendamento e modal de histórico
+  const [agendamentoParaEditar, setAgendamentoParaEditar] = useState(null);
+  const [agendamentoParaHistorico, setAgendamentoParaHistorico] = useState(null);
+
+  // Estado para a tela de atenção e confirmação de mudança de status
+  const [mudancaStatusPendente, setMudancaStatusPendente] = useState(null); // { agendamento, novoStatus }
+  const [processandoMudancaStatus, setProcessandoMudancaStatus] = useState(false);
 
   const carregarDados = async () => {
     setCarregando(true);
@@ -58,13 +81,141 @@ export function PainelGestao({
     carregarDados();
   }, [filtroPedreira, filtroStatus, filtroData]);
 
-  const handleMudarStatus = async (id, novoStatus) => {
-    const res = await atualizarStatusAgendamento(id, novoStatus);
+  const handleExportarExcel = () => {
+    if (agendamentosFiltrados.length === 0) {
+      alert('Nenhum agendamento para exportar com os filtros atuais.');
+      return;
+    }
+
+    const cabecalhos = [
+      'Protocolo',
+      'Data Agendamento',
+      'Horário',
+      'Pedreira',
+      'Material',
+      'Nº Bloco',
+      'Carga Mista / Combinada',
+      'Cliente Destinatário',
+      'Transportadora',
+      'Motorista',
+      'CPF Motorista',
+      'Telefone Motorista',
+      'Tipo de Veículo',
+      'Placa Cavalo',
+      'Placa Carreta 1',
+      'Placa Carreta 2',
+      'Status Atual',
+      'Último Editor',
+      'Histórico de Alterações',
+      'Observações / Ocorrências'
+    ];
+
+    const dados = agendamentosFiltrados.map(ag => {
+      const isMisto = (ag.is_combinado || ag.observacoes?.includes('[Carga Combinada') || ag.observacoes?.includes('[Carga Mista')) 
+        ? 'SIM (Carga Mista / Combinada)' 
+        : 'NÃO (Simples)';
+
+      const histTexto = Array.isArray(ag.historico_status) && ag.historico_status.length > 0
+        ? ag.historico_status.map(h => {
+            const dataFmt = h.data_hora ? new Date(h.data_hora).toLocaleString('pt-BR') : '';
+            return `[${dataFmt}] De "${h.status_anterior}" para "${h.status_novo}" por ${h.usuario_nome} (${h.usuario_role})`;
+          }).join(' | ')
+        : 'Sem alterações registradas';
+
+      const ultimoEditor = ag.ultimo_editor || (ag.historico_status && ag.historico_status.length > 0 ? ag.historico_status[0].usuario_nome : 'Sistema');
+
+      return {
+        'Protocolo': (ag.id || '').substring(0, 8).toUpperCase(),
+        'Data Agendamento': formatarDataBR(ag.data_agendamento),
+        'Horário': ag.horario_agendamento || '',
+        'Pedreira': ag.pedreira || '',
+        'Material': ag.material || '',
+        'Nº Bloco': ag.numero_bloco || '',
+        'Carga Mista / Combinada': isMisto,
+        'Cliente Destinatário': ag.cliente || '',
+        'Transportadora': ag.transportadora || '',
+        'Motorista': ag.motorista_nome || '',
+        'CPF Motorista': ag.motorista_cpf || '',
+        'Telefone Motorista': ag.motorista_telefone || '',
+        'Tipo de Veículo': ag.tipo_veiculo || '',
+        'Placa Cavalo': ag.placa_cavalo || '',
+        'Placa Carreta 1': ag.placa_carreta || '',
+        'Placa Carreta 2': ag.placa_carreta_2 || '',
+        'Status Atual': ag.status || '',
+        'Último Editor': ultimoEditor,
+        'Histórico de Alterações': histTexto,
+        'Observações / Ocorrências': (ag.observacoes || '').replace(/[\r\n]+/g, ' ')
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dados, { header: cabecalhos });
+
+    // Ajusta a largura das colunas dinamicamente
+    worksheet['!cols'] = cabecalhos.map(header => {
+      const maxLen = Math.max(
+        header.length,
+        ...dados.map(row => String(row[header] || '').length)
+      );
+      return { wch: Math.min(Math.max(maxLen + 2, 12), 45) };
+    });
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Carregamentos');
+
+    const dataHoraStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `relatorio_carregamentos_vermont_${dataHoraStr}.xlsx`);
+  };
+
+  const solicitarMudancaStatus = (agendamento, novoStatus) => {
+    if (!agendamento || !novoStatus) return;
+    const statusAtual = agendamento.status === 'Carregado' ? 'Finalizado' : agendamento.status;
+    if (novoStatus === statusAtual) return;
+
+    if (!isAdmin && novoStatus === 'Aguardando Liberação') {
+      alert('Acesso restrito: Usuários da pedreira não possuem autorização para reverter o status para "Aguardando Liberação". Esta ação é exclusiva do Administrador Geral.');
+      return;
+    }
+
+    // Abre a tela de atenção e confirmação com o usuário
+    setMudancaStatusPendente({ agendamento, novoStatus });
+  };
+
+  const handleConfirmarMudancaStatus = async () => {
+    if (!mudancaStatusPendente) return;
+    const { agendamento, novoStatus } = mudancaStatusPendente;
+
+    setProcessandoMudancaStatus(true);
+    const res = await atualizarStatusAgendamento(agendamento.id, novoStatus, usuarioInfo);
+    setProcessandoMudancaStatus(false);
+    setMudancaStatusPendente(null);
+
     if (res.success) {
-      setAgendamentos(prev => prev.map(ag => ag.id === id ? { ...ag, status: novoStatus } : ag));
+      setAgendamentos(prev => prev.map(ag => {
+        if (ag.id === agendamento.id) {
+          return { 
+            ...ag, 
+            status: novoStatus, 
+            historico_status: res.data?.historico_status || ag.historico_status,
+            ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema'
+          };
+        }
+        return ag;
+      }));
+      setMensagemAviso(`Status do Bloco ${agendamento.numero_bloco} atualizado para "${novoStatus}" com sucesso.`);
+      setTimeout(() => setMensagemAviso(''), 6000);
     } else {
       alert('Erro ao atualizar status: ' + res.error);
     }
+  };
+
+  const handleCancelarMudancaStatus = () => {
+    setMudancaStatusPendente(null);
+  };
+
+  const handleSalvoEdicao = (agendamentoAtualizado) => {
+    setAgendamentos(prev => prev.map(ag => ag.id === agendamentoAtualizado.id ? agendamentoAtualizado : ag));
+    setMensagemAviso(`Informações do Bloco ${agendamentoAtualizado.numero_bloco} atualizadas com sucesso!`);
+    setTimeout(() => setMensagemAviso(''), 6000);
   };
 
   const handleExcluir = async (ag) => {
@@ -102,7 +253,7 @@ export function PainelGestao({
     const res = await dispararEmailConfirmacao(agendamento);
     setNotificandoEmailId(null);
     if (res.success) {
-      setMensagemAviso(`Notificação enviada para ${EMAIL_NOTIFICACAO_DESTINO}! Verifique também a pasta de Spam.`);
+      setMensagemAviso(`Notificação enviada para o e-mail da logística!`);
       setTimeout(() => setMensagemAviso(''), 7000);
       setAgendamentos(prev => prev.map(ag => ag.id === agendamento.id ? { ...ag, email_notificado: true } : ag));
     } else {
@@ -139,12 +290,12 @@ export function PainelGestao({
       if (data && (data.success === 'true' || data.success === true)) {
         setStatusEmailTeste({
           tipo: 'sucesso',
-          mensagem: 'E-mail enviado com sucesso! Cheque sua caixa de entrada e spam.'
+          mensagem: 'E-mail enviado com sucesso! Cheque a caixa de entrada da logística.'
         });
       } else if (data && data.message && data.message.includes('Activation')) {
         setStatusEmailTeste({
           tipo: 'ativacao',
-          mensagem: `O serviço enviou um e-mail com o assunto 'Action Required: Activate your Form' para ${EMAIL_NOTIFICACAO_DESTINO}. Abra a caixa postal e clique no link de ativação para autorizar o recebimento contínuo.`
+          mensagem: `O serviço enviou um e-mail de ativação ('Action Required: Activate your Form') para ${EMAIL_NOTIFICACAO_DESTINO}. Abra a caixa postal e confirme para autorizar o envio automático.`
         });
       } else {
         setStatusEmailTeste({
@@ -173,19 +324,18 @@ export function PainelGestao({
       (ag.transportadora && ag.transportadora.toLowerCase().includes(busca)) ||
       (ag.cliente && ag.cliente.toLowerCase().includes(busca)) ||
       (ag.pedreira && ag.pedreira.toLowerCase().includes(busca)) ||
-      (ag.material && ag.material.toLowerCase().includes(busca))
+      (ag.material && ag.material.toLowerCase().includes(busca)) ||
+      (ag.observacoes && ag.observacoes.toLowerCase().includes(busca))
     );
   });
 
-  const agendamentosHoje = agendamentos.filter(ag => {
-    const hojeStr = new Date().toISOString().split('T')[0];
-    return ag.data_agendamento === hojeStr;
-  });
+  const agendamentosHoje = agendamentos.filter(ag => ag.data_agendamento === hojeStr);
 
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '16px 0' }}>
-      {/* Cabeçalho do Painel */}
-      <div className="glass-panel" style={{
+    <div style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 0' }}>
+      
+      {/* Cabeçalho do Painel (Oculto na impressão) */}
+      <div className="glass-panel no-print" style={{
         padding: '20px 24px',
         marginBottom: 20,
         display: 'flex',
@@ -194,29 +344,41 @@ export function PainelGestao({
         flexWrap: 'wrap',
         gap: 16
       }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h1 style={{ fontSize: '1.4rem', margin: 0 }}>Painel Operacional de Carregamentos</h1>
-              {isAdmin ? (
-                <span className="badge badge-warning" style={{ fontSize: '0.75rem' }}>🛡️ Admin Geral</span>
-              ) : (
-                <span className="badge badge-vermont" style={{ fontSize: '0.75rem' }}>
-                  👷 Operador • {pedreiraOperador || 'Pedreira'}
-                </span>
-              )}
-            </div>
-            <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--slate-400)' }}>
-              {isAdmin 
-                ? 'Visão consolidada de todas as pedreiras, controle de slots e exclusão irrestrita' 
-                : `Visão operacional exclusiva da pedreira ${pedreiraOperador}. Permissão: visualização e baixa.`}
-            </p>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h1 style={{ fontSize: '1.4rem', margin: 0, color: '#fff' }}>
+              Painel Operacional de Carregamentos
+            </h1>
+            {isAdmin ? (
+              <span className="badge badge-warning" style={{ fontSize: '0.75rem' }}>🛡️ Admin Geral</span>
+            ) : (
+              <span className="badge badge-vermont" style={{ fontSize: '0.75rem' }}>
+                👷 Operador • {pedreiraOperador || 'Pedreira'}
+              </span>
+            )}
           </div>
+          <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--slate-400)' }}>
+            {isAdmin 
+              ? 'Gestão integrada de todas as unidades, edição de blocos, romaneios e fluxo de carregamento' 
+              : `Controle de pátio e romaneio exclusivo da unidade ${pedreiraOperador}.`}
+          </p>
+        </div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
+            onClick={handleExportarExcel}
+            className="btn btn-secondary"
+            style={{ padding: '9px 16px', fontWeight: 600, gap: 8, background: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399' }}
+            title="Exportar dados da tabela para planilha Excel (CSV UTF-8)"
+          >
+            <FileSpreadsheet size={18} />
+            Exportar Excel
+          </button>
+          <button
             onClick={() => window.print()}
             className="btn btn-secondary"
-            title="Imprimir lista de agendamentos para a balança"
+            style={{ padding: '9px 16px', fontWeight: 600, gap: 8 }}
+            title="Imprimir romaneio e lista de carregamentos para a balança"
           >
             <Printer size={18} />
             Imprimir Relatório
@@ -225,6 +387,7 @@ export function PainelGestao({
             onClick={carregarDados}
             className="btn btn-vermont"
             disabled={carregando}
+            style={{ padding: '9px 18px', fontWeight: 600, gap: 8 }}
           >
             <RefreshCw size={18} className={carregando ? 'spin' : ''} />
             Atualizar
@@ -233,7 +396,7 @@ export function PainelGestao({
       </div>
 
       {mensagemAviso && (
-        <div className="animate-fade" style={{
+        <div className="animate-fade no-print" style={{
           background: 'var(--success-bg)',
           border: '1px solid var(--success-border)',
           color: '#6ee7b7',
@@ -267,7 +430,7 @@ export function PainelGestao({
             <strong style={{ color: '#fff' }}>Notificações por E-mail para: </strong>
             <span style={{ color: '#4ade80', fontWeight: 600 }}>{EMAIL_NOTIFICACAO_DESTINO}</span>
             <p style={{ margin: '3px 0 0 0', color: 'var(--slate-300)', fontSize: '0.8rem' }}>
-              Importante: Para autorizar o recebimento automático, certifique-se de que o e-mail de ativação (<strong>"Action Required: Activate your Form"</strong>) foi clicado em {EMAIL_NOTIFICACAO_DESTINO} (verifique a pasta de <strong>Spam / Lixo Eletrônico</strong>).
+              Cada agendamento e atualização é registrado com cópia imediata para a coordenação de logística.
             </p>
           </div>
         </div>
@@ -298,72 +461,82 @@ export function PainelGestao({
         )}
       </div>
 
-      {/* Métricas Rápidas */}
-      <div style={{
+      {/* Métricas Rápidas (Oculto na impressão) */}
+      <div className="no-print" style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: 14,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+        gap: 12,
         marginBottom: 20
       }}>
-        <div className="glass-panel" style={{ padding: '16px 18px' }}>
-          <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
+        <div className="glass-panel" style={{ padding: '14px 16px' }}>
+          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
             Total Registrado
           </span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#fff', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', marginTop: 4 }}>
             {agendamentos.length}
           </div>
-          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Carregamentos no Sistema</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Carregamentos no Sistema</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '16px 18px', borderLeft: '4px solid #4ade80' }}>
-          <span style={{ fontSize: '0.78rem', color: '#4ade80', textTransform: 'uppercase', fontWeight: 700 }}>
+        <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #4ade80' }}>
+          <span style={{ fontSize: '0.74rem', color: '#4ade80', textTransform: 'uppercase', fontWeight: 700 }}>
             Carregamentos Hoje
           </span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#4ade80', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#4ade80', marginTop: 4 }}>
             {agendamentosHoje.length}
           </div>
-          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Previstos para a data atual</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Previstos para hoje</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '16px 18px', borderLeft: '4px solid #f59e0b' }}>
-          <span style={{ fontSize: '0.78rem', color: '#fbbf24', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
+          <span style={{ fontSize: '0.74rem', color: '#fbbf24', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
             <Clock size={13} /> Aguardando Liberação
           </span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>
             {agendamentos.filter(a => a.status === 'Aguardando Liberação').length}
           </div>
-          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Aguardando aval do Admin</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Aguardando aval</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '16px 18px', borderLeft: '4px solid #22c55e' }}>
-          <span style={{ fontSize: '0.78rem', color: '#86efac', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #22c55e' }}>
+          <span style={{ fontSize: '0.74rem', color: '#86efac', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
             <CheckCircle2 size={13} /> Liberados p/ Carregar
           </span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#86efac', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#86efac', marginTop: 4 }}>
             {agendamentos.filter(a => a.status === 'Liberado para Carregar' || a.status === 'Confirmado').length}
           </div>
-          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Aprovados para expedição</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Aprovados p/ pátio</span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '16px 18px', borderLeft: '4px solid #3b82f6' }}>
-          <span style={{ fontSize: '0.78rem', color: '#93c5fd', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Truck size={13} /> Carregados
+        <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #38bdf8' }}>
+          <span style={{ fontSize: '0.74rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <PlayCircle size={13} /> Carregando
           </span>
-          <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#93c5fd', marginTop: 4 }}>
-            {agendamentos.filter(a => a.status === 'Carregado').length}
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38bdf8', marginTop: 4 }}>
+            {agendamentos.filter(a => a.status === 'Carregando').length}
           </div>
-          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Carga e pesagem concluídas</span>
+          <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Em operação na pedreira</span>
+        </div>
+
+        <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #10b981' }}>
+          <span style={{ fontSize: '0.74rem', color: '#34d399', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <CheckCheck size={13} /> Finalizados
+          </span>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>
+            {agendamentos.filter(a => a.status === 'Finalizado' || a.status === 'Carregado').length}
+          </div>
+          <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Pesagem & NFE ok</span>
         </div>
       </div>
 
-      {/* Barra de Filtros */}
+      {/* Barra de Filtros (Oculto na impressão) */}
       <div className="glass-panel no-print" style={{ padding: 18, marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ flex: '1 1 240px', position: 'relative' }}>
             <Search size={18} color="var(--slate-400)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
-              placeholder="Buscar por bloco, material, placa, motorista, cliente..."
+              placeholder="Buscar por bloco, material, placa, motorista, cliente, obs..."
               className="form-input"
               style={{ paddingLeft: 38 }}
               value={termoBusca}
@@ -371,7 +544,7 @@ export function PainelGestao({
             />
           </div>
 
-          <div style={{ flex: '0 1 240px' }}>
+          <div style={{ flex: '0 1 230px' }}>
             {isAdmin ? (
               <select
                 className="form-select"
@@ -401,7 +574,7 @@ export function PainelGestao({
             )}
           </div>
 
-          <div style={{ flex: '0 1 190px' }}>
+          <div style={{ flex: '0 1 200px' }}>
             <select
               className="form-select"
               value={filtroStatus}
@@ -409,60 +582,105 @@ export function PainelGestao({
             >
               <option value="todos">Todos os Status</option>
               <option value="Aguardando Liberação">🟡 Aguardando Liberação</option>
-              <option value="Liberado para Carregar">🟢 Liberado p/ Carregar</option>
-              <option value="Carregado">🔵 Carregado</option>
-              <option value="Cancelado">Cancelado</option>
+              <option value="Liberado para Carregar">🟢 Liberados p/ Carregar</option>
+              <option value="Carregando">🔵 Carregando</option>
+              <option value="Finalizado">✅ Finalizados</option>
+              <option value="Cancelado">❌ Cancelados</option>
             </select>
           </div>
 
-          <div style={{ flex: '0 1 170px' }}>
+          <div style={{ flex: '0 1 160px' }}>
             <input
               type="date"
               className="form-input"
               value={filtroData}
               onChange={(e) => setFiltroData(e.target.value)}
               style={{ colorScheme: 'dark' }}
-              title="Filtrar por data específica"
+              title="Filtrar por data específica (Padrão: Hoje)"
             />
           </div>
 
-          {filtroData && (
+          {filtroData ? (
             <button
               onClick={() => setFiltroData('')}
               className="btn btn-secondary"
-              style={{ padding: '10px 14px', fontSize: '0.8rem' }}
+              style={{ padding: '9px 14px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+              title="Ver agendamentos de todas as datas (remover filtro de data)"
             >
-              Limpar Data
+              Ver Todas as Datas
+            </button>
+          ) : (
+            <button
+              onClick={() => setFiltroData(hojeStr)}
+              className="btn btn-secondary"
+              style={{ padding: '9px 14px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+              title="Filtrar agendamentos de hoje"
+            >
+              Ver Hoje
             </button>
           )}
         </div>
       </div>
 
-      {/* Tabela de Agendamentos com Botão de Exclusão */}
-      <div className="glass-panel" style={{ overflow: 'hidden' }}>
+      {/* ÁREA DE IMPRESSÃO DO RELATÓRIO / ROMANEIO (Visível na tela e perfeitamente formatada no papel/PDF) */}
+      <div id="relatorio-imprimir" className="glass-panel" style={{ overflow: 'hidden' }}>
+        
+        {/* Cabeçalho Oficial do Relatório para a Balança */}
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: '2px solid #00762c',
+          background: 'rgba(0, 118, 44, 0.12)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 12
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff', letterSpacing: 0.5 }}>
+                VERMONT MINERAÇÃO LTDA.
+              </span>
+              <span className="badge badge-vermont" style={{ fontSize: '0.72rem' }}>
+                CONTROLE DE CARREGAMENTOS & ROMANEIO
+              </span>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: 'var(--slate-300)', marginTop: 2 }}>
+              Unidade: <strong>{filtroPedreira === 'todas' ? 'Todas as Pedreiras (Polo Ceará)' : filtroPedreira}</strong> | 
+              Data de Emissão: <strong>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date())}</strong>
+              {filtroData && <> | Filtrado para a data: <strong>{formatarDataBR(filtroData)}</strong></>}
+            </div>
+          </div>
+
+          <div style={{ fontSize: '0.82rem', color: '#4ade80', fontWeight: 700 }}>
+            Total de Veículos Listados: {agendamentosFiltrados.length}
+          </div>
+        </div>
+
         <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
             <thead>
               <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                <th style={{ padding: '14px 16px', color: 'var(--slate-400)', fontWeight: 600 }}>DATA / HORÁRIO</th>
-                <th style={{ padding: '14px 16px', color: 'var(--slate-400)', fontWeight: 600 }}>PEDREIRA / MATERIAL</th>
-                <th style={{ padding: '14px 16px', color: 'var(--slate-400)', fontWeight: 600 }}>BLOCO / CLIENTE</th>
-                <th style={{ padding: '14px 16px', color: 'var(--slate-400)', fontWeight: 600 }}>MOTORISTA / CPF</th>
-                <th style={{ padding: '14px 16px', color: 'var(--slate-400)', fontWeight: 600 }}>VEÍCULO / PLACAS</th>
-                <th style={{ padding: '14px 16px', color: 'var(--slate-400)', fontWeight: 600 }}>STATUS</th>
-                <th style={{ padding: '14px 16px', color: 'var(--slate-400)', fontWeight: 600 }} className="no-print">AÇÕES DO ADMIN</th>
+                <th style={{ padding: '12px 14px', color: 'var(--slate-400)', fontWeight: 600, width: '100px' }}>HORÁRIO</th>
+                <th style={{ padding: '12px 14px', color: 'var(--slate-400)', fontWeight: 600 }}>PEDREIRA / MATERIAL</th>
+                <th style={{ padding: '12px 14px', color: 'var(--slate-400)', fontWeight: 600 }}>BLOCO / CLIENTE</th>
+                <th style={{ padding: '12px 14px', color: 'var(--slate-400)', fontWeight: 600 }}>MOTORISTA / CPF</th>
+                <th style={{ padding: '12px 14px', color: 'var(--slate-400)', fontWeight: 600 }}>PLACAS</th>
+                <th style={{ padding: '12px 14px', color: 'var(--slate-400)', fontWeight: 600 }}>STATUS</th>
+                <th style={{ padding: '12px 14px', color: 'var(--slate-400)', fontWeight: 600 }}>OBSERVAÇÕES / OCORRÊNCIAS</th>
+                <th style={{ padding: '12px 14px', color: 'var(--slate-400)', fontWeight: 600 }} className="no-print">AÇÕES</th>
               </tr>
             </thead>
             <tbody>
               {carregando ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--slate-400)' }}>
+                  <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'var(--slate-400)' }}>
                     Carregando agendamentos...
                   </td>
                 </tr>
               ) : agendamentosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--slate-400)' }}>
+                  <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'var(--slate-400)' }}>
                     Nenhum agendamento encontrado para os filtros selecionados.
                   </td>
                 </tr>
@@ -483,7 +701,7 @@ export function PainelGestao({
                       onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                     >
                       {/* Data / Horário */}
-                      <td style={{ padding: '14px 16px' }}>
+                      <td style={{ padding: '12px 14px' }}>
                         <div style={{ fontWeight: 700, color: '#fff' }}>{formatarDataBR(ag.data_agendamento)}</div>
                         <div style={{ fontSize: '0.8rem', color: isSabado ? '#fbbf24' : '#86efac', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                           <Clock size={13} />
@@ -491,66 +709,62 @@ export function PainelGestao({
                         </div>
                         {isSabado && (
                           <span className="badge badge-warning" style={{ fontSize: '0.65rem', padding: '1px 6px', marginTop: 4 }}>
-                            Sábado (Cota)
+                            Sábado
                           </span>
                         )}
                       </td>
 
                       {/* Pedreira / Material */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <strong style={{ color: '#fff' }}>{ag.pedreira}</strong>
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <strong style={{ color: '#fff' }}>{ag.pedreira}</strong>
+                          {(ag.is_combinado || ag.observacoes?.includes('[Carga Combinada') || ag.observacoes?.includes('[Carga Mista')) && (
+                            <span 
+                              title="Carregamento Misto / Carga Combinada (múltiplos blocos no mesmo veículo)"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
+                                background: 'rgba(56, 189, 248, 0.18)',
+                                border: '1px solid rgba(56, 189, 248, 0.5)',
+                                color: '#38bdf8',
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                padding: '1px 6px',
+                                borderRadius: 4,
+                                cursor: 'help'
+                              }}
+                            >
+                              ° Misto
+                            </span>
+                          )}
+                        </div>
                         <div style={{ fontSize: '0.82rem', color: '#86efac', fontWeight: 500 }}>
                           Material: {ag.material}
                         </div>
-                        {ag.observacoes?.includes('[Carga Combinada 1/2]') && (
-                          <span className="badge" style={{
-                            background: 'rgba(56, 189, 248, 0.15)',
-                            color: '#38bdf8',
-                            border: '1px solid rgba(56, 189, 248, 0.3)',
-                            fontSize: '0.68rem',
-                            padding: '2px 6px',
-                            borderRadius: 4,
-                            display: 'inline-block',
-                            marginTop: 4
-                          }}>
-                            🔄 Carga Combinada (1/2)
-                          </span>
-                        )}
-                        {ag.observacoes?.includes('[Carga Combinada 2/2]') && (
-                          <span className="badge" style={{
-                            background: 'rgba(168, 85, 247, 0.15)',
-                            color: '#c084fc',
-                            border: '1px solid rgba(168, 85, 247, 0.3)',
-                            fontSize: '0.68rem',
-                            padding: '2px 6px',
-                            borderRadius: 4,
-                            display: 'inline-block',
-                            marginTop: 4
-                          }}>
-                            🔄 Carga Combinada (2/2)
-                          </span>
-                        )}
                       </td>
 
                       {/* Bloco / Cliente */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontWeight: 700, color: '#fff' }}>Bloco: {ag.numero_bloco}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--slate-400)' }}>Cliente: {ag.cliente}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--slate-500)' }}>Transp: {ag.transportadora}</div>
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.94rem' }}>
+                          Bloco: {ag.numero_bloco}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>Cliente: {ag.cliente}</div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--slate-500)' }}>Transp: {ag.transportadora}</div>
                       </td>
 
                       {/* Motorista / CPF */}
-                      <td style={{ padding: '14px 16px' }}>
+                      <td style={{ padding: '12px 14px' }}>
                         <div style={{ fontWeight: 600, color: '#fff' }}>{ag.motorista_nome}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--slate-400)', fontFamily: 'monospace' }}>CPF: {ag.motorista_cpf}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)', fontFamily: 'monospace' }}>CPF: {ag.motorista_cpf}</div>
                         {ag.motorista_telefone && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--info)' }}>{ag.motorista_telefone}</div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--info)' }}>{ag.motorista_telefone}</div>
                         )}
                       </td>
 
                       {/* Veículo / Placas Dinâmicas */}
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontSize: '0.78rem', color: '#86efac', fontWeight: 600 }}>
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ fontSize: '0.76rem', color: '#86efac', fontWeight: 600 }}>
                           {ag.tipo_veiculo}
                         </div>
                         <div style={{ fontSize: '0.78rem', marginTop: 2 }}>
@@ -564,7 +778,7 @@ export function PainelGestao({
                       </td>
 
                       {/* Status */}
-                      <td style={{ padding: '14px 16px' }}>
+                      <td style={{ padding: '12px 14px', minWidth: 175 }}>
                         {ag.status === 'Aguardando Liberação' && (
                           <span className="badge" style={{
                             background: 'rgba(245, 158, 11, 0.18)',
@@ -572,7 +786,10 @@ export function PainelGestao({
                             border: '1px solid rgba(245, 158, 11, 0.45)',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: 5
+                            gap: 5,
+                            padding: '4px 8px',
+                            fontSize: '0.76rem',
+                            fontWeight: 700
                           }}>
                             <Clock size={12} /> Aguardando Liberação
                           </span>
@@ -584,122 +801,193 @@ export function PainelGestao({
                             border: '1px solid rgba(74, 222, 128, 0.45)',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: 5
+                            gap: 5,
+                            padding: '4px 8px',
+                            fontSize: '0.76rem',
+                            fontWeight: 700
                           }}>
                             <CheckCircle2 size={12} /> Liberado p/ Carregar
                           </span>
                         )}
-                        {ag.status === 'Carregado' && (
+                        {ag.status === 'Carregando' && (
                           <span className="badge" style={{
-                            background: 'rgba(59, 130, 246, 0.18)',
-                            color: '#60a5fa',
-                            border: '1px solid rgba(59, 130, 246, 0.45)',
+                            background: 'rgba(56, 189, 248, 0.18)',
+                            color: '#38bdf8',
+                            border: '1px solid rgba(56, 189, 248, 0.45)',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: 5
+                            gap: 5,
+                            padding: '4px 8px',
+                            fontSize: '0.76rem',
+                            fontWeight: 700
                           }}>
-                            <Truck size={12} /> Carregado
+                            <PlayCircle size={12} /> Carregando
                           </span>
                         )}
-                        {ag.status !== 'Aguardando Liberação' && ag.status !== 'Liberado para Carregar' && ag.status !== 'Confirmado' && ag.status !== 'Carregado' && (
-                          <span className="badge badge-danger">
-                            {ag.status}
+                        {(ag.status === 'Finalizado' || ag.status === 'Carregado') && (
+                          <span className="badge" style={{
+                            background: 'rgba(16, 185, 129, 0.18)',
+                            color: '#34d399',
+                            border: '1px solid rgba(16, 185, 129, 0.45)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            padding: '4px 8px',
+                            fontSize: '0.76rem',
+                            fontWeight: 700
+                          }}>
+                            <CheckCheck size={12} /> Finalizado
                           </span>
                         )}
-                        {ag.email_notificado && (
-                          <div style={{ fontSize: '0.7rem', color: '#86efac', marginTop: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
-                            <Mail size={11} /> Notificado
+                        {ag.status === 'Cancelado' && (
+                          <span className="badge badge-danger" style={{ padding: '4px 8px', fontSize: '0.76rem', fontWeight: 700 }}>
+                            ❌ Cancelado
+                          </span>
+                        )}
+
+                        {/* Seletor Moderno de Alteração de Status */}
+                        <div className="no-print" style={{ marginTop: 8 }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: 'rgba(15, 23, 42, 0.85)',
+                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            borderRadius: 8,
+                            padding: '2px 6px'
+                          }}>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--slate-400)', fontWeight: 600, textTransform: 'uppercase' }}>
+                              Mudar:
+                            </span>
+                            <select
+                              value={ag.status === 'Carregado' ? 'Finalizado' : ag.status}
+                              onChange={(e) => solicitarMudancaStatus(ag, e.target.value)}
+                              style={{
+                                flex: 1,
+                                padding: '4px 6px',
+                                fontSize: '0.76rem',
+                                fontWeight: 600,
+                                borderRadius: 5,
+                                background: '#111915',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                color: '#f1f5f9',
+                                cursor: 'pointer',
+                                outline: 'none'
+                              }}
+                            >
+                              {isAdmin && (
+                                <option value="Aguardando Liberação" style={{ background: '#111915', color: '#fbbf24' }}>
+                                  🟡 Aguardando Liberação
+                                </option>
+                              )}
+                              <option value="Liberado para Carregar" style={{ background: '#111915', color: '#4ade80' }}>
+                                🟢 Liberado p/ Carregar
+                              </option>
+                              <option value="Carregando" style={{ background: '#111915', color: '#38bdf8' }}>
+                                🔵 Carregando
+                              </option>
+                              <option value="Finalizado" style={{ background: '#111915', color: '#34d399' }}>
+                                ✅ Finalizado
+                              </option>
+                              <option value="Cancelado" style={{ background: '#111915', color: '#f87171' }}>
+                                ❌ Cancelado
+                              </option>
+                            </select>
                           </div>
+                        </div>
+
+                        {/* Link / Botão para Histórico de Alterações de Status */}
+                        <div className="no-print">
+                          {Array.isArray(ag.historico_status) && ag.historico_status.length > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => setAgendamentoParaHistorico(ag)}
+                              style={{
+                                marginTop: 5,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                background: 'rgba(56, 189, 248, 0.08)',
+                                border: '1px dashed rgba(56, 189, 248, 0.35)',
+                                color: '#38bdf8',
+                                fontSize: '0.68rem',
+                                fontWeight: 600,
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                cursor: 'pointer',
+                                width: '100%',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s'
+                              }}
+                              title="Ver histórico completo de quem alterou o status e data/hora"
+                            >
+                              <History size={11} /> {ag.historico_status.length} {ag.historico_status.length === 1 ? 'alteração' : 'alterações'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setAgendamentoParaHistorico(ag)}
+                              style={{
+                                marginTop: 5,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--slate-500)',
+                                fontSize: '0.66rem',
+                                padding: '2px 4px',
+                                cursor: 'pointer',
+                                width: '100%',
+                                justifyContent: 'center'
+                              }}
+                              title="Ver registro de auditoria do status"
+                            >
+                              <History size={10} /> Histórico
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Observações Operacionais */}
+                      <td style={{ padding: '12px 14px', maxWidth: 220 }}>
+                        {ag.observacoes ? (
+                          <div style={{ fontSize: '0.78rem', color: '#e2e8f0', lineHeight: '1.3' }}>
+                            {ag.observacoes}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--slate-500)', fontStyle: 'italic' }}>
+                            Sem observações registradas.
+                          </span>
                         )}
                       </td>
 
-                      {/* Ações Administrativas e Operacionais */}
-                      <td style={{ padding: '14px 16px' }} className="no-print">
+                      {/* Ações Administrativas e Operacionais (Oculto na impressão) */}
+                      <td style={{ padding: '12px 14px' }} className="no-print">
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                          
+                          {/* BOTÃO EDITAR INFORMAÇÕES DO BLOCO & OBSERVAÇÕES */}
+                          <button
+                            type="button"
+                            onClick={() => setAgendamentoParaEditar(ag)}
+                            className="btn btn-vermont"
+                            style={{ padding: '6px 10px', fontSize: '0.78rem', gap: 4 }}
+                            title="Editar bloco, material, motorista, placas ou adicionar observações"
+                          >
+                            <Edit3 size={14} />
+                            Editar
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => onVisualizarComprovante(ag)}
                             className="btn btn-secondary"
                             style={{ padding: '6px 10px', fontSize: '0.78rem' }}
-                            title="Ver Comprovante Oficial"
+                            title="Ver Comprovante Oficial de Agendamento"
                           >
                             <FileText size={14} />
                             Ver
                           </button>
-
-                          {/* BOTÃO EXCLUSIVO ADMIN: LIBERAR CARREGAMENTO */}
-                          {isAdmin && ag.status === 'Aguardando Liberação' && (
-                            <button
-                              type="button"
-                              onClick={() => handleMudarStatus(ag.id, 'Liberado para Carregar')}
-                              className="btn btn-vermont glow-effect"
-                              style={{ padding: '6px 12px', fontSize: '0.78rem', fontWeight: 700, gap: 5 }}
-                              title="Validar documentação e autorizar o carregamento na pedreira"
-                            >
-                              <ShieldCheck size={15} />
-                              Liberar
-                            </button>
-                          )}
-
-                          {/* BLOQUEIO OPERACIONAL QUANDO AGUARDANDO ADMIN (Visão do Operador) */}
-                          {!isAdmin && ag.status === 'Aguardando Liberação' && (
-                            <span 
-                              style={{
-                                padding: '5px 8px',
-                                background: 'rgba(245, 158, 11, 0.12)',
-                                border: '1px solid rgba(245, 158, 11, 0.35)',
-                                borderRadius: 6,
-                                color: '#fde047',
-                                fontSize: '0.72rem',
-                                fontWeight: 600,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4
-                              }}
-                              title="Aguardando liberação do Administrador Geral para poder iniciar o carregamento"
-                            >
-                              <ShieldAlert size={12} /> Aguarda Admin
-                            </span>
-                          )}
-
-                          {/* MARCAR COMO CARREGADO: Disponível apenas se já estiver liberado */}
-                          {(ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
-                            <button
-                              type="button"
-                              onClick={() => handleMudarStatus(ag.id, 'Carregado')}
-                              className="btn btn-success"
-                              style={{ padding: '6px 10px', fontSize: '0.78rem', fontWeight: 600 }}
-                              title="Registrar que o veículo foi carregado e pesado"
-                            >
-                              <Truck size={14} />
-                              Carregado
-                            </button>
-                          )}
-
-                          {/* ADMIN: Opção de reverter status se necessário */}
-                          {isAdmin && (ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
-                            <button
-                              type="button"
-                              onClick={() => handleMudarStatus(ag.id, 'Aguardando Liberação')}
-                              className="btn btn-secondary"
-                              style={{ padding: '6px 8px', fontSize: '0.78rem' }}
-                              title="Reverter para Aguardando Liberação (Segurar carregamento)"
-                            >
-                              <RotateCcw size={13} color="#f59e0b" />
-                            </button>
-                          )}
-
-                          {isAdmin && ag.status === 'Carregado' && (
-                            <button
-                              type="button"
-                              onClick={() => handleMudarStatus(ag.id, 'Liberado para Carregar')}
-                              className="btn btn-secondary"
-                              style={{ padding: '6px 8px', fontSize: '0.78rem' }}
-                              title="Reabrir status para Liberado para Carregar"
-                            >
-                              <RotateCcw size={13} color="#4ade80" />
-                            </button>
-                          )}
 
                           <button
                             type="button"
@@ -707,7 +995,7 @@ export function PainelGestao({
                             className="btn btn-secondary"
                             style={{ padding: '6px 8px', fontSize: '0.78rem' }}
                             disabled={notificandoEmailId === ag.id}
-                            title={`Reenviar e-mail para ${EMAIL_NOTIFICACAO_DESTINO}`}
+                            title="Reenviar e-mail de notificação para a logística"
                           >
                             <Mail size={14} color="var(--info)" />
                           </button>
@@ -734,7 +1022,61 @@ export function PainelGestao({
             </tbody>
           </table>
         </div>
+
+        {/* Rodapé Oficial da Balança para Impressão */}
+        <div className="print-only" style={{
+          marginTop: 24,
+          padding: '16px 20px',
+          borderTop: '1px solid #64748b',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 30
+        }}>
+          <div>
+            <div style={{ borderBottom: '1px solid #334155', height: 36, marginBottom: 6 }} />
+            <div style={{ fontSize: '11px', textAlign: 'center', color: '#1e293b', fontWeight: 600 }}>
+              Assinatura do Conferente / Operador da Balança
+            </div>
+          </div>
+          <div>
+            <div style={{ borderBottom: '1px solid #334155', height: 36, marginBottom: 6 }} />
+            <div style={{ fontSize: '11px', textAlign: 'center', color: '#1e293b', fontWeight: 600 }}>
+              Assinatura do Responsável pela Logística / Expedição
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Modal de Edição de Agendamento */}
+      {agendamentoParaEditar && (
+        <ModalEditarAgendamento
+          agendamento={agendamentoParaEditar}
+          onFechar={() => setAgendamentoParaEditar(null)}
+          onSalvo={handleSalvoEdicao}
+          isAdmin={isAdmin}
+          usuarioInfo={usuarioInfo}
+        />
+      )}
+
+      {/* Modal de Histórico de Alterações de Status */}
+      {agendamentoParaHistorico && (
+        <ModalHistoricoStatus
+          agendamento={agendamentoParaHistorico}
+          onFechar={() => setAgendamentoParaHistorico(null)}
+        />
+      )}
+
+      {/* Modal de Atenção e Confirmação de Alteração de Status */}
+      {mudancaStatusPendente && (
+        <ModalConfirmarStatus
+          agendamento={mudancaStatusPendente.agendamento}
+          novoStatus={mudancaStatusPendente.novoStatus}
+          usuarioInfo={usuarioInfo}
+          processando={processandoMudancaStatus}
+          onConfirmar={handleConfirmarMudancaStatus}
+          onCancelar={handleCancelarMudancaStatus}
+        />
+      )}
     </div>
   );
 }

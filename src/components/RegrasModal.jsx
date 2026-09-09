@@ -107,7 +107,7 @@ export function RegrasModal({ aberto, onFechar }) {
                 <strong>Capacidade Máxima:</strong> 12 Veículos no total do dia.
               </p>
               <p style={{ fontSize: '0.78rem', color: 'var(--slate-400)', margin: 0 }}>
-                Apenas a pedreira <strong>URUOCA - CE (TAJ MAHAL)</strong> opera aos sábados. Demais pedreiras funcionam de segunda a sexta.
+                Apenas a pedreira <strong>Uruoca - CE (Taj Mahal)</strong> opera aos sábados. Demais pedreiras funcionam de segunda a sexta.
               </p>
             </div>
           </div>
@@ -234,7 +234,7 @@ export function RegrasModal({ aberto, onFechar }) {
           <div style={{ fontSize: '0.84rem' }}>
             <strong style={{ color: '#fff' }}>Notificação Oficial de Carregamento</strong>
             <p style={{ margin: '4px 0 0 0', color: 'var(--slate-300)' }}>
-              Cada agendamento gravado despacha confirmação imediata para <strong style={{ color: '#86efac' }}>{EMAIL_NOTIFICACAO_DESTINO}</strong>.
+              Cada agendamento gravado despacha confirmação imediata para <strong style={{ color: '#86efac' }}>o e-mail da logística</strong>.
             </p>
           </div>
         </div>

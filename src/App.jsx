@@ -6,7 +6,7 @@ import { AdminLogin } from './components/AdminLogin';
 import { ComprovanteModal } from './components/ComprovanteModal';
 import { RegrasModal } from './components/RegrasModal';
 import { ShieldCheck, Mail } from 'lucide-react';
-import { EMAIL_NOTIFICACAO_DESTINO } from './services/agendamentoService';
+import { EMAIL_NOTIFICACAO_DESTINO, isSupabaseConfigurado } from './services/agendamentoService';
 import { supabase } from './lib/supabase';
 
 export function App() {
@@ -24,23 +24,41 @@ export function App() {
     localStorage.setItem('vermont_tema_fundo', temaFundo);
   }, [temaFundo]);
 
-  // Estado de autenticação via Supabase Auth (Admin ou Operador de Pedreira)
-  const [usuarioAuth, setUsuarioAuth] = useState(null);
+  // Estado de autenticação via Supabase Auth com persistência local
+  const [usuarioAuth, setUsuarioAuth] = useState(() => {
+    try {
+      const raw = localStorage.getItem('vermont_auth_session');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  });
 
   useEffect(() => {
-    // Verifica sessão ativa existente
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUsuarioAuth(session?.user || null);
-    });
+    // Verifica sessão ativa existente se o Supabase estiver configurado
+    if (isSupabaseConfigurado()) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          setUsuarioAuth(session.user);
+          localStorage.setItem('vermont_auth_session', JSON.stringify(session.user));
+        }
+      }).catch(() => {});
 
-    // Escuta alterações de estado de autenticação em tempo real
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUsuarioAuth(session?.user || null);
-    });
+      // Escuta alterações de estado de autenticação em tempo real
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          setUsuarioAuth(session.user);
+          localStorage.setItem('vermont_auth_session', JSON.stringify(session.user));
+        } else if (_event === 'SIGNED_OUT') {
+          setUsuarioAuth(null);
+          localStorage.removeItem('vermont_auth_session');
+        }
+      });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
   }, []);
 
   const isAutenticado = !!usuarioAuth;
@@ -51,33 +69,46 @@ export function App() {
   const isAdmin = isAutenticado && (
     userMeta.role === 'admin' || 
     userEmail.startsWith('admin') || 
-    userEmail.includes('faturamento')
+    userEmail.includes('faturamento') ||
+    userEmail.includes('diretoria') ||
+    userEmail.includes('logistica')
   );
 
   // Pedreira vinculada caso seja operador de campo
   const pedreiraOperador = isAdmin ? null : (
     userMeta.pedreira || (
-      userEmail.includes('uruoca') ? 'URUOCA - CE (TAJ MAHAL)' :
-      userEmail.includes('negresco') ? 'MASSAPÊ - CE (NEGRESCO)' :
-      userEmail.includes('delmare') ? 'MASSAPÊ - CE (DEL MARE)' :
-      userEmail.includes('jaibaras') ? 'SOBRAL - CE (JAIBARAS)' :
-      userEmail.includes('serrote') ? 'SÃO GONÇALO DO AMARANTE - CE (SERROTE)' :
-      userEmail.includes('beberibe') ? 'BEBERIBE - CE' : null
+      userEmail.includes('uruoca') ? 'Uruoca - CE (Taj Mahal)' :
+      userEmail.includes('negresco') ? 'Massapê - CE (Negresco)' :
+      userEmail.includes('delmare') ? 'Massapê - CE (Del Mare)' :
+      userEmail.includes('jaibaras') ? 'Sobral - CE (Jaibaras)' :
+      userEmail.includes('serrote') ? 'São Gonçalo do Amarante - CE (Serrote)' :
+      userEmail.includes('beberibe') ? 'Beberibe - CE' : null
     )
   );
 
-  const handleLoginSucesso = () => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUsuarioAuth(session?.user || null);
-    });
+  const handleLoginSucesso = (user) => {
+    if (user) {
+      setUsuarioAuth(user);
+      localStorage.setItem('vermont_auth_session', JSON.stringify(user));
+    } else if (isSupabaseConfigurado()) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          setUsuarioAuth(session.user);
+          localStorage.setItem('vermont_auth_session', JSON.stringify(session.user));
+        }
+      });
+    }
   };
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      if (isSupabaseConfigurado()) {
+        await supabase.auth.signOut();
+      }
     } catch (err) {
       console.error('Erro ao encerrar sessão:', err);
     }
+    localStorage.removeItem('vermont_auth_session');
     setUsuarioAuth(null);
     setAbaAtiva('agendar');
   };
@@ -167,14 +198,14 @@ export function App() {
           <div>
             <strong style={{ color: '#fff', fontSize: '0.92rem' }}>VERMONT MINERAÇÃO LTDA.</strong>
             <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem' }}>
-              Polo Operacional Ceará: URUOCA (TAJ MAHAL) • MASSAPÊ (NEGRESCO) • MASSAPÊ (DEL MARE) • SOBRAL (JAIBARAS) • SÃO GONÇALO DO AMARANTE (SERROTE) • BEBERIBE
+              Polo Operacional Ceará: Uruoca (Taj Mahal) • Massapê (Negresco) • Massapê (Del Mare) • Sobral (Jaibaras) • São Gonçalo do Amarante (Serrote) • Beberibe
             </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: '0.8rem' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--slate-300)' }}>
               <Mail size={15} color="#4ade80" />
-              Notificações: <strong style={{ color: '#4ade80' }}>{EMAIL_NOTIFICACAO_DESTINO}</strong>
+              Notificações: <strong style={{ color: '#4ade80' }}>E-mail da logística</strong>
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--slate-400)' }}>
               <ShieldCheck size={15} color="#34d399" />

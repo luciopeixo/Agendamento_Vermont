@@ -65,6 +65,25 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   const [ocupacaoSabado2, setOcupacaoSabado2] = useState({ total: 0, limite: 12, disponivel: 12, lotado: false });
   const [horariosOcupados2, setHorariosOcupados2] = useState([]);
 
+  // Quantidade de blocos no carregamento combinado: 2 ou 3
+  const [qtdBlocosCombinados, setQtdBlocosCombinados] = useState(2);
+
+  // Ponto 3 (para Carregamento Combinado com 3 Blocos)
+  const pedreira3Inicial = PEDREIRAS_CEARA[2]?.nome || PEDREIRAS_CEARA[0].nome;
+  const materiaisIniciaisPonto3 = obterMateriaisPorPedreira(pedreira3Inicial);
+  const [ponto3, setPonto3] = useState({
+    pedreira: pedreira3Inicial,
+    material: materiaisIniciaisPonto3[0] || '',
+    numero_bloco: '',
+    data_agendamento: hoje,
+    horario_agendamento: '15:10',
+    justificativa_outros: ''
+  });
+
+  const [tipoDia3, setTipoDia3] = useState('dia_util');
+  const [ocupacaoSabado3, setOcupacaoSabado3] = useState({ total: 0, limite: 12, disponivel: 12, lotado: false });
+  const [horariosOcupados3, setHorariosOcupados3] = useState([]);
+
   const [carregandoOcupacao, setCarregandoOcupacao] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [mensagemErro, setMensagemErro] = useState('');
@@ -168,6 +187,35 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     }
   }, [tipoCarregamento, ponto2.data_agendamento, ponto2.pedreira]);
 
+  // Avalia o tipo de dia e carrega vagas de sábado ou horários ocupados para o PONTO 3 (se combinado com 3 blocos)
+  useEffect(() => {
+    if (tipoCarregamento !== 'combinado' || qtdBlocosCombinados !== 3 || !ponto3.data_agendamento) return;
+
+    const [ano, mes, dia] = ponto3.data_agendamento.split('-').map(Number);
+    const dataObj = new Date(ano, mes - 1, dia);
+    const diaSemana = dataObj.getDay();
+
+    if (diaSemana === 0) {
+      setTipoDia3('domingo');
+      setHorariosOcupados3([]);
+    } else if (diaSemana === 6) {
+      setTipoDia3('sabado');
+      obterOcupacaoSabado(ponto3.data_agendamento, ponto3.pedreira).then(setOcupacaoSabado3);
+      setHorariosOcupados3([]);
+    } else {
+      setTipoDia3('dia_util');
+      obterHorariosOcupados(ponto3.data_agendamento, ponto3.pedreira).then(ocupados => {
+        setHorariosOcupados3(ocupados);
+        if (ocupados.includes(ponto3.horario_agendamento)) {
+          const primeiroLivre = HORARIOS_SEMANA.find(h => h.id !== 'outros' && !ocupados.includes(h.id));
+          if (primeiroLivre) {
+            setPonto3(prev => ({ ...prev, horario_agendamento: primeiroLivre.id }));
+          }
+        }
+      });
+    }
+  }, [tipoCarregamento, qtdBlocosCombinados, ponto3.data_agendamento, ponto3.pedreira]);
+
   const handleChange = (campo, valor) => {
     setFormData(prev => ({ ...prev, [campo]: valor }));
     if (mensagemErro) setMensagemErro('');
@@ -200,6 +248,22 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     if (mensagemErro) setMensagemErro('');
   };
 
+  const handlePonto3Change = (campo, valor) => {
+    setPonto3(prev => ({ ...prev, [campo]: valor }));
+    if (mensagemErro) setMensagemErro('');
+  };
+
+  const handlePedreira3Change = (novaPedreira) => {
+    const novosMateriais = obterMateriaisPorPedreira(novaPedreira);
+    const materialValido = novosMateriais.includes(ponto3.material);
+    setPonto3(prev => ({
+      ...prev,
+      pedreira: novaPedreira,
+      material: materialValido ? prev.material : (novosMateriais[0] || '')
+    }));
+    if (mensagemErro) setMensagemErro('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMensagemErro('');
@@ -211,7 +275,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     }
 
     if (tipoDia === 'sabado' && !isPedreiraUruoca(formData.pedreira)) {
-      setMensagemErro('Aos sábados, o carregamento opera exclusivamente na pedreira de URUOCA - CE (TAJ MAHAL). Por favor, selecione uma data entre segunda e sexta-feira ou altere para a pedreira de Uruoca no 1º carregamento.');
+      setMensagemErro('Aos sábados, o carregamento opera exclusivamente na pedreira de Uruoca - CE (Taj Mahal). Por favor, selecione uma data entre segunda e sexta-feira ou altere para a pedreira de Uruoca no 1º carregamento.');
       return;
     }
 
@@ -243,7 +307,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       }
 
       if (tipoDia2 === 'sabado' && !isPedreiraUruoca(ponto2.pedreira)) {
-        setMensagemErro('Aos sábados, o carregamento opera exclusivamente na pedreira de URUOCA - CE (TAJ MAHAL). Por favor, selecione uma data entre segunda e sexta-feira para o 2º carregamento.');
+        setMensagemErro('Aos sábados, o carregamento opera exclusivamente na pedreira de Uruoca - CE (Taj Mahal). Por favor, selecione uma data entre segunda e sexta-feira para o 2º carregamento.');
         return;
       }
 
@@ -273,8 +337,62 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         formData.horario_agendamento === ponto2.horario_agendamento &&
         formData.horario_agendamento !== 'outros'
       ) {
-        setMensagemErro('Para a mesma pedreira e mesma data, selecione horários distintos para cada um dos blocos.');
+        setMensagemErro('Para a mesma pedreira e mesma data, selecione horários distintos para o 1º e 2º blocos.');
         return;
+      }
+
+      // Validações do 3º Ponto (se for carga combinada de 3 blocos)
+      if (qtdBlocosCombinados === 3) {
+        if (tipoDia3 === 'domingo') {
+          setMensagemErro('As pedreiras não realizam carregamentos aos domingos. Por favor, selecione outra data para o 3º carregamento.');
+          return;
+        }
+
+        if (tipoDia3 === 'sabado' && !isPedreiraUruoca(ponto3.pedreira)) {
+          setMensagemErro('Aos sábados, o carregamento opera exclusivamente na pedreira de Uruoca - CE (Taj Mahal). Por favor, selecione uma data entre segunda e sexta-feira para o 3º carregamento.');
+          return;
+        }
+
+        if (tipoDia3 === 'sabado' && ocupacaoSabado3.lotado) {
+          setMensagemErro('O limite máximo de 12 veículos para este sábado na pedreira de Uruoca foi atingido (3º carregamento). Escolha outra data.');
+          return;
+        }
+
+        if (tipoDia3 === 'dia_util' && ponto3.horario_agendamento !== 'outros' && horariosOcupados3.includes(ponto3.horario_agendamento)) {
+          setMensagemErro(`O horário ${ponto3.horario_agendamento} já foi reservado nesta pedreira (3º carregamento). Por favor, selecione outro horário disponível.`);
+          return;
+        }
+
+        if (!ponto3.material || !ponto3.material.trim()) {
+          setMensagemErro('Selecione o material do 3º carregamento.');
+          return;
+        }
+
+        if (!ponto3.numero_bloco.trim()) {
+          setMensagemErro('Informe a numeração do bloco do 3º carregamento.');
+          return;
+        }
+
+        // Colisões entre 3º ponto e 1º ou 2º ponto
+        if (
+          formData.pedreira === ponto3.pedreira &&
+          formData.data_agendamento === ponto3.data_agendamento &&
+          formData.horario_agendamento === ponto3.horario_agendamento &&
+          formData.horario_agendamento !== 'outros'
+        ) {
+          setMensagemErro('Para a mesma pedreira e mesma data, selecione horários distintos para o 1º e 3º blocos.');
+          return;
+        }
+
+        if (
+          ponto2.pedreira === ponto3.pedreira &&
+          ponto2.data_agendamento === ponto3.data_agendamento &&
+          ponto2.horario_agendamento === ponto3.horario_agendamento &&
+          ponto2.horario_agendamento !== 'outros'
+        ) {
+          setMensagemErro('Para a mesma pedreira e mesma data, selecione horários distintos para o 2º e 3º blocos.');
+          return;
+        }
       }
     }
 
@@ -324,6 +442,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return;
     }
 
+    if (tipoCarregamento === 'combinado' && qtdBlocosCombinados === 3 && tipoDia3 === 'dia_util' && ponto3.horario_agendamento === 'outros' && !ponto3.justificativa_outros.trim()) {
+      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 3º carregamento.');
+      return;
+    }
+
     setEnviando(true);
 
     let resultado;
@@ -348,6 +471,15 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           horario_agendamento: tipoDia2 === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : ponto2.horario_agendamento,
           justificativa_outros: ponto2.justificativa_outros
         },
+        ponto3: qtdBlocosCombinados === 3 ? {
+          pedreira: ponto3.pedreira,
+          material: ponto3.material,
+          numero_bloco: ponto3.numero_bloco,
+          data_agendamento: ponto3.data_agendamento,
+          tipo_dia: tipoDia3,
+          horario_agendamento: tipoDia3 === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : ponto3.horario_agendamento,
+          justificativa_outros: ponto3.justificativa_outros
+        } : null,
         veiculo: {
           cliente: formData.cliente,
           transportadora: formData.transportadora,
@@ -427,7 +559,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       <div style={{
         display: 'flex',
         gap: 10,
-        marginBottom: 20,
+        marginBottom: tipoCarregamento === 'combinado' ? 12 : 20,
         background: 'rgba(20, 28, 24, 0.7)',
         padding: 6,
         borderRadius: 14,
@@ -486,9 +618,68 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           }}
         >
           <Layers size={19} />
-          Carga Combinada (2 Blocos / Pedreiras)
+          Carga Combinada (2 ou 3 Blocos / Pedreiras)
         </button>
       </div>
+
+      {/* Se for Carga Combinada: Seletor de 2 ou 3 Blocos */}
+      {tipoCarregamento === 'combinado' && (
+        <div className="animate-fade" style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'rgba(56, 189, 248, 0.08)',
+          border: '1px solid rgba(56, 189, 248, 0.3)',
+          borderRadius: 12,
+          padding: '10px 16px',
+          marginBottom: 20,
+          flexWrap: 'wrap',
+          gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#38bdf8', fontSize: '0.9rem' }}>
+            <Layers size={18} />
+            <span><strong>Quantidade de Blocos no Carregamento:</strong></span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setQtdBlocosCombinados(2)}
+              style={{
+                padding: '7px 18px',
+                borderRadius: 8,
+                border: '1px solid',
+                borderColor: qtdBlocosCombinados === 2 ? '#38bdf8' : 'rgba(255, 255, 255, 0.15)',
+                background: qtdBlocosCombinados === 2 ? 'rgba(56, 189, 248, 0.25)' : 'transparent',
+                color: qtdBlocosCombinados === 2 ? '#38bdf8' : 'var(--slate-300)',
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontSize: '0.86rem',
+                transition: 'all 0.15s'
+              }}
+            >
+              2 Blocos (2 Pedreiras)
+            </button>
+            <button
+              type="button"
+              onClick={() => setQtdBlocosCombinados(3)}
+              style={{
+                padding: '7px 18px',
+                borderRadius: 8,
+                border: '1px solid',
+                borderColor: qtdBlocosCombinados === 3 ? '#f59e0b' : 'rgba(255, 255, 255, 0.15)',
+                background: qtdBlocosCombinados === 3 ? 'rgba(245, 158, 11, 0.25)' : 'transparent',
+                color: qtdBlocosCombinados === 3 ? '#fbbf24' : 'var(--slate-300)',
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontSize: '0.86rem',
+                transition: 'all 0.15s'
+              }}
+            >
+              3 Blocos (Até 3 Pedreiras)
+            </button>
+          </div>
+        </div>
+      )}
 
       {mensagemErro && (
         <div className="animate-fade" style={{
@@ -668,7 +859,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     padding: 14,
                     color: '#fef3c7'
                   }}>
-                    A operação aos sábados é <strong>exclusiva para a pedreira de URUOCA - CE (TAJ MAHAL)</strong>. Demais pedreiras operam de segunda a sexta-feira.
+                    A operação aos sábados é <strong>exclusiva para a pedreira de Uruoca - CE (Taj Mahal)</strong>. Demais pedreiras operam de segunda a sexta-feira.
                   </div>
                 )}
               </div>
@@ -927,6 +1118,116 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 </div>
               )}
             </div>
+
+            {/* PONTO 3 DE CARREGAMENTO (SE COMBINADO COM 3 BLOCOS) */}
+            {qtdBlocosCombinados === 3 && (
+              <div className="glass-panel animate-fade" style={{
+                padding: 24,
+                borderLeft: '4px solid #f59e0b'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{
+                      background: '#ca8a04',
+                      color: '#fff',
+                      borderRadius: '50%',
+                      width: 26,
+                      height: 26,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      fontSize: '0.85rem'
+                    }}>3</span>
+                    <h2 style={{ fontSize: '1.15rem', margin: 0, color: '#fbbf24' }}>3º Ponto de Carregamento</h2>
+                  </div>
+                  <span className="badge" style={{
+                    background: 'rgba(245, 158, 11, 0.15)',
+                    color: '#fbbf24',
+                    border: '1px solid rgba(245, 158, 11, 0.35)',
+                    fontSize: '0.72rem'
+                  }}>Terceira Coleta</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+                  {/* Pedreira 3 */}
+                  <div className="form-group">
+                    <label className="form-label form-label-required">Pedreira (3º Ponto)</label>
+                    <select
+                      className="form-select"
+                      value={ponto3.pedreira}
+                      onChange={(e) => handlePedreira3Change(e.target.value)}
+                      required
+                    >
+                      {PEDREIRAS_CEARA.map(p => (
+                        <option key={p.id} value={p.nome}>{p.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Material 3 */}
+                  <div className="form-group">
+                    <label className="form-label form-label-required">Material (3º Ponto)</label>
+                    <select
+                      className="form-select"
+                      value={ponto3.material}
+                      onChange={(e) => handlePonto3Change('material', e.target.value)}
+                      required
+                    >
+                      <option value="">Selecione o material...</option>
+                      {obterMateriaisPorPedreira(ponto3.pedreira).map(mat => (
+                        <option key={mat} value={mat}>{mat}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Bloco 3 */}
+                  <div className="form-group">
+                    <label className="form-label form-label-required">Nº do 3º Bloco</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Ex: VT-5060"
+                      value={ponto3.numero_bloco}
+                      onChange={(e) => handlePonto3Change('numero_bloco', e.target.value)}
+                      required
+                      style={{ textTransform: 'uppercase' }}
+                    />
+                  </div>
+
+                  {/* Data 3 */}
+                  <div className="form-group">
+                    <label className="form-label form-label-required">Data (3º Ponto)</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      min={hoje}
+                      value={ponto3.data_agendamento}
+                      onChange={(e) => handlePonto3Change('data_agendamento', e.target.value)}
+                      required
+                      style={{ colorScheme: 'dark' }}
+                    />
+                  </div>
+
+                  {/* Horário 3 */}
+                  <div className="form-group">
+                    <label className="form-label form-label-required">Horário (3º Ponto)</label>
+                    <select
+                      className="form-select"
+                      value={ponto3.horario_agendamento}
+                      onChange={(e) => handlePonto3Change('horario_agendamento', e.target.value)}
+                      required
+                    >
+                      {HORARIOS_SEMANA.map(h => (
+                        <option key={h.id} value={h.id} disabled={horariosOcupados3.includes(h.id)}>
+                          {h.id} {horariosOcupados3.includes(h.id) ? '— [OCUPADO]' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -1107,7 +1408,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           }}>
             <Mail size={18} color="#4ade80" style={{ flexShrink: 0 }} />
             <span style={{ color: 'var(--slate-200)' }}>
-              Confirmação despachada para <strong style={{ color: '#4ade80' }}>{EMAIL_NOTIFICACAO_DESTINO}</strong>
+              Confirmação despachada para <strong style={{ color: '#4ade80' }}>o e-mail da logística</strong>
             </span>
           </div>
 
@@ -1172,7 +1473,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               (tipoDia === 'sabado' && (!isPedreiraUruoca(formData.pedreira) || ocupacaoSabado.lotado)) ||
               (tipoCarregamento === 'combinado' && (
                 tipoDia2 === 'domingo' || 
-                (tipoDia2 === 'sabado' && (!isPedreiraUruoca(ponto2.pedreira) || ocupacaoSabado2.lotado))
+                (tipoDia2 === 'sabado' && (!isPedreiraUruoca(ponto2.pedreira) || ocupacaoSabado2.lotado)) ||
+                (qtdBlocosCombinados === 3 && (
+                  tipoDia3 === 'domingo' ||
+                  (tipoDia3 === 'sabado' && (!isPedreiraUruoca(ponto3.pedreira) || ocupacaoSabado3.lotado))
+                ))
               ))
             }
             className="btn btn-vermont glow-effect"
@@ -1186,7 +1491,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               <>
                 <Send size={20} />
                 {tipoCarregamento === 'combinado' 
-                  ? 'Confirmar Agendamento Combinado (2 Pedreiras)' 
+                  ? `Confirmar Agendamento Combinado (${qtdBlocosCombinados} Blocos)` 
                   : 'Confirmar Agendamento de Carregamento'}
               </>
             )}

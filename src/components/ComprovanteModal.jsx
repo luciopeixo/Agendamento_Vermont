@@ -28,9 +28,9 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
   // Lista de placas formatadas corretamente (Carreta simples se for 1 carreta, 1ª e 2ª se for Bitrem)
   const listaPlacas = formatarPlacasExibicao(agendamento);
 
-  const isCombinado = agendamento.is_combinado || (agendamento.observacoes && agendamento.observacoes.includes('[Carga Combinada'));
-  const ponto1 = agendamento.ponto1 || agendamento.pontos?.[0] || agendamento;
-  const ponto2 = agendamento.ponto2 || agendamento.pontos?.[1];
+  const isCombinado = agendamento.is_combinado || (agendamento.observacoes && (agendamento.observacoes.includes('[Carga Combinada') || agendamento.observacoes.includes('[Carga Mista')));
+  const listaPontos = agendamento.pontos || [agendamento.ponto1 || agendamento, agendamento.ponto2, agendamento.ponto3].filter(Boolean);
+  const totalPontos = isCombinado ? Math.max(listaPontos.length, 2) : 1;
 
   // Formatação das placas para o texto do WhatsApp
   const placasFormatadasWhats = listaPlacas
@@ -41,29 +41,24 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
   const handleCompartilharWhatsApp = () => {
     let textoWhats = '';
 
-    if (isCombinado && ponto2) {
+    if (isCombinado && listaPontos.length > 1) {
+      const roteiroTextoWhats = listaPontos.map((p, idx) => `
+🔸 *${idx + 1}º PONTO DE CARREGAMENTO:*
+🏢 *Pedreira:* *${p.pedreira}*
+🪨 *Material:* *${p.material}*
+🏷️ *Nº do Bloco:* *${p.numero_bloco}*
+📅 *Data:* *${formatarDataBR(p.data_agendamento)}*
+⏰ *Horário:* *${p.horario_agendamento}*`).join('\n');
+
       textoWhats = 
 `🏗️ *VERMONT MINERAÇÃO LTDA.* 🪨
-*AUTORIZAÇÃO OFICIAL DE AGENDAMENTO • CARGA COMBINADA*
+*AUTORIZAÇÃO OFICIAL DE AGENDAMENTO • CARGA COMBINADA (${listaPontos.length} BLOCOS)*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 *PROTOCOLO:* #${protocolo}
-✅ *STATUS:* *AGENDAMENTO COMBINADO CONFIRMADO (2 PONTOS)*
+✅ *STATUS:* *AGENDAMENTO COMBINADO CONFIRMADO (${listaPontos.length} PONTOS)*
 
 📍 *ROTEIRO DE CARREGAMENTO:*
-
-🔸 *1º PONTO DE CARREGAMENTO:*
-🏢 *Pedreira:* *${ponto1.pedreira}*
-🪨 *Material:* *${ponto1.material}*
-🏷️ *Nº do Bloco:* *${ponto1.numero_bloco}*
-📅 *Data:* *${formatarDataBR(ponto1.data_agendamento)}*
-⏰ *Horário:* *${ponto1.horario_agendamento}*
-
-🔸 *2º PONTO DE CARREGAMENTO:*
-🏢 *Pedreira:* *${ponto2.pedreira}*
-🪨 *Material:* *${ponto2.material}*
-🏷️ *Nº do Bloco:* *${ponto2.numero_bloco}*
-📅 *Data:* *${formatarDataBR(ponto2.data_agendamento)}*
-⏰ *Horário:* *${ponto2.horario_agendamento}*
+${roteiroTextoWhats}
 
 🚛 *DADOS DO TRANSPORTE:*
 🏢 *Transportadora:* *${agendamento.transportadora}*
@@ -208,7 +203,7 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
           </h2>
           <p style={{ margin: 0, fontSize: '0.86rem', color: '#86efac' }}>
             {isCombinado 
-              ? 'Autorização Oficial de Entrada & Rota Combinada (2 Pedreiras) • Vermont Mineração' 
+              ? `Autorização Oficial de Entrada & Rota Combinada (${listaPontos.length} Pedreiras / Blocos) • Vermont Mineração` 
               : 'Autorização Oficial de Entrada & Carregamento • Vermont Mineração'}
           </p>
 
@@ -231,8 +226,8 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
         {/* Detalhes do Agendamento */}
         <div style={{ padding: '18px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
           
-          {/* Se for Carga Combinada: Roteiro dos 2 Pontos */}
-          {isCombinado && ponto2 ? (
+          {/* Se for Carga Combinada: Roteiro dos Pontos */}
+          {isCombinado && listaPontos.length > 0 ? (
             <div style={{
               background: 'rgba(255, 255, 255, 0.03)',
               border: '1px solid var(--vermont-green-border)',
@@ -242,49 +237,41 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80' }}>
                   <MapPin size={18} />
-                  <strong style={{ fontSize: '0.96rem' }}>Roteiro de Carregamento (2 Pedreiras)</strong>
+                  <strong style={{ fontSize: '0.96rem' }}>Roteiro de Carregamento ({listaPontos.length} Pedreiras / Blocos)</strong>
                 </div>
                 <span className="badge badge-vermont" style={{ fontSize: '0.72rem' }}>Carga Combinada</span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {/* 1º Ponto */}
-                <div style={{
-                  background: 'rgba(0, 118, 44, 0.12)',
-                  border: '1px solid rgba(0, 118, 44, 0.35)',
-                  borderRadius: 8,
-                  padding: '10px 14px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#86efac', fontWeight: 700, fontSize: '0.85rem', marginBottom: 6 }}>
-                    <span style={{ background: '#00762c', color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>1</span>
-                    1º Ponto de Carregamento
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 6, fontSize: '0.86rem' }}>
-                    <div><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }}>{ponto1.pedreira}</strong></div>
-                    <div><span style={{ color: 'var(--slate-400)' }}>Material:</span> <strong style={{ color: '#86efac' }}>{ponto1.material}</strong></div>
-                    <div><span style={{ color: 'var(--slate-400)' }}>Bloco:</span> <strong style={{ color: '#fff' }}>{ponto1.numero_bloco}</strong></div>
-                    <div><span style={{ color: 'var(--slate-400)' }}>Data & Horário:</span> <strong style={{ color: '#4ade80' }}>{formatarDataBR(ponto1.data_agendamento)} às {ponto1.horario_agendamento}</strong></div>
-                  </div>
-                </div>
+                {listaPontos.map((pt, idx) => {
+                  const themeColors = [
+                    { bg: 'rgba(0, 118, 44, 0.12)', border: 'rgba(0, 118, 44, 0.35)', text: '#86efac', circle: '#00762c' },
+                    { bg: 'rgba(56, 189, 248, 0.10)', border: 'rgba(56, 189, 248, 0.3)', text: '#38bdf8', circle: '#0284c7' },
+                    { bg: 'rgba(234, 179, 8, 0.10)', border: 'rgba(234, 179, 8, 0.35)', text: '#fde047', circle: '#ca8a04' }
+                  ][idx % 3];
 
-                {/* 2º Ponto */}
-                <div style={{
-                  background: 'rgba(56, 189, 248, 0.10)',
-                  border: '1px solid rgba(56, 189, 248, 0.3)',
-                  borderRadius: 8,
-                  padding: '10px 14px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#38bdf8', fontWeight: 700, fontSize: '0.85rem', marginBottom: 6 }}>
-                    <span style={{ background: '#0284c7', color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>2</span>
-                    2º Ponto de Carregamento
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 6, fontSize: '0.86rem' }}>
-                    <div><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }}>{ponto2.pedreira}</strong></div>
-                    <div><span style={{ color: 'var(--slate-400)' }}>Material:</span> <strong style={{ color: '#38bdf8' }}>{ponto2.material}</strong></div>
-                    <div><span style={{ color: 'var(--slate-400)' }}>Bloco:</span> <strong style={{ color: '#fff' }}>{ponto2.numero_bloco}</strong></div>
-                    <div><span style={{ color: 'var(--slate-400)' }}>Data & Horário:</span> <strong style={{ color: '#38bdf8' }}>{formatarDataBR(ponto2.data_agendamento)} às {ponto2.horario_agendamento}</strong></div>
-                  </div>
-                </div>
+                  return (
+                    <div key={idx} style={{
+                      background: themeColors.bg,
+                      border: `1px solid ${themeColors.border}`,
+                      borderRadius: 8,
+                      padding: '10px 14px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: themeColors.text, fontWeight: 700, fontSize: '0.85rem', marginBottom: 6 }}>
+                        <span style={{ background: themeColors.circle, color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>
+                          {idx + 1}
+                        </span>
+                        {idx + 1}º Ponto de Carregamento
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 6, fontSize: '0.86rem' }}>
+                        <div><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }}>{pt.pedreira}</strong></div>
+                        <div><span style={{ color: 'var(--slate-400)' }}>Material:</span> <strong style={{ color: themeColors.text }}>{pt.material}</strong></div>
+                        <div><span style={{ color: 'var(--slate-400)' }}>Bloco:</span> <strong style={{ color: '#fff' }}>{pt.numero_bloco}</strong></div>
+                        <div><span style={{ color: 'var(--slate-400)' }}>Data & Horário:</span> <strong style={{ color: themeColors.text }}>{formatarDataBR(pt.data_agendamento)} às {pt.horario_agendamento}</strong></div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : (
@@ -436,10 +423,10 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
             type="button"
             onClick={handlePrint}
             className="btn btn-secondary"
-            style={{ flex: 1, minWidth: 130 }}
+            style={{ flex: 1, minWidth: 140 }}
           >
             <Printer size={18} />
-            Imprimir
+            Imprimir / Salvar PDF
           </button>
 
           <button

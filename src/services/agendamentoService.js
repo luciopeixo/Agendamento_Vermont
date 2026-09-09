@@ -1,35 +1,35 @@
 import { supabase } from '../lib/supabase.js';
 
-// Nomenclatura exata conforme solicitado
+// Nomenclatura oficial formatada
 export const PEDREIRAS_CEARA = [
   {
     id: 'uruoca',
-    nome: 'URUOCA - CE (TAJ MAHAL)',
+    nome: 'Uruoca - CE (Taj Mahal)',
     cidade: 'Uruoca - CE'
   },
   {
     id: 'massape_negresco',
-    nome: 'MASSAPÊ - CE (NEGRESCO)',
+    nome: 'Massapê - CE (Negresco)',
     cidade: 'Massapê - CE'
   },
   {
     id: 'massape_delmare',
-    nome: 'MASSAPÊ - CE (DEL MARE)',
+    nome: 'Massapê - CE (Del Mare)',
     cidade: 'Massapê - CE'
   },
   {
     id: 'sobral_jaibaras',
-    nome: 'SOBRAL - CE (JAIBARAS)',
+    nome: 'Sobral - CE (Jaibaras)',
     cidade: 'Sobral - CE'
   },
   {
     id: 'serrote',
-    nome: 'SÃO GONÇALO DO AMARANTE - CE (SERROTE)',
+    nome: 'São Gonçalo do Amarante - CE (Serrote)',
     cidade: 'São Gonçalo do Amarante - CE'
   },
   {
     id: 'beberibe',
-    nome: 'BEBERIBE - CE',
+    nome: 'Beberibe - CE',
     cidade: 'Beberibe - CE'
   }
 ];
@@ -149,7 +149,7 @@ export const TIPOS_VEICULO = [
   'Outro'
 ];
 
-export const EMAIL_NOTIFICACAO_DESTINO = import.meta.env.VITE_EMAIL_NOTIFICACAO_DESTINO || '';
+export const EMAIL_NOTIFICACAO_DESTINO = import.meta.env.VITE_EMAIL_NOTIFICACAO_DESTINO || 'faturamento@vermontmineracao.com.br';
 
 /**
  * Verifica se a pedreira é Uruoca (única que opera aos sábados)
@@ -174,7 +174,8 @@ export const AVISO_CONFIRMACAO_CLIENTE = 'O transportador deverá sempre confirm
 export const STATUS_AGENDAMENTO = {
   AGUARDANDO: 'Aguardando Liberação',
   LIBERADO: 'Liberado para Carregar',
-  CARREGADO: 'Carregado',
+  CARREGANDO: 'Carregando',
+  FINALIZADO: 'Finalizado',
   CANCELADO: 'Cancelado'
 };
 
@@ -293,6 +294,188 @@ export function formatarPlacasExibicao(ag) {
   ];
 }
 
+// Utilitários de Persistência Local (Fallback transparente quando Supabase não estiver conectado ou em ambiente local)
+const LOCAL_STORAGE_KEY = 'vermont_agendamentos_local';
+
+export function isSupabaseConfigurado() {
+  const url = import.meta.env.VITE_SUPABASE_URL || '';
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  return Boolean(url && key && !url.includes('seu-projeto.supabase.co') && !key.includes('sua-chave-anon'));
+}
+
+export function obterAgendamentosLocais() {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function salvarAgendamentoLocal(registro) {
+  try {
+    const lista = obterAgendamentosLocais();
+    const protocoloNumero = Math.floor(100000 + Math.random() * 900000);
+    const novo = {
+      ...registro,
+      id: registro.id || `VT-${protocoloNumero}`,
+      created_at: new Date().toISOString()
+    };
+    lista.unshift(novo);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lista));
+    return novo;
+  } catch (e) {
+    return {
+      ...registro,
+      id: registro.id || `VT-${Math.floor(100000 + Math.random() * 900000)}`,
+      created_at: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * Registra um evento de histórico de alteração de status
+ */
+export function registrarHistoricoStatus(agendamentoAtual, novoStatus, usuarioInfo = {}) {
+  const statusAnterior = agendamentoAtual.status || 'Aguardando Liberação';
+  if (statusAnterior === novoStatus) {
+    return Array.isArray(agendamentoAtual.historico_status) ? agendamentoAtual.historico_status : [];
+  }
+
+  const novaEntrada = {
+    id: `hist_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    status_anterior: statusAnterior,
+    status_novo: novoStatus,
+    usuario_nome: usuarioInfo.nome || usuarioInfo.email?.split('@')[0]?.toUpperCase() || 'SISTEMA',
+    usuario_email: usuarioInfo.email || '',
+    usuario_role: usuarioInfo.role || (usuarioInfo.isAdmin ? 'Administrador Geral' : 'Operador Pedreira'),
+    data_hora: new Date().toISOString()
+  };
+
+  const historicoExistente = Array.isArray(agendamentoAtual.historico_status) ? agendamentoAtual.historico_status : [];
+  return [novaEntrada, ...historicoExistente];
+}
+
+export function atualizarAgendamentoLocal(id, novoStatus, usuarioInfo = {}) {
+  try {
+    const lista = obterAgendamentosLocais();
+    const index = lista.findIndex(item => item.id === id);
+    if (index !== -1) {
+      const historicoAtualizado = registrarHistoricoStatus(lista[index], novoStatus, usuarioInfo);
+      lista[index].status = novoStatus;
+      lista[index].historico_status = historicoAtualizado;
+      lista[index].ultimo_editor = usuarioInfo.nome || usuarioInfo.email || 'Sistema';
+      lista[index].updated_at = new Date().toISOString();
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lista));
+      return lista[index];
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function atualizarAgendamentoLocalCompleto(agendamentoAtualizado, usuarioInfo = {}) {
+  try {
+    const lista = obterAgendamentosLocais();
+    const index = lista.findIndex(item => item.id === agendamentoAtualizado.id);
+    if (index !== -1) {
+      const itemAtual = lista[index];
+      let historico = agendamentoAtualizado.historico_status || itemAtual.historico_status || [];
+      if (agendamentoAtualizado.status && agendamentoAtualizado.status !== itemAtual.status) {
+        historico = registrarHistoricoStatus(itemAtual, agendamentoAtualizado.status, usuarioInfo);
+      }
+      lista[index] = { 
+        ...lista[index], 
+        ...agendamentoAtualizado, 
+        historico_status: historico,
+        ultimo_editor: usuarioInfo.nome || usuarioInfo.email || itemAtual.ultimo_editor || 'Sistema',
+        updated_at: new Date().toISOString() 
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lista));
+      return lista[index];
+    } else {
+      lista.unshift(agendamentoAtualizado);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lista));
+      return agendamentoAtualizado;
+    }
+  } catch (e) {
+    return agendamentoAtualizado;
+  }
+}
+
+export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo = {}) {
+  try {
+    if (!agendamentoAtualizado || !agendamentoAtualizado.id) {
+      throw new Error('ID do agendamento inválido para edição.');
+    }
+
+    const listaLocal = obterAgendamentosLocais();
+    const itemAtual = listaLocal.find(item => item.id === agendamentoAtualizado.id) || {};
+    let historicoAtualizado = agendamentoAtualizado.historico_status || itemAtual.historico_status || [];
+    if (agendamentoAtualizado.status && agendamentoAtualizado.status !== itemAtual.status) {
+      historicoAtualizado = registrarHistoricoStatus(itemAtual, agendamentoAtualizado.status, usuarioInfo);
+    }
+    agendamentoAtualizado.historico_status = historicoAtualizado;
+
+    let resultado = null;
+
+    if (isSupabaseConfigurado()) {
+      try {
+        const { data, error } = await supabase
+          .from('agendamentos_pedreira')
+          .update({
+            pedreira: agendamentoAtualizado.pedreira,
+            material: agendamentoAtualizado.material,
+            numero_bloco: agendamentoAtualizado.numero_bloco ? String(agendamentoAtualizado.numero_bloco).toUpperCase().trim() : '',
+            cliente: agendamentoAtualizado.cliente ? String(agendamentoAtualizado.cliente).toUpperCase().trim() : '',
+            transportadora: agendamentoAtualizado.transportadora ? String(agendamentoAtualizado.transportadora).toUpperCase().trim() : '',
+            motorista_nome: agendamentoAtualizado.motorista_nome ? String(agendamentoAtualizado.motorista_nome).toUpperCase().trim() : '',
+            motorista_cpf: agendamentoAtualizado.motorista_cpf,
+            motorista_telefone: agendamentoAtualizado.motorista_telefone || null,
+            tipo_veiculo: agendamentoAtualizado.tipo_veiculo,
+            placa_cavalo: agendamentoAtualizado.placa_cavalo ? String(agendamentoAtualizado.placa_cavalo).toUpperCase().replace(/[^A-Z0-9]/g, '') : '',
+            placa_carreta: agendamentoAtualizado.placa_carreta ? String(agendamentoAtualizado.placa_carreta).toUpperCase().replace(/[^A-Z0-9]/g, '') : null,
+            placa_carreta_2: agendamentoAtualizado.placa_carreta_2 ? String(agendamentoAtualizado.placa_carreta_2).toUpperCase().replace(/[^A-Z0-9]/g, '') : null,
+            data_agendamento: agendamentoAtualizado.data_agendamento,
+            horario_agendamento: agendamentoAtualizado.horario_agendamento,
+            justificativa_outros: agendamentoAtualizado.justificativa_outros || null,
+            observacoes: agendamentoAtualizado.observacoes || null,
+            status: agendamentoAtualizado.status,
+            historico_status: historicoAtualizado,
+            ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema'
+          })
+          .eq('id', agendamentoAtualizado.id)
+          .select()
+          .single();
+
+        if (!error && data) {
+          resultado = data;
+        }
+      } catch (eSup) {
+        console.warn('Erro ao atualizar agendamento no Supabase, atualizando localmente:', eSup);
+      }
+    }
+
+    const localAtualizado = atualizarAgendamentoLocalCompleto(agendamentoAtualizado, usuarioInfo);
+    return { success: true, data: resultado || localAtualizado || agendamentoAtualizado };
+  } catch (err) {
+    console.error('Erro ao salvar edição de agendamento:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export function excluirAgendamentoLocal(id) {
+  try {
+    const lista = obterAgendamentosLocais();
+    const filtrados = lista.filter(item => item.id !== id);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtrados));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 /**
  * Consulta horários que já foram agendados para a pedreira e data selecionadas
  */
@@ -300,16 +483,30 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
   try {
     if (!dataStr || !pedreira) return [];
 
-    const { data, error } = await supabase
-      .from('agendamentos_pedreira')
-      .select('horario_agendamento')
-      .eq('data_agendamento', dataStr)
-      .eq('pedreira', pedreira)
-      .neq('status', 'Cancelado');
+    let ocupados = [];
+    if (isSupabaseConfigurado()) {
+      try {
+        const { data, error } = await supabase
+          .from('agendamentos_pedreira')
+          .select('horario_agendamento')
+          .eq('data_agendamento', dataStr)
+          .eq('pedreira', pedreira)
+          .neq('status', 'Cancelado');
 
-    if (error) throw error;
+        if (!error && data) {
+          ocupados = data
+            .map(item => item.horario_agendamento)
+            .filter(h => h && h !== 'outros' && !h.startsWith('Sábado'));
+          return ocupados;
+        }
+      } catch (e) {
+        console.warn('Erro ao consultar Supabase, buscando dados locais:', e);
+      }
+    }
 
-    const ocupados = (data || [])
+    const locais = obterAgendamentosLocais();
+    ocupados = locais
+      .filter(item => item.data_agendamento === dataStr && item.pedreira === pedreira && item.status !== 'Cancelado')
       .map(item => item.horario_agendamento)
       .filter(h => h && h !== 'outros' && !h.startsWith('Sábado'));
 
@@ -325,24 +522,42 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
  */
 export async function obterOcupacaoSabado(dataStr, pedreira = null) {
   try {
-    let query = supabase
-      .from('agendamentos_pedreira')
-      .select('id, pedreira, status', { count: 'exact' })
-      .eq('data_agendamento', dataStr)
-      .neq('status', 'Cancelado');
+    if (isSupabaseConfigurado()) {
+      try {
+        let query = supabase
+          .from('agendamentos_pedreira')
+          .select('id, pedreira, status', { count: 'exact' })
+          .eq('data_agendamento', dataStr)
+          .neq('status', 'Cancelado');
 
-    if (pedreira) {
-      query = query.eq('pedreira', pedreira);
+        if (pedreira) {
+          query = query.eq('pedreira', pedreira);
+        }
+
+        const { count, error } = await query;
+        if (!error && typeof count === 'number') {
+          const total = count || 0;
+          const limite = 12;
+          const disponivel = Math.max(0, limite - total);
+          const lotado = total >= limite;
+          return { total, limite, disponivel, lotado };
+        }
+      } catch (e) {
+        console.warn('Erro ao verificar sábado no Supabase, buscando local:', e);
+      }
     }
 
-    const { count, error } = await query;
-    if (error) throw error;
+    const locais = obterAgendamentosLocais();
+    const total = locais.filter(item => {
+      const matchData = item.data_agendamento === dataStr;
+      const matchPedreira = pedreira ? item.pedreira === pedreira : true;
+      const matchStatus = item.status !== 'Cancelado';
+      return matchData && matchPedreira && matchStatus;
+    }).length;
 
-    const total = count || 0;
     const limite = 12;
     const disponivel = Math.max(0, limite - total);
     const lotado = total >= limite;
-
     return { total, limite, disponivel, lotado };
   } catch (err) {
     console.error('Erro ao verificar ocupação do sábado:', err);
@@ -355,31 +570,58 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
  */
 export async function listarAgendamentos(filtros = {}) {
   try {
-    let query = supabase
-      .from('agendamentos_pedreira')
-      .select('*')
-      .order('data_agendamento', { ascending: false })
-      .order('created_at', { ascending: false });
+    if (isSupabaseConfigurado()) {
+      try {
+        let query = supabase
+          .from('agendamentos_pedreira')
+          .select('*')
+          .order('data_agendamento', { ascending: false })
+          .order('created_at', { ascending: false });
 
-    if (filtros.pedreira && filtros.pedreira !== 'todas') {
-      query = query.eq('pedreira', filtros.pedreira);
-    }
+        if (filtros.pedreira && filtros.pedreira !== 'todas') {
+          query = query.eq('pedreira', filtros.pedreira);
+        }
 
-    if (filtros.status && filtros.status !== 'todos') {
-      if (filtros.status === 'Liberado para Carregar') {
-        query = query.in('status', ['Liberado para Carregar', 'Confirmado']);
-      } else {
-        query = query.eq('status', filtros.status);
+        if (filtros.status && filtros.status !== 'todos') {
+          if (filtros.status === 'Liberado para Carregar') {
+            query = query.in('status', ['Liberado para Carregar', 'Confirmado']);
+          } else if (filtros.status === 'Finalizado' || filtros.status === 'Carregado') {
+            query = query.in('status', ['Finalizado', 'Carregado']);
+          } else {
+            query = query.eq('status', filtros.status);
+          }
+        }
+
+        if (filtros.data) {
+          query = query.eq('data_agendamento', filtros.data);
+        }
+
+        const { data, error } = await query;
+        if (!error && data) {
+          return data;
+        }
+      } catch (e) {
+        console.warn('Erro ao listar do Supabase, buscando locais:', e);
       }
     }
 
-    if (filtros.data) {
-      query = query.eq('data_agendamento', filtros.data);
+    let resultado = obterAgendamentosLocais();
+    if (filtros.pedreira && filtros.pedreira !== 'todas') {
+      resultado = resultado.filter(item => item.pedreira === filtros.pedreira);
     }
-
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
+    if (filtros.status && filtros.status !== 'todos') {
+      if (filtros.status === 'Liberado para Carregar') {
+        resultado = resultado.filter(item => item.status === 'Liberado para Carregar' || item.status === 'Confirmado');
+      } else if (filtros.status === 'Finalizado' || filtros.status === 'Carregado') {
+        resultado = resultado.filter(item => item.status === 'Finalizado' || item.status === 'Carregado');
+      } else {
+        resultado = resultado.filter(item => item.status === filtros.status);
+      }
+    }
+    if (filtros.data) {
+      resultado = resultado.filter(item => item.data_agendamento === filtros.data);
+    }
+    return resultado;
   } catch (err) {
     console.error('Erro ao listar agendamentos:', err);
     return [];
@@ -389,17 +631,33 @@ export async function listarAgendamentos(filtros = {}) {
 /**
  * Atualiza o status de um agendamento
  */
-export async function atualizarStatusAgendamento(id, novoStatus) {
+export async function atualizarStatusAgendamento(id, novoStatus, usuarioInfo = {}) {
   try {
-    const { data, error } = await supabase
-      .from('agendamentos_pedreira')
-      .update({ status: novoStatus })
-      .eq('id', id)
-      .select()
-      .single();
+    let atualizado = null;
+    const listaLocal = obterAgendamentosLocais();
+    const itemAtual = listaLocal.find(item => item.id === id) || {};
+    const historicoAtualizado = registrarHistoricoStatus(itemAtual, novoStatus, usuarioInfo);
 
-    if (error) throw error;
-    return { success: true, data };
+    if (isSupabaseConfigurado()) {
+      try {
+        const { data, error } = await supabase
+          .from('agendamentos_pedreira')
+          .update({ 
+            status: novoStatus,
+            historico_status: historicoAtualizado,
+            ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema'
+          })
+          .eq('id', id)
+          .select()
+          .single();
+        if (!error && data) {
+          atualizado = data;
+        }
+      } catch (e) {}
+    }
+
+    const local = atualizarAgendamentoLocal(id, novoStatus, usuarioInfo);
+    return { success: true, data: atualizado || local || { id, status: novoStatus, historico_status: historicoAtualizado } };
   } catch (err) {
     console.error('Erro ao atualizar status:', err);
     return { success: false, error: err.message };
@@ -411,12 +669,15 @@ export async function atualizarStatusAgendamento(id, novoStatus) {
  */
 export async function excluirAgendamento(id) {
   try {
-    const { error } = await supabase
-      .from('agendamentos_pedreira')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    if (isSupabaseConfigurado()) {
+      try {
+        await supabase
+          .from('agendamentos_pedreira')
+          .delete()
+          .eq('id', id);
+      } catch (e) {}
+    }
+    excluirAgendamentoLocal(id);
     return { success: true };
   } catch (err) {
     console.error('Erro ao excluir agendamento:', err);
@@ -441,7 +702,6 @@ export function formatarDataBR(dataStr) {
   return dataStr;
 }
 
-/**
 // Cache em memória para evitar disparos concorrentes ou em duplicidade para o mesmo agendamento
 const disparosEmAndamento = new Set();
 
@@ -472,21 +732,23 @@ export async function dispararEmailConfirmacao(agendamento) {
     let enviado = false;
 
     // 1. Envio Principal: Edge Function do Supabase (layout corporativo HTML, backend seguro)
-    try {
-      const { data, error } = await supabase.functions.invoke('notificar-agendamento', {
-        body: { agendamento }
-      });
-      if (!error && data && data.success) {
-        enviado = true;
-      } else {
-        console.warn('Edge Function retornou erro/aviso, acionando fallback direto:', error || data);
+    if (isSupabaseConfigurado()) {
+      try {
+        const { data, error } = await supabase.functions.invoke('notificar-agendamento', {
+          body: { agendamento }
+        });
+        if (!error && data && data.success) {
+          enviado = true;
+        } else {
+          console.warn('Edge Function retornou erro/aviso, acionando fallback direto:', error || data);
+        }
+      } catch (eEdge) {
+        console.warn('Falha na invocação da Edge Function, ativando fallback direto:', eEdge);
       }
-    } catch (eEdge) {
-      console.warn('Falha na invocação da Edge Function, ativando fallback direto:', eEdge);
     }
 
     // 2. Fallback de Contingência: Acionado SOMENTE se a Edge Function não tiver concluído o envio
-    if (!enviado) {
+    if (!enviado && EMAIL_NOTIFICACAO_DESTINO) {
       try {
         const dataHoraEnvio = new Intl.DateTimeFormat('pt-BR', {
           dateStyle: 'full',
@@ -536,11 +798,13 @@ export async function dispararEmailConfirmacao(agendamento) {
       }
     }
 
-    if (agendamento.id) {
-      await supabase
-        .from('agendamentos_pedreira')
-        .update({ email_notificado: true })
-        .eq('id', agendamento.id);
+    if (agendamento.id && isSupabaseConfigurado()) {
+      try {
+        await supabase
+          .from('agendamentos_pedreira')
+          .update({ email_notificado: true })
+          .eq('id', agendamento.id);
+      } catch (eUp) {}
     }
 
     return {
@@ -562,7 +826,7 @@ export async function salvarAgendamento(dados) {
   try {
     if (dados.tipo_dia === 'sabado') {
       if (!isPedreiraUruoca(dados.pedreira)) {
-        throw new Error('Aos sábados, o carregamento está disponível exclusivamente para a pedreira de URUOCA - CE (TAJ MAHAL). Nas demais pedreiras, os carregamentos ocorrem de segunda a sexta-feira.');
+        throw new Error('Aos sábados, o carregamento está disponível exclusivamente para a pedreira de Uruoca - CE (Taj Mahal). Nas demais pedreiras, os carregamentos ocorrem de segunda a sexta-feira.');
       }
 
       const { lotado } = await obterOcupacaoSabado(dados.data_agendamento, dados.pedreira);
@@ -586,37 +850,59 @@ export async function salvarAgendamento(dados) {
       ? dados.placa_carreta_2.toUpperCase().replace(/[^A-Z0-9]/g, '')
       : null;
 
-    const { data, error } = await supabase
-      .from('agendamentos_pedreira')
-      .insert([{
-        pedreira: dados.pedreira,
-        material: dados.material.trim(),
-        numero_bloco: dados.numero_bloco.toUpperCase().trim(),
-        cliente: dados.cliente.toUpperCase().trim(),
-        transportadora: dados.transportadora.toUpperCase().trim(),
-        motorista_nome: dados.motorista_nome.toUpperCase().trim(),
-        motorista_cpf: dados.motorista_cpf.trim(),
-        motorista_telefone: dados.motorista_telefone ? dados.motorista_telefone.trim() : null,
-        placa_cavalo: placaCavaloLimpa,
-        placa_carreta: placaCarretaLimpa,
-        placa_carreta_2: placaCarreta2Limpa,
-        tipo_veiculo: dados.tipo_veiculo,
-        data_agendamento: dados.data_agendamento,
-        tipo_dia: dados.tipo_dia,
-        horario_agendamento: dados.horario_agendamento,
-        justificativa_outros: dados.justificativa_outros || null,
-        observacoes: dados.observacoes || null,
-        status: STATUS_AGENDAMENTO.AGUARDANDO,
-        email_notificado: false
-      }])
-      .select()
-      .single();
+    const payload = {
+      pedreira: dados.pedreira,
+      material: dados.material.trim(),
+      numero_bloco: dados.numero_bloco.toUpperCase().trim(),
+      cliente: dados.cliente.toUpperCase().trim(),
+      transportadora: dados.transportadora.toUpperCase().trim(),
+      motorista_nome: dados.motorista_nome.toUpperCase().trim(),
+      motorista_cpf: dados.motorista_cpf.trim(),
+      motorista_telefone: dados.motorista_telefone ? dados.motorista_telefone.trim() : null,
+      placa_cavalo: placaCavaloLimpa,
+      placa_carreta: placaCarretaLimpa,
+      placa_carreta_2: placaCarreta2Limpa,
+      tipo_veiculo: dados.tipo_veiculo,
+      data_agendamento: dados.data_agendamento,
+      tipo_dia: dados.tipo_dia,
+      horario_agendamento: dados.horario_agendamento,
+      justificativa_outros: dados.justificativa_outros || null,
+      observacoes: dados.observacoes || null,
+      status: STATUS_AGENDAMENTO.AGUARDANDO,
+      email_notificado: false
+    };
 
-    if (error) throw error;
+    let agendamentoSalvo = null;
 
-    await dispararEmailConfirmacao(data);
+    if (isSupabaseConfigurado()) {
+      try {
+        const { data, error } = await supabase
+          .from('agendamentos_pedreira')
+          .insert([payload])
+          .select()
+          .single();
 
-    return { success: true, agendamento: data };
+        if (!error && data) {
+          agendamentoSalvo = data;
+        } else if (error) {
+          console.warn('Falha no insert Supabase, usando armazenamento local:', error);
+        }
+      } catch (eSupabase) {
+        console.warn('Erro de conexão com Supabase, salvando localmente:', eSupabase);
+      }
+    }
+
+    if (!agendamentoSalvo) {
+      agendamentoSalvo = salvarAgendamentoLocal(payload);
+    }
+
+    try {
+      await dispararEmailConfirmacao(agendamentoSalvo);
+    } catch (eEmail) {
+      console.warn('Alerta ao disparar e-mail de confirmação:', eEmail);
+    }
+
+    return { success: true, agendamento: agendamentoSalvo };
   } catch (err) {
     console.error('Erro ao gravar agendamento:', err);
     return { success: false, error: err.message };
@@ -624,39 +910,30 @@ export async function salvarAgendamento(dados) {
 }
 
 /**
- * Cria dois agendamentos vinculados para carga combinada (dois blocos em pedreiras diferentes)
+ * Cria múltiplos agendamentos vinculados para carga combinada / mista (2 ou 3 blocos)
  */
-export async function salvarAgendamentoCombinado({ ponto1, ponto2, veiculo }) {
+export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null, veiculo }) {
   try {
-    // 1. Validação Ponto 1
-    if (ponto1.tipo_dia === 'sabado') {
-      if (!isPedreiraUruoca(ponto1.pedreira)) {
-        throw new Error(`[1º Carregamento] Aos sábados, o carregamento está disponível exclusivamente para a pedreira de URUOCA - CE (TAJ MAHAL).`);
-      }
-      const { lotado } = await obterOcupacaoSabado(ponto1.data_agendamento, ponto1.pedreira);
-      if (lotado) {
-        throw new Error(`[1º Carregamento] Limite máximo de 12 veículos para o sábado (${ponto1.data_agendamento}) na pedreira de Uruoca já foi atingido.`);
-      }
-    } else if (ponto1.tipo_dia === 'dia_util' && ponto1.horario_agendamento !== 'outros') {
-      const ocupados1 = await obterHorariosOcupados(ponto1.data_agendamento, ponto1.pedreira);
-      if (ocupados1.includes(ponto1.horario_agendamento)) {
-        throw new Error(`[1º Carregamento] O horário ${ponto1.horario_agendamento} já foi reservado na pedreira ${ponto1.pedreira}. Escolha outro horário.`);
-      }
-    }
+    const listaPontos = [ponto1, ponto2, ponto3].filter(Boolean);
+    const totalPontos = listaPontos.length;
 
-    // 2. Validação Ponto 2
-    if (ponto2.tipo_dia === 'sabado') {
-      if (!isPedreiraUruoca(ponto2.pedreira)) {
-        throw new Error(`[2º Carregamento] Aos sábados, o carregamento está disponível exclusivamente para a pedreira de URUOCA - CE (TAJ MAHAL).`);
-      }
-      const { lotado } = await obterOcupacaoSabado(ponto2.data_agendamento, ponto2.pedreira);
-      if (lotado) {
-        throw new Error(`[2º Carregamento] Limite máximo de 12 veículos para o sábado (${ponto2.data_agendamento}) na pedreira de Uruoca já foi atingido.`);
-      }
-    } else if (ponto2.tipo_dia === 'dia_util' && ponto2.horario_agendamento !== 'outros') {
-      const ocupados2 = await obterHorariosOcupados(ponto2.data_agendamento, ponto2.pedreira);
-      if (ocupados2.includes(ponto2.horario_agendamento)) {
-        throw new Error(`[2º Carregamento] O horário ${ponto2.horario_agendamento} já foi reservado na pedreira ${ponto2.pedreira}. Escolha outro horário.`);
+    // 1. Validações para cada ponto de carregamento
+    for (let i = 0; i < totalPontos; i++) {
+      const p = listaPontos[i];
+      const numPonto = i + 1;
+      if (p.tipo_dia === 'sabado') {
+        if (!isPedreiraUruoca(p.pedreira)) {
+          throw new Error(`[${numPonto}º Carregamento] Aos sábados, o carregamento está disponível exclusivamente para a pedreira de Uruoca - CE (Taj Mahal).`);
+        }
+        const { lotado } = await obterOcupacaoSabado(p.data_agendamento, p.pedreira);
+        if (lotado) {
+          throw new Error(`[${numPonto}º Carregamento] Limite máximo de 12 veículos para o sábado (${p.data_agendamento}) na pedreira de Uruoca já foi atingido.`);
+        }
+      } else if (p.tipo_dia === 'dia_util' && p.horario_agendamento !== 'outros') {
+        const ocupados = await obterHorariosOcupados(p.data_agendamento, p.pedreira);
+        if (ocupados.includes(p.horario_agendamento)) {
+          throw new Error(`[${numPonto}º Carregamento] O horário ${p.horario_agendamento} já foi reservado na pedreira ${p.pedreira}. Escolha outro horário.`);
+        }
       }
     }
 
@@ -671,84 +948,76 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, veiculo }) {
 
     const obsBase = veiculo.observacoes ? veiculo.observacoes.trim() : '';
 
-    // Obs cruzada para identificação pelas equipes de expedição e balança
-    const obsPonto1 = `[Carga Combinada 1/2] 2º Ponto: ${ponto2.pedreira} | Bloco: ${ponto2.numero_bloco.toUpperCase()} | Data: ${ponto2.data_agendamento} às ${ponto2.horario_agendamento}${obsBase ? ` | Obs: ${obsBase}` : ''}`;
-    const obsPonto2 = `[Carga Combinada 2/2] 1º Ponto: ${ponto1.pedreira} | Bloco: ${ponto1.numero_bloco.toUpperCase()} | Data: ${ponto1.data_agendamento} às ${ponto1.horario_agendamento}${obsBase ? ` | Obs: ${obsBase}` : ''}`;
+    // Monta payloads com observação cruzada de carga combinada/mista
+    const payloads = listaPontos.map((p, idx) => {
+      const numPonto = idx + 1;
+      const outrosPontosTexto = listaPontos
+        .map((op, oidx) => oidx !== idx ? `${oidx + 1}º Ponto: ${op.pedreira} (Bloco ${op.numero_bloco.toUpperCase()})` : null)
+        .filter(Boolean)
+        .join(' | ');
 
-    const registro1Payload = {
-      pedreira: ponto1.pedreira,
-      material: ponto1.material.trim(),
-      numero_bloco: ponto1.numero_bloco.toUpperCase().trim(),
-      cliente: veiculo.cliente.toUpperCase().trim(),
-      transportadora: veiculo.transportadora.toUpperCase().trim(),
-      motorista_nome: veiculo.motorista_nome.toUpperCase().trim(),
-      motorista_cpf: veiculo.motorista_cpf.trim(),
-      motorista_telefone: veiculo.motorista_telefone ? veiculo.motorista_telefone.trim() : null,
-      placa_cavalo: placaCavaloLimpa,
-      placa_carreta: placaCarretaLimpa,
-      placa_carreta_2: placaCarreta2Limpa,
-      tipo_veiculo: veiculo.tipo_veiculo,
-      data_agendamento: ponto1.data_agendamento,
-      tipo_dia: ponto1.tipo_dia,
-      horario_agendamento: ponto1.horario_agendamento,
-      justificativa_outros: ponto1.justificativa_outros || null,
-      observacoes: obsPonto1,
-      status: STATUS_AGENDAMENTO.AGUARDANDO,
-      email_notificado: false
-    };
+      const obsPonto = `[Carga Combinada ${numPonto}/${totalPontos}] ${outrosPontosTexto}${obsBase ? ` | Obs: ${obsBase}` : ''}`;
 
-    const registro2Payload = {
-      pedreira: ponto2.pedreira,
-      material: ponto2.material.trim(),
-      numero_bloco: ponto2.numero_bloco.toUpperCase().trim(),
-      cliente: veiculo.cliente.toUpperCase().trim(),
-      transportadora: veiculo.transportadora.toUpperCase().trim(),
-      motorista_nome: veiculo.motorista_nome.toUpperCase().trim(),
-      motorista_cpf: veiculo.motorista_cpf.trim(),
-      motorista_telefone: veiculo.motorista_telefone ? veiculo.motorista_telefone.trim() : null,
-      placa_cavalo: placaCavaloLimpa,
-      placa_carreta: placaCarretaLimpa,
-      placa_carreta_2: placaCarreta2Limpa,
-      tipo_veiculo: veiculo.tipo_veiculo,
-      data_agendamento: ponto2.data_agendamento,
-      tipo_dia: ponto2.tipo_dia,
-      horario_agendamento: ponto2.horario_agendamento,
-      justificativa_outros: ponto2.justificativa_outros || null,
-      observacoes: obsPonto2,
-      status: STATUS_AGENDAMENTO.AGUARDANDO,
-      email_notificado: false
-    };
+      return {
+        pedreira: p.pedreira,
+        material: p.material.trim(),
+        numero_bloco: p.numero_bloco.toUpperCase().trim(),
+        cliente: veiculo.cliente.toUpperCase().trim(),
+        transportadora: veiculo.transportadora.toUpperCase().trim(),
+        motorista_nome: veiculo.motorista_nome.toUpperCase().trim(),
+        motorista_cpf: veiculo.motorista_cpf.trim(),
+        motorista_telefone: veiculo.motorista_telefone ? veiculo.motorista_telefone.trim() : null,
+        placa_cavalo: placaCavaloLimpa,
+        placa_carreta: placaCarretaLimpa,
+        placa_carreta_2: placaCarreta2Limpa,
+        tipo_veiculo: veiculo.tipo_veiculo,
+        data_agendamento: p.data_agendamento,
+        tipo_dia: p.tipo_dia,
+        horario_agendamento: p.horario_agendamento,
+        justificativa_outros: p.justificativa_outros || null,
+        observacoes: obsPonto,
+        status: STATUS_AGENDAMENTO.AGUARDANDO,
+        email_notificado: false
+      };
+    });
 
-    const { data: data1, error: err1 } = await supabase
-      .from('agendamentos_pedreira')
-      .insert([registro1Payload])
-      .select()
-      .single();
+    const resultadosSalvos = [];
 
-    if (err1) throw err1;
+    for (const payload of payloads) {
+      let dataSalva = null;
+      if (isSupabaseConfigurado()) {
+        try {
+          const res = await supabase
+            .from('agendamentos_pedreira')
+            .insert([payload])
+            .select()
+            .single();
+          if (!res.error && res.data) dataSalva = res.data;
+        } catch (eSup) {
+          console.warn('Erro ao salvar ponto no Supabase, usando local:', eSup);
+        }
+      }
 
-    const { data: data2, error: err2 } = await supabase
-      .from('agendamentos_pedreira')
-      .insert([registro2Payload])
-      .select()
-      .single();
+      if (!dataSalva) {
+        dataSalva = salvarAgendamentoLocal(payload);
+      }
+      resultadosSalvos.push(dataSalva);
+    }
 
-    if (err2) throw err2;
-
-    // Disparar notificações por e-mail para ambos os agendamentos
-    await Promise.allSettled([
-      dispararEmailConfirmacao(data1),
-      dispararEmailConfirmacao(data2)
-    ]);
+    // Disparar notificações por e-mail para todos os agendamentos da carga combinada
+    await Promise.allSettled(
+      resultadosSalvos.map(item => dispararEmailConfirmacao(item))
+    );
 
     return {
       success: true,
       agendamento: {
-        ...data1,
+        ...resultadosSalvos[0],
         is_combinado: true,
-        ponto1: data1,
-        ponto2: data2,
-        pontos: [data1, data2]
+        ponto1: resultadosSalvos[0],
+        ponto2: resultadosSalvos[1],
+        ponto3: resultadosSalvos[2] || null,
+        pontos: resultadosSalvos
       }
     };
   } catch (err) {

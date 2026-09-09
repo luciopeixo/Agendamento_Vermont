@@ -377,26 +377,32 @@ h1, h2, h3, h4, h5, h6 {
 
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 8mm 12mm 8mm 12mm;
+    size: A4 landscape;
+    margin: 8mm 8mm 8mm 8mm;
   }
 
   body {
     background: #ffffff !important;
-    color: #111827 !important;
+    color: #0f172a !important;
     margin: 0 !important;
     padding: 0 !important;
   }
 
-  /* Oculta tudo na página por padrão durante a impressão */
-  body * {
-    visibility: hidden;
+  /* Oculta elementos que não devem ser impressos */
+  .no-print,
+  nav,
+  footer,
+  header {
+    display: none !important;
   }
 
-  /* Torna visível estritamente a área do comprovante */
+  /* Torna visíveis as áreas de impressão oficiais */
   #comprovante-imprimir,
-  #comprovante-imprimir * {
-    visibility: visible;
+  #comprovante-imprimir *,
+  #relatorio-imprimir,
+  #relatorio-imprimir * {
+    visibility: visible !important;
+    color: #0f172a !important;
   }
 
   #comprovante-imprimir {
@@ -418,27 +424,42 @@ h1, h2, h3, h4, h5, h6 {
     break-inside: avoid !important;
   }
 
-  .no-print {
-    display: none !important;
+  #relatorio-imprimir {
+    display: block !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #relatorio-imprimir table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 11px !important;
+  }
+
+  #relatorio-imprimir th {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    border: 1px solid #64748b !important;
+    padding: 6px 8px !important;
+    font-weight: 700 !important;
+    text-align: left !important;
+  }
+
+  #relatorio-imprimir td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 8px !important;
+    color: #1e293b !important;
+    background: #ffffff !important;
+  }
+
+  #relatorio-imprimir tr:nth-child(even) td {
+    background: #f8fafc !important;
   }
 
   .print-only {
     display: block !important;
-  }
-
-  /* Garante alto contraste em papel/PDF */
-  #comprovante-imprimir h2,
-  #comprovante-imprimir strong,
-  #comprovante-imprimir span,
-  #comprovante-imprimir p,
-  #comprovante-imprimir div,
-  #comprovante-imprimir li {
-    color: #111827 !important;
-  }
-
-  #comprovante-imprimir .glass-panel {
-    background: #ffffff !important;
-    border: none !important;
-    box-shadow: none !important;
   }
 }
