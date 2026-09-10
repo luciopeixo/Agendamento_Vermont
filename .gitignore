@@ -46,6 +46,12 @@ test_*.ts
 scratch/
 temp/
 tmp/
+*.csv
+*.xlsx
+*.xls
+*.jsonl
+data/
+dados/
 
 # Supabase Local e Cache de CLI
 .supabase/
