@@ -86,6 +86,7 @@ export function PainelGestao({
   };
 
   const [agendamentos, setAgendamentos] = useState([]);
+  const [todosAgendamentos, setTodosAgendamentos] = useState([]);
   const [pendenciasAnteriores, setPendenciasAnteriores] = useState([]);
   const [exibindoPendenciasAnteriores, setExibindoPendenciasAnteriores] = useState(false);
   const [carregando, setCarregando] = useState(true);
@@ -149,7 +150,7 @@ export function PainelGestao({
   const carregarDados = async (isManual = true) => {
     if (isManual) setCarregando(true);
     try {
-      const [lista, pendentes] = await Promise.all([
+      const [lista, pendentes, listaCompletaGeral] = await Promise.all([
         listarAgendamentos({
           pedreira: filtroPedreira,
           status: filtroStatus,
@@ -158,10 +159,13 @@ export function PainelGestao({
         obterPendenciasAnteriores({
           pedreira: filtroPedreira,
           dataReferencia: hojeStr
-        })
+        }),
+        // Busca base histórica completa sem restrição de data para alimentar a aba analítica / gráficos do Admin
+        listarAgendamentos({})
       ]);
 
       setPendenciasAnteriores(pendentes);
+      setTodosAgendamentos(listaCompletaGeral);
 
       const mapaAnterior = statusAnterioresMapRef.current;
       const novosCarregamentos = [];
@@ -376,6 +380,7 @@ export function PainelGestao({
       };
 
       setAgendamentos(prev => prev.map(ag => ag.id === agendamento.id ? agAtualizado : ag));
+      setTodosAgendamentos(prev => prev.map(ag => ag.id === agendamento.id ? agAtualizado : ag));
 
       // Mantém a lista de pendências anteriores sincronizada
       setPendenciasAnteriores(prev => {
@@ -403,6 +408,7 @@ export function PainelGestao({
     };
 
     setAgendamentos(prev => prev.map(ag => ag.id === itemFormatado.id ? itemFormatado : ag));
+    setTodosAgendamentos(prev => prev.map(ag => ag.id === itemFormatado.id ? itemFormatado : ag));
 
     setPendenciasAnteriores(prev => {
       const isAnterior = itemFormatado.data_agendamento && itemFormatado.data_agendamento < hojeStr;
@@ -444,6 +450,7 @@ export function PainelGestao({
 
     if (res.success) {
       setAgendamentos(prev => prev.filter(item => item.id !== ag.id));
+      setTodosAgendamentos(prev => prev.filter(item => item.id !== ag.id));
       setMensagemAviso(`Agendamento do Bloco ${ag.numero_bloco} apagado com sucesso. O horário ${ag.horario_agendamento} do dia ${formatarDataBR(ag.data_agendamento)} foi liberado!`);
       setTimeout(() => setMensagemAviso(''), 7000);
     } else {
@@ -1010,7 +1017,7 @@ export function PainelGestao({
             }}
           >
             <FileText size={16} />
-            Controle de Romaneio & Tabela
+            Controle de Carregamento
           </button>
 
           <button
@@ -1036,9 +1043,9 @@ export function PainelGestao({
         </div>
       )}
 
-      {/* VISÃO 1: GRÁFICOS & ANÁLISE DE BLOCOS (EXCLUSIVO ADMIN) */}
+      {/* VISÃO 1: GRÁFICOS & ANÁLISE DE BLOCOS (EXCLUSIVO ADMIN - USA O DATASET HISTÓRICO COMPLETO) */}
       {isAdmin && abaAtiva === 'graficos' ? (
-        <GraficosBlocosAdmin agendamentos={agendamentos} />
+        <GraficosBlocosAdmin agendamentos={todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos} />
       ) : (
         /* VISÃO 2: TABELA OPERACIONAL & ROMANEIO */
         <>
