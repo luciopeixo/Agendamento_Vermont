@@ -965,7 +965,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <h2 style={{ fontSize: '1.15rem', margin: 0 }}>1. Localização, Material & Bloco</h2>
               </div>
 
-              <div className="form-grid-2">
+              <div className="form-grid-3">
                 {/* Escolha da Pedreira */}
                 <div className="form-group">
                   <label className="form-label form-label-required">Pedreira de Carregamento</label>
@@ -981,6 +981,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       </option>
                     ))}
                   </select>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block', marginTop: 4 }}>
+                    Unidade de extração da pedreira
+                  </span>
                 </div>
 
                 {/* Material da Pedreira */}
@@ -999,14 +1002,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       </option>
                     ))}
                   </select>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>
-                    Materiais oficiais disponíveis na pedreira selecionada
+                  <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block', marginTop: 4 }}>
+                    Materiais disponíveis na pedreira
                   </span>
                 </div>
 
-                {/* Numeração do Bloco (Apenas 1 Bloco) */}
+                {/* Numeração do Bloco */}
                 <div className="form-group">
-                  <label className="form-label form-label-required">Numeração do Bloco (Apenas 1 Bloco)</label>
+                  <label className="form-label form-label-required">Numeração do Bloco</label>
                   <input
                     type="text"
                     className="form-input"
@@ -1017,7 +1020,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     style={{ textTransform: 'uppercase' }}
                   />
                   <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block', marginTop: 4 }}>
-                    Digite apenas 1 número de bloco. Para 2 ou 3 blocos, use "Carga Combinada".
+                    1 bloco por agendamento simples
                   </span>
 
                   {/* Alerta em tempo real com botão de conversão automática se múltiplos blocos digitados */}
