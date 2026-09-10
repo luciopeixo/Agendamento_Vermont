@@ -168,12 +168,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           nomeEncontrado: resultado.motorista.nome,
           origem: resultado.origem || 'base_interna'
         });
-        // Preenchimento automático dos dados do motorista a partir da base
+        // Preenchimento automático dos dados do motorista a partir da base (apenas Nome e Telefone)
         setFormData(prev => ({
           ...prev,
           motorista_nome: resultado.motorista.nome || prev.motorista_nome,
-          motorista_telefone: resultado.motorista.telefone ? formatarTelefone(resultado.motorista.telefone) : prev.motorista_telefone,
-          transportadora: prev.transportadora ? prev.transportadora : (resultado.motorista.transportadora || prev.transportadora)
+          motorista_telefone: resultado.motorista.telefone ? formatarTelefone(resultado.motorista.telefone) : prev.motorista_telefone
         }));
       } else {
         setStatusCPF({
