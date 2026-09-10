@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Truck, Calendar, Clock, MapPin, AlertTriangle, Send, Info, Mail, FileCheck, Layers, ArrowRight,
-  CheckCircle, UserCheck, Sparkles, Search
+  CheckCircle, UserCheck, Sparkles, Search, Building2
 } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
@@ -25,7 +25,10 @@ import {
   extrairBlocosDigitados,
   validarCPF,
   consultarMotoristaPorCPF,
-  MOTORISTAS_SEED
+  MOTORISTAS_SEED,
+  validarCNPJ,
+  consultarCNPJReceita,
+  TRANSPORTADORAS_SEED
 } from '../services/agendamentoService';
 
 export function AgendamentoForm({ onAgendamentoSucesso }) {
@@ -43,6 +46,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     material: materiaisIniciaisPonto1[0] || '',
     numero_bloco: '',
     cliente: '',
+    transportadora_cnpj: '',
     transportadora: '',
     motorista_nome: '',
     motorista_cpf: '',
@@ -115,7 +119,28 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     origem: ''
   });
 
+  // Estado da validação e consulta de CNPJ da Transportadora na Receita Federal
+  const [statusCNPJ, setStatusCNPJ] = useState({
+    buscando: false,
+    valido: null,
+    erro: '',
+    encontrado: false,
+    razaoSocial: '',
+    situacao: '',
+    cidade: '',
+    fonte: ''
+  });
+
   // Máscaras de formatação
+  const formatarCNPJ = (valor) => {
+    const nums = valor.replace(/\D/g, '').slice(0, 14);
+    if (nums.length <= 2) return nums;
+    if (nums.length <= 5) return `${nums.slice(0, 2)}.${nums.slice(2)}`;
+    if (nums.length <= 8) return `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5)}`;
+    if (nums.length <= 12) return `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8)}`;
+    return `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8, 12)}-${nums.slice(12)}`;
+  };
+
   const formatarCPF = (valor) => {
     const nums = valor.replace(/\D/g, '').slice(0, 11);
     if (nums.length <= 3) return nums;
@@ -138,6 +163,66 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return `${clean.slice(0, 3)}-${clean.slice(3)}`;
     }
     return clean;
+  };
+
+  // Consulta automática do CNPJ da Transportadora diretamente na Receita Federal
+  const handleCNPJChange = async (valor) => {
+    const formatado = formatarCNPJ(valor);
+    handleChange('transportadora_cnpj', formatado);
+
+    const limpo = formatado.replace(/\D/g, '');
+    if (limpo.length === 14) {
+      setStatusCNPJ(prev => ({ ...prev, buscando: true, erro: '' }));
+      const resultado = await consultarCNPJReceita(limpo);
+
+      if (!resultado.valido) {
+        setStatusCNPJ({
+          buscando: false,
+          valido: false,
+          erro: resultado.erro || 'CNPJ inválido (dígitos verificadores incorretos).',
+          encontrado: false,
+          razaoSocial: '',
+          situacao: '',
+          cidade: '',
+          fonte: ''
+        });
+      } else if (resultado.encontrado && resultado.empresa) {
+        setStatusCNPJ({
+          buscando: false,
+          valido: true,
+          erro: '',
+          encontrado: true,
+          razaoSocial: resultado.empresa.razao_social,
+          situacao: resultado.empresa.situacao_cadastral,
+          cidade: resultado.empresa.cidade,
+          fonte: resultado.fonte || 'Receita Federal'
+        });
+        // Preenche automaticamente o Nome da Transportadora com a Razão Social oficial
+        handleChange('transportadora', resultado.empresa.razao_social);
+      } else {
+        setStatusCNPJ({
+          buscando: false,
+          valido: true,
+          erro: '',
+          encontrado: false,
+          razaoSocial: '',
+          situacao: '',
+          cidade: '',
+          fonte: ''
+        });
+      }
+    } else {
+      setStatusCNPJ({
+        buscando: false,
+        valido: null,
+        erro: '',
+        encontrado: false,
+        razaoSocial: '',
+        situacao: '',
+        cidade: '',
+        fonte: ''
+      });
+    }
   };
 
   // Busca e validação automática do motorista por CPF
@@ -539,6 +624,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     }
 
     // Validações comuns de Transporte & Motorista
+    if (formData.transportadora_cnpj) {
+      const cnpjLimpo = formData.transportadora_cnpj.replace(/\D/g, '');
+      if (cnpjLimpo.length > 0 && (cnpjLimpo.length !== 14 || !validarCNPJ(cnpjLimpo))) {
+        setMensagemErro('O CNPJ da transportadora informado é inválido (dígitos verificadores incorretos). Por favor, corrija.');
+        return;
+      }
+    }
+
     if (!formData.transportadora.trim()) {
       setMensagemErro('Informe o nome da transportadora.');
       return;
@@ -633,6 +726,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         veiculo: {
           cliente: formData.cliente,
           transportadora: formData.transportadora,
+          transportadora_cnpj: formData.transportadora_cnpj,
           motorista_nome: formData.motorista_nome,
           motorista_cpf: formData.motorista_cpf,
           motorista_telefone: formData.motorista_telefone,
@@ -1633,9 +1727,102 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               </div>
             )}
 
+            {/* CNPJ da Transportadora com Consulta em Tempo Real na Receita Federal */}
+            <div className="form-group animate-fade">
+              <label className="form-label" style={{ justifyContent: 'space-between' }}>
+                <span>CNPJ da Transportadora (Opcional)</span>
+                {statusCNPJ.buscando && (
+                  <span style={{ fontSize: '0.72rem', color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} /> Consultando Receita Federal...
+                  </span>
+                )}
+                {statusCNPJ.valido === false && (
+                  <span style={{ fontSize: '0.72rem', color: '#f87171', fontWeight: 600 }}>
+                    ❌ CNPJ Inválido
+                  </span>
+                )}
+                {statusCNPJ.encontrado && (
+                  <span style={{ fontSize: '0.72rem', color: '#4ade80', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Building2 size={12} /> Receita Federal OK ({statusCNPJ.situacao})
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="00.000.000/0000-00"
+                maxLength={18}
+                value={formData.transportadora_cnpj}
+                onChange={(e) => handleCNPJChange(e.target.value)}
+                style={{
+                  borderColor: statusCNPJ.valido === false ? '#ef4444' : statusCNPJ.encontrado ? '#00a83e' : undefined
+                }}
+              />
+
+              {/* Mensagem de Feedback da Busca na Receita Federal */}
+              {statusCNPJ.valido === false && (
+                <span className="animate-fade" style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 2, fontWeight: 600 }}>
+                  ⚠️ {statusCNPJ.erro}
+                </span>
+              )}
+              {statusCNPJ.encontrado && (
+                <div className="animate-fade" style={{
+                  marginTop: 4,
+                  padding: '6px 10px',
+                  background: 'rgba(0, 118, 44, 0.15)',
+                  border: '1px solid rgba(0, 118, 44, 0.4)',
+                  borderRadius: 6,
+                  fontSize: '0.74rem',
+                  color: '#86efac',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <Building2 size={14} color="#4ade80" />
+                  <span>
+                    Razão Social obtida na <strong>Receita Federal</strong>: <strong>{statusCNPJ.razaoSocial}</strong> {statusCNPJ.cidade ? `(${statusCNPJ.cidade})` : ''}
+                  </span>
+                </div>
+              )}
+
+              {/* Exemplos Rápidos de CNPJ para Teste Local */}
+              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--slate-400)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <Search size={11} /> Testar CNPJ:
+                </span>
+                {TRANSPORTADORAS_SEED.map((t, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleCNPJChange(t.cnpj)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(0, 118, 44, 0.35)',
+                      color: '#86efac',
+                      fontSize: '0.68rem',
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                    title={`Clique para testar com ${t.nome}`}
+                  >
+                    {formatarCNPJ(t.cnpj)} ({t.nome.split(' ')[0]})
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Nome da Transportadora */}
             <div className="form-group">
-              <label className="form-label form-label-required">Nome da Transportadora</label>
+              <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
+                <span>Nome da Transportadora</span>
+                {statusCNPJ.encontrado && (
+                  <span style={{ fontSize: '0.7rem', color: '#86efac', fontWeight: 500 }}>
+                    Auto-preenchido via Receita
+                  </span>
+                )}
+              </label>
               <input
                 type="text"
                 className="form-input"

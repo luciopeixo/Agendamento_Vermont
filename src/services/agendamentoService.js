@@ -426,6 +426,173 @@ export async function consultarMotoristaPorCPF(cpf = '') {
   return { valido: true, encontrado: false, motorista: null };
 }
 
+// ==========================================
+// VALIDAÇÃO & CONSULTA DE CNPJ NA RECEITA FEDERAL
+// ==========================================
+
+export const TRANSPORTADORAS_BASE_KEY = 'vermont_base_transportadoras';
+
+/**
+ * Exemplos de CNPJ para teste rápido de consulta à Receita Federal
+ */
+export const TRANSPORTADORAS_SEED = [
+  {
+    cnpj: '07526557000100', // Vermont Mineração
+    nome: 'VERMONT MINERAÇÃO LTDA.'
+  },
+  {
+    cnpj: '00000000000191', // Banco do Brasil
+    nome: 'BANCO DO BRASIL S.A.'
+  },
+  {
+    cnpj: '33000167000101', // Petrobras
+    nome: 'PETROLEO BRASILEIRO S.A. PETROBRAS'
+  },
+  {
+    cnpj: '02558157000162', // Exemplo Logística / Transporte
+    nome: 'RODONAVES TRANSPORTES E ENCOMENDAS LTDA'
+  }
+];
+
+/**
+ * Validação algorítmica oficial de dígitos verificadores do CNPJ (módulo 11)
+ */
+export function validarCNPJ(cnpj = '') {
+  if (!cnpj) return false;
+  const limpo = String(cnpj).replace(/\D/g, '');
+  if (limpo.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(limpo)) return false;
+
+  let tamanho = limpo.length - 2;
+  let numeros = limpo.substring(0, tamanho);
+  let digitos = limpo.substring(tamanho);
+  let soma = 0;
+  let pos = tamanho - 7;
+
+  for (let i = tamanho; i >= 1; i--) {
+    soma += parseInt(numeros.charAt(tamanho - i), 10) * pos--;
+    if (pos < 2) pos = 9;
+  }
+
+  let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+  if (resultado !== parseInt(digitos.charAt(0), 10)) return false;
+
+  tamanho = tamanho + 1;
+  numeros = limpo.substring(0, tamanho);
+  soma = 0;
+  pos = tamanho - 7;
+
+  for (let i = tamanho; i >= 1; i--) {
+    soma += parseInt(numeros.charAt(tamanho - i), 10) * pos--;
+    if (pos < 2) pos = 9;
+  }
+
+  resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+  if (resultado !== parseInt(digitos.charAt(1), 10)) return false;
+
+  return true;
+}
+
+/**
+ * Consulta em tempo real dados cadastrais do CNPJ diretamente na Receita Federal (via BrasilAPI / MinhaReceita)
+ */
+export async function consultarCNPJReceita(cnpj = '') {
+  if (!cnpj) return { valido: null, encontrado: false, empresa: null };
+  const limpo = String(cnpj).replace(/\D/g, '');
+
+  if (limpo.length < 14) {
+    return { valido: null, encontrado: false, empresa: null };
+  }
+
+  // 1. Validação matemática do CNPJ
+  if (!validarCNPJ(limpo)) {
+    return {
+      valido: false,
+      erro: 'CNPJ inválido (dígitos verificadores incorretos).',
+      encontrado: false,
+      empresa: null
+    };
+  }
+
+  // 2. Consulta primária via BrasilAPI (Dados Oficiais da Receita Federal)
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6500);
+
+    const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${limpo}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      const razaoSocial = (data.razao_social || data.nome_fantasia || '').toUpperCase().trim();
+      const nomeFantasia = (data.nome_fantasia || '').toUpperCase().trim();
+      const situacao = (data.descricao_situacao_cadastral || 'ATIVA').toUpperCase();
+      const cidade = data.municipio ? `${data.municipio} - ${data.uf}` : '';
+
+      return {
+        valido: true,
+        encontrado: true,
+        fonte: 'Receita Federal (BrasilAPI)',
+        empresa: {
+          razao_social: razaoSocial,
+          nome_fantasia: nomeFantasia,
+          nome_exibicao: razaoSocial,
+          situacao_cadastral: situacao,
+          cidade: cidade,
+          telefone: data.ddd_telefone_1 || ''
+        }
+      };
+    }
+  } catch (eBrasilApi) {
+    console.warn('Consulta BrasilAPI indisponível ou lenta, acionando fallback MinhaReceita...', eBrasilApi);
+  }
+
+  // 3. Consulta secundária via MinhaReceita.org (Fallback público da Receita Federal)
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6500);
+
+    const res = await fetch(`https://minhareceita.org/${limpo}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      const razaoSocial = (data.razao_social || data.nome_fantasia || '').toUpperCase().trim();
+      const nomeFantasia = (data.nome_fantasia || '').toUpperCase().trim();
+      const situacao = (data.descricao_situacao_cadastral || 'ATIVA').toUpperCase();
+      const cidade = data.municipio ? `${data.municipio} - ${data.uf}` : '';
+
+      return {
+        valido: true,
+        encontrado: true,
+        fonte: 'Receita Federal (MinhaReceita)',
+        empresa: {
+          razao_social: razaoSocial,
+          nome_fantasia: nomeFantasia,
+          nome_exibicao: razaoSocial,
+          situacao_cadastral: situacao,
+          cidade: cidade,
+          telefone: data.ddd_telefone_1 || ''
+        }
+      };
+    }
+  } catch (eMinhaReceita) {
+    console.warn('Fallback MinhaReceita indisponível:', eMinhaReceita);
+  }
+
+  // 4. Se a API estiver offline mas o CNPJ for autêntico:
+  return {
+    valido: true,
+    encontrado: false,
+    aviso: 'CNPJ autêntico. Conexão temporariamente lenta com a Receita Federal; você pode digitar a Razão Social manualmente.',
+    empresa: null
+  };
+}
+
 /**
  * Retorna o primeiro horário livre e válido (não ocupado e não expirado) para uma pedreira e data
  */
@@ -1650,6 +1817,7 @@ export async function salvarAgendamento(dados) {
       numero_bloco: dados.numero_bloco.toUpperCase().trim(),
       cliente: dados.cliente.toUpperCase().trim(),
       transportadora: dados.transportadora.toUpperCase().trim(),
+      transportadora_cnpj: dados.transportadora_cnpj ? dados.transportadora_cnpj.trim() : null,
       motorista_nome: dados.motorista_nome.toUpperCase().trim(),
       motorista_cpf: dados.motorista_cpf.trim(),
       motorista_telefone: dados.motorista_telefone ? dados.motorista_telefone.trim() : null,
@@ -1764,6 +1932,7 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
         numero_bloco: p.numero_bloco.toUpperCase().trim(),
         cliente: (p.cliente || veiculo.cliente || '').toUpperCase().trim(),
         transportadora: veiculo.transportadora.toUpperCase().trim(),
+        transportadora_cnpj: veiculo.transportadora_cnpj ? veiculo.transportadora_cnpj.trim() : null,
         motorista_nome: veiculo.motorista_nome.toUpperCase().trim(),
         motorista_cpf: veiculo.motorista_cpf.trim(),
         motorista_telefone: veiculo.motorista_telefone ? veiculo.motorista_telefone.trim() : null,
