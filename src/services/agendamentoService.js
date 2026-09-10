@@ -352,25 +352,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
   // 4. Se Supabase configurado, busca na base de motoristas e no histórico do Supabase
   if (isSupabaseConfigurado()) {
     try {
-      // 4.1 Consulta via RPC segura (função SQL com SECURITY DEFINER contra vazamento de dados)
-      const { data: dataRpc, error: errorRpc } = await supabase
-        .rpc('consultar_motorista', { p_cpf: cpfLimpo });
-
-      if (!errorRpc && dataRpc && dataRpc.length > 0 && dataRpc[0].nome) {
-        const mot = {
-          nome: dataRpc[0].nome,
-          telefone: dataRpc[0].telefone || '',
-          transportadora: dataRpc[0].transportadora || '',
-          tipo_veiculo: '',
-          placa_cavalo: '',
-          placa_carreta: '',
-          placa_carreta_2: ''
-        };
-        salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
-        return { valido: true, encontrado: true, origem: 'base_supabase', motorista: mot };
-      }
-
-      // 4.2 Consulta direta na tabela base_motoristas (caso RLS com SELECT esteja ativo)
+      // 4.1 Consulta direta na tabela base_motoristas (mais direta e rápida)
       const { data: dataBase, error: errorBase } = await supabase
         .from('base_motoristas')
         .select('nome, telefone, transportadora')
@@ -382,6 +364,24 @@ export async function consultarMotoristaPorCPF(cpf = '') {
           nome: dataBase[0].nome,
           telefone: dataBase[0].telefone || '',
           transportadora: dataBase[0].transportadora || '',
+          tipo_veiculo: '',
+          placa_cavalo: '',
+          placa_carreta: '',
+          placa_carreta_2: ''
+        };
+        salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
+        return { valido: true, encontrado: true, origem: 'base_supabase', motorista: mot };
+      }
+
+      // 4.2 Consulta via RPC segura (função SQL)
+      const { data: dataRpc, error: errorRpc } = await supabase
+        .rpc('consultar_motorista', { p_cpf: cpfLimpo });
+
+      if (!errorRpc && dataRpc && dataRpc.length > 0 && dataRpc[0].nome) {
+        const mot = {
+          nome: dataRpc[0].nome,
+          telefone: dataRpc[0].telefone || '',
+          transportadora: dataRpc[0].transportadora || '',
           tipo_veiculo: '',
           placa_cavalo: '',
           placa_carreta: '',
@@ -413,8 +413,10 @@ export async function consultarMotoristaPorCPF(cpf = '') {
         return { valido: true, encontrado: true, origem: 'historico_supabase', motorista: mot };
       }
     } catch (e) {
-      console.warn('Erro ao consultar motorista no Supabase:', e);
+      console.warn('[Supabase Motorista] Erro ao consultar motorista no Supabase:', e);
     }
+  } else {
+    console.warn('[Supabase Motorista] Supabase não configurado ou variáveis VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY ausentes.');
   }
 
   return { valido: true, encontrado: false, motorista: null };
