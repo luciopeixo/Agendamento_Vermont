@@ -38,7 +38,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Scripts de Teste e Rascunhos Locais
+# Scripts de Teste, Rascunhos e Arquivos de Dados Locais
 test_*.js
 test*.js
 test_*.mjs
@@ -50,6 +50,9 @@ tmp/
 *.xlsx
 *.xls
 *.jsonl
+*.sql
+*.sqlite
+*.db
 data/
 dados/
 
