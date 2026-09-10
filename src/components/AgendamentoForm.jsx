@@ -624,12 +624,20 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     }
 
     // Validações comuns de Transporte & Motorista
-    if (formData.transportadora_cnpj) {
-      const cnpjLimpo = formData.transportadora_cnpj.replace(/\D/g, '');
-      if (cnpjLimpo.length > 0 && (cnpjLimpo.length !== 14 || !validarCNPJ(cnpjLimpo))) {
-        setMensagemErro('O CNPJ da transportadora informado é inválido (dígitos verificadores incorretos). Por favor, corrija.');
-        return;
-      }
+    if (!formData.transportadora_cnpj || !formData.transportadora_cnpj.trim()) {
+      setMensagemErro('Informe o CNPJ da transportadora.');
+      return;
+    }
+
+    const cnpjLimpo = formData.transportadora_cnpj.replace(/\D/g, '');
+    if (cnpjLimpo.length !== 14) {
+      setMensagemErro('CNPJ da transportadora incompleto. Digite os 14 dígitos.');
+      return;
+    }
+
+    if (!validarCNPJ(cnpjLimpo)) {
+      setMensagemErro('O CNPJ da transportadora informado é inválido (dígitos verificadores incorretos). Por favor, confira o número.');
+      return;
     }
 
     if (!formData.transportadora.trim()) {
@@ -1729,8 +1737,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
             {/* CNPJ da Transportadora com Consulta em Tempo Real na Receita Federal */}
             <div className="form-group animate-fade">
-              <label className="form-label" style={{ justifyContent: 'space-between' }}>
-                <span>CNPJ da Transportadora (Opcional)</span>
+              <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
+                <span>CNPJ da Transportadora</span>
                 {statusCNPJ.buscando && (
                   <span style={{ fontSize: '0.72rem', color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} /> Consultando Receita Federal...
@@ -1754,6 +1762,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 maxLength={18}
                 value={formData.transportadora_cnpj}
                 onChange={(e) => handleCNPJChange(e.target.value)}
+                required
                 style={{
                   borderColor: statusCNPJ.valido === false ? '#ef4444' : statusCNPJ.encontrado ? '#00a83e' : undefined
                 }}
