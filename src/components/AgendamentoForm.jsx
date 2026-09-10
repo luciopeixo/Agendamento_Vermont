@@ -1264,7 +1264,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
                 {/* Horário 2 */}
                 <div className="form-group">
-                  <label className="form-label form-label-required">Horário (2º Ponto)</label>
+                  <label className="form-label form-label-required">
+                    Horário (2º Ponto)
+                    {horariosOcupados2.length > 0 && (
+                      <span style={{ fontSize: '0.74rem', color: '#fca5a5', fontWeight: 500, marginLeft: 6, textTransform: 'none' }}>
+                        ({horariosOcupados2.length} horário{horariosOcupados2.length > 1 ? 's' : ''} já reservado{horariosOcupados2.length > 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </label>
                   <select
                     className="form-select"
                     value={ponto2.horario_agendamento}
@@ -1453,7 +1460,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
                   {/* Horário 3 */}
                   <div className="form-group">
-                    <label className="form-label form-label-required">Horário (3º Ponto)</label>
+                    <label className="form-label form-label-required">
+                      Horário (3º Ponto)
+                      {horariosOcupados3.length > 0 && (
+                        <span style={{ fontSize: '0.74rem', color: '#fca5a5', fontWeight: 500, marginLeft: 6, textTransform: 'none' }}>
+                          ({horariosOcupados3.length} horário{horariosOcupados3.length > 1 ? 's' : ''} já reservado{horariosOcupados3.length > 1 ? 's' : ''})
+                        </span>
+                      )}
+                    </label>
                     <select
                       className="form-select"
                       value={ponto3.horario_agendamento}

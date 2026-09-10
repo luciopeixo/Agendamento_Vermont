@@ -919,7 +919,7 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
             .filter(item => saoMesmaPedreira(item.pedreira, pedreira))
             .map(item => item.horario_agendamento)
             .filter(h => h && h !== 'outros' && !h.startsWith('Sábado'));
-          return ocupados;
+          return Array.from(new Set(ocupados));
         }
       } catch (e) {
         console.warn('Erro ao consultar Supabase, buscando dados locais:', e);
@@ -932,7 +932,7 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
       .map(item => item.horario_agendamento)
       .filter(h => h && h !== 'outros' && !h.startsWith('Sábado'));
 
-    return ocupados;
+    return Array.from(new Set(ocupados));
   } catch (err) {
     console.error('Erro ao consultar horários ocupados:', err);
     return [];
@@ -944,22 +944,28 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
  */
 export async function obterOcupacaoSabado(dataStr, pedreira = null) {
   try {
+    const extrairChaveVeiculo = (item) => {
+      const placa = item.placa_cavalo ? item.placa_cavalo.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+      if (placa) return `placa:${placa}`;
+      return `id:${item.id || item.codigo_agendamento || Math.random()}`;
+    };
+
     if (isSupabaseConfigurado()) {
       try {
         let query = supabase
           .from('agendamentos_pedreira')
-          .select('id, pedreira, status')
+          .select('id, pedreira, status, placa_cavalo, codigo_agendamento')
           .eq('data_agendamento', dataStr)
           .neq('status', 'Cancelado');
 
         const { data, error } = await query;
         if (!error && data) {
           const filtrados = pedreira ? data.filter(item => saoMesmaPedreira(item.pedreira, pedreira)) : data;
-          const total = filtrados.length;
+          const totalVeiculos = new Set(filtrados.map(extrairChaveVeiculo)).size;
           const limite = 12;
-          const disponivel = Math.max(0, limite - total);
-          const lotado = total >= limite;
-          return { total, limite, disponivel, lotado };
+          const disponivel = Math.max(0, limite - totalVeiculos);
+          const lotado = totalVeiculos >= limite;
+          return { total: totalVeiculos, limite, disponivel, lotado };
         }
       } catch (e) {
         console.warn('Erro ao verificar sábado no Supabase, buscando local:', e);
@@ -967,12 +973,13 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
     }
 
     const locais = obterAgendamentosLocais();
-    const total = locais.filter(item => {
+    const filtrados = locais.filter(item => {
       const matchData = item.data_agendamento === dataStr;
       const matchPedreira = pedreira ? saoMesmaPedreira(item.pedreira, pedreira) : true;
       const matchStatus = item.status !== 'Cancelado';
       return matchData && matchPedreira && matchStatus;
-    }).length;
+    });
+    const total = new Set(filtrados.map(extrairChaveVeiculo)).size;
 
     const limite = 12;
     const disponivel = Math.max(0, limite - total);
