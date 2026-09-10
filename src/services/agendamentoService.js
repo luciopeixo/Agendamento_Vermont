@@ -678,11 +678,11 @@ export function gerarMensagemWhatsAppCarregando(agendamento, usuarioInfo = {}) {
 👤 *Motorista:* *${agendamento.motorista_nome}*
 🪪 *CPF:* ${agendamento.motorista_cpf}
 📱 *WhatsApp Motorista:* ${agendamento.motorista_telefone || 'Não informado'}
-🏢 *Transportadora:* ${agendamento.transportadora}
+🏢 *Transportadora:* ${agendamento.transportadora} ${agendamento.transportadora_cnpj ? `(CNPJ: ${agendamento.transportadora_cnpj})` : ''}
 🛣️ *Tipo Veículo:* ${agendamento.tipo_veiculo}
 ⚖️ *Placas:*
 ${placas}
-💼 *Cliente Destino:* *${agendamento.cliente}*
+💼 *Cliente Destino:* *${agendamento.cliente}* ${agendamento.cliente_cnpj ? `(CNPJ: ${agendamento.cliente_cnpj})` : ''}
 ${agendamento.observacoes ? `\n📝 *Observações / Balança:* _${agendamento.observacoes}_\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👷 *Operador Responsável:* ${operadorNome} (${operadorRole})
@@ -945,7 +945,9 @@ export const ROTULOS_CAMPOS_AUDITORIA = {
   pedreira: 'Pedreira',
   material: 'Material',
   cliente: 'Cliente',
+  cliente_cnpj: 'CNPJ do Destinatário',
   transportadora: 'Transportadora',
+  transportadora_cnpj: 'CNPJ da Transportadora',
   motorista_nome: 'Motorista',
   motorista_cpf: 'CPF do Motorista',
   motorista_telefone: 'WhatsApp / Telefone',
@@ -1164,7 +1166,9 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
       material: agendamentoAtualizado.material,
       numero_bloco: agendamentoAtualizado.numero_bloco ? String(agendamentoAtualizado.numero_bloco).toUpperCase().trim() : '',
       cliente: agendamentoAtualizado.cliente ? String(agendamentoAtualizado.cliente).toUpperCase().trim() : '',
+      cliente_cnpj: agendamentoAtualizado.cliente_cnpj ? String(agendamentoAtualizado.cliente_cnpj).trim() : null,
       transportadora: agendamentoAtualizado.transportadora ? String(agendamentoAtualizado.transportadora).toUpperCase().trim() : '',
+      transportadora_cnpj: agendamentoAtualizado.transportadora_cnpj ? String(agendamentoAtualizado.transportadora_cnpj).trim() : null,
       motorista_nome: agendamentoAtualizado.motorista_nome ? String(agendamentoAtualizado.motorista_nome).toUpperCase().trim() : '',
       motorista_cpf: agendamentoAtualizado.motorista_cpf,
       motorista_telefone: agendamentoAtualizado.motorista_telefone || null,
@@ -1855,6 +1859,7 @@ export async function enviarComprovantePorEmail(agendamento, emailDestino, mensa
     'Data do Carregamento': dataFormatada,
     'Horário Agendado': `${agendamento.horario_agendamento} ${agendamento.justificativa_outros ? `(Justificativa: ${agendamento.justificativa_outros})` : ''}`,
     'Cliente Destinatário': agendamento.cliente,
+    'CNPJ Destinatário': agendamento.cliente_cnpj || 'Não informado',
     'Nome da Transportadora': agendamento.transportadora,
     'CNPJ Transportadora': agendamento.transportadora_cnpj || 'Não informado',
     'Motorista Responsável': agendamento.motorista_nome,
@@ -1937,7 +1942,7 @@ TRANSPORTE & MOTORISTA:
 • Tipo do Veículo: ${agendamento.tipo_veiculo}
 • Placas:
 ${placasTexto}
-• Cliente Destinatário: ${agendamento.cliente}
+• Cliente Destinatário: ${agendamento.cliente} ${agendamento.cliente_cnpj ? `(CNPJ: ${agendamento.cliente_cnpj})` : ''}
 ${agendamento.observacoes ? `\nObservações: ${agendamento.observacoes}\n` : ''}
 DOCUMENTOS OBRIGATÓRIOS PARA APRESENTAÇÃO NA PEDREIRA:
 1. CRLVs do cavalo e carreta atualizados;
@@ -2000,6 +2005,7 @@ export async function salvarAgendamento(dados) {
       material: dados.material.trim(),
       numero_bloco: dados.numero_bloco.toUpperCase().trim(),
       cliente: dados.cliente.toUpperCase().trim(),
+      cliente_cnpj: dados.cliente_cnpj ? dados.cliente_cnpj.trim() : null,
       transportadora: dados.transportadora.toUpperCase().trim(),
       transportadora_cnpj: dados.transportadora_cnpj ? dados.transportadora_cnpj.trim() : null,
       motorista_nome: dados.motorista_nome.toUpperCase().trim(),
@@ -2032,7 +2038,7 @@ export async function salvarAgendamento(dados) {
           agendamentoSalvo = data;
         } else if (error) {
           console.warn('Falha no insert Supabase completo, tentando payload essencial:', error.message);
-          // Fallback caso a tabela ainda não tenha colunas opcionais como transportadora_cnpj ou justificativa_outros
+          // Fallback caso a tabela ainda não tenha colunas opcionais como transportadora_cnpj ou cliente_cnpj
           const payloadEssencial = {
             pedreira: payload.pedreira,
             material: payload.material,
@@ -2148,6 +2154,7 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
         material: p.material.trim(),
         numero_bloco: p.numero_bloco.toUpperCase().trim(),
         cliente: (p.cliente || veiculo.cliente || '').toUpperCase().trim(),
+        cliente_cnpj: p.cliente_cnpj ? p.cliente_cnpj.trim() : (veiculo.cliente_cnpj ? veiculo.cliente_cnpj.trim() : null),
         transportadora: veiculo.transportadora.toUpperCase().trim(),
         transportadora_cnpj: veiculo.transportadora_cnpj ? veiculo.transportadora_cnpj.trim() : null,
         motorista_nome: veiculo.motorista_nome.toUpperCase().trim(),

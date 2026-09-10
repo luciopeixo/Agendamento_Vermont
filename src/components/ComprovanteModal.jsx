@@ -96,14 +96,14 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
 ${roteiroTextoWhats}
 
 🚛 *DADOS DO TRANSPORTE:*
-🏢 *Transportadora:* *${agendamento.transportadora}*
+🏢 *Transportadora:* *${agendamento.transportadora}* ${agendamento.transportadora_cnpj ? `(CNPJ: ${agendamento.transportadora_cnpj})` : ''}
 👤 *Motorista:* *${agendamento.motorista_nome}*
 🪪 *CPF:* ${agendamento.motorista_cpf}
 📱 *WhatsApp/Tel:* ${agendamento.motorista_telefone || 'Não informado'}
 🛣️ *Tipo de Veículo:* *${agendamento.tipo_veiculo}*
 ⚖️ *Placas:*
 ${placasFormatadasWhats}
-💼 *Cliente Destinatário:* *${agendamento.cliente}*
+💼 *Cliente Destinatário:* *${agendamento.cliente}* ${agendamento.cliente_cnpj ? `(CNPJ: ${agendamento.cliente_cnpj})` : ''}
 ${agendamento.observacoes ? `\n📌 *Observações:* _${agendamento.observacoes}_\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📄 *DOCUMENTOS OBRIGATÓRIOS NA PEDREIRA:*
@@ -133,7 +133,7 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
 ⏰ *Horário:* *${agendamento.horario_agendamento}* ${agendamento.justificativa_outros ? `\n   📝 _Justificativa: ${agendamento.justificativa_outros}_` : ''}
 
 🚛 *DADOS DO TRANSPORTE:*
-🏢 *Transportadora:* *${agendamento.transportadora}*
+🏢 *Transportadora:* *${agendamento.transportadora}* ${agendamento.transportadora_cnpj ? `(CNPJ: ${agendamento.transportadora_cnpj})` : ''}
 👤 *Motorista:* *${agendamento.motorista_nome}*
 🪪 *CPF:* ${agendamento.motorista_cpf}
 📱 *WhatsApp/Tel:* ${agendamento.motorista_telefone || 'Não informado'}
@@ -144,7 +144,7 @@ ${placasFormatadasWhats}
 📦 *DADOS DA CARGA:*
 🪨 *Material:* *${agendamento.material}*
 🏷️ *Nº do Bloco:* *${agendamento.numero_bloco}*
-💼 *Cliente Destinatário:* *${agendamento.cliente}*
+💼 *Cliente Destinatário:* *${agendamento.cliente}* ${agendamento.cliente_cnpj ? `(CNPJ: ${agendamento.cliente_cnpj})` : ''}
 ${agendamento.observacoes ? `\n📌 *Observações:* _${agendamento.observacoes}_\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📄 *DOCUMENTOS OBRIGATÓRIOS NA PEDREIRA:*
@@ -349,7 +349,7 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
                   <div><span style={{ color: 'var(--slate-400)' }}>Bloco Nº:</span> <strong style={{ color: '#fff' }}>{agendamento.numero_bloco}</strong></div>
                   <div><span style={{ color: 'var(--slate-400)' }}>Material Imputado:</span> <strong style={{ color: '#fff' }}>{agendamento.material}</strong></div>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <span style={{ color: 'var(--slate-400)' }}>Cliente Destinatário:</span> <strong>{agendamento.cliente}</strong>
+                    <span style={{ color: 'var(--slate-400)' }}>Cliente Destinatário:</span> <strong>{agendamento.cliente}</strong> {agendamento.cliente_cnpj && <span style={{ color: 'var(--slate-400)', fontSize: '0.82rem' }}>({agendamento.cliente_cnpj})</span>}
                   </div>
                 </div>
               </div>
@@ -368,8 +368,8 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
               <strong style={{ fontSize: '0.92rem' }}>Veículo, Motorista & Cliente</strong>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
-              <div><span style={{ color: 'var(--slate-400)' }}>Transportadora:</span> <strong>{agendamento.transportadora}</strong></div>
-              <div><span style={{ color: 'var(--slate-400)' }}>Cliente:</span> <strong>{agendamento.cliente}</strong></div>
+              <div><span style={{ color: 'var(--slate-400)' }}>Transportadora:</span> <strong>{agendamento.transportadora}</strong> {agendamento.transportadora_cnpj && <span style={{ color: 'var(--slate-400)', fontSize: '0.8rem' }}>({agendamento.transportadora_cnpj})</span>}</div>
+              <div><span style={{ color: 'var(--slate-400)' }}>Cliente:</span> <strong>{agendamento.cliente}</strong> {agendamento.cliente_cnpj && <span style={{ color: 'var(--slate-400)', fontSize: '0.8rem' }}>({agendamento.cliente_cnpj})</span>}</div>
               <div><span style={{ color: 'var(--slate-400)' }}>Motorista:</span> <strong>{agendamento.motorista_nome}</strong></div>
               <div><span style={{ color: 'var(--slate-400)' }}>CPF:</span> <strong>{agendamento.motorista_cpf}</strong></div>
               <div><span style={{ color: 'var(--slate-400)' }}>Telefone:</span> <strong>{agendamento.motorista_telefone || 'Não informado'}</strong></div>

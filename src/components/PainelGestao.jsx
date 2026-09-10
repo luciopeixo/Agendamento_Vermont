@@ -270,7 +270,9 @@ export function PainelGestao({
       'Nº Bloco',
       'Carga Mista / Combinada',
       'Cliente Destinatário',
+      'CNPJ Destinatário',
       'Transportadora',
+      'CNPJ Transportadora',
       'Motorista',
       'CPF Motorista',
       'Telefone Motorista',
@@ -314,7 +316,9 @@ export function PainelGestao({
         'Nº Bloco': ag.numero_bloco || '',
         'Carga Mista / Combinada': isMisto,
         'Cliente Destinatário': ag.cliente || '',
+        'CNPJ Destinatário': ag.cliente_cnpj || '',
         'Transportadora': ag.transportadora || '',
+        'CNPJ Transportadora': ag.transportadora_cnpj || '',
         'Motorista': ag.motorista_nome || '',
         'CPF Motorista': ag.motorista_cpf || '',
         'Telefone Motorista': ag.motorista_telefone || '',
@@ -538,6 +542,7 @@ export function PainelGestao({
       (ag.transportadora && ag.transportadora.toLowerCase().includes(busca)) ||
       (ag.transportadora_cnpj && ag.transportadora_cnpj.toLowerCase().includes(busca)) ||
       (ag.cliente && ag.cliente.toLowerCase().includes(busca)) ||
+      (ag.cliente_cnpj && ag.cliente_cnpj.toLowerCase().includes(busca)) ||
       (ag.pedreira && ag.pedreira.toLowerCase().includes(busca)) ||
       (ag.material && ag.material.toLowerCase().includes(busca)) ||
       (ag.observacoes && ag.observacoes.toLowerCase().includes(busca)) ||
@@ -1479,8 +1484,12 @@ export function PainelGestao({
                         <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.94rem' }}>
                           Bloco: {ag.numero_bloco}
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>Cliente: {ag.cliente}</div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--slate-500)' }}>Transp: {ag.transportadora}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
+                          Cliente: <strong style={{ color: 'var(--slate-200)' }}>{ag.cliente}</strong> {ag.cliente_cnpj && <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)', fontFamily: 'monospace' }}>({ag.cliente_cnpj})</span>}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--slate-500)' }}>
+                          Transp: {ag.transportadora} {ag.transportadora_cnpj && <span style={{ fontSize: '0.70rem', color: 'var(--slate-400)', fontFamily: 'monospace' }}>({ag.transportadora_cnpj})</span>}
+                        </div>
                       </td>
 
                       {/* Motorista / CPF */}
