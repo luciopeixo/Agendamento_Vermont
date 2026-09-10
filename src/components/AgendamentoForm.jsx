@@ -1772,26 +1772,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   ⚠️ {statusCNPJ.erro}
                 </span>
               )}
-              {statusCNPJ.encontrado && (
-                <div className="animate-fade" style={{
-                  marginTop: 4,
-                  padding: '6px 10px',
-                  background: 'rgba(0, 118, 44, 0.15)',
-                  border: '1px solid rgba(0, 118, 44, 0.4)',
-                  borderRadius: 6,
-                  fontSize: '0.74rem',
-                  color: '#86efac',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}>
-                  <Building2 size={14} color="#4ade80" />
-                  <span>
-                    Razão Social obtida na <strong>Receita Federal</strong>: <strong>{statusCNPJ.razaoSocial}</strong> {statusCNPJ.cidade ? `(${statusCNPJ.cidade})` : ''}
-                  </span>
-                </div>
-              )}
-
             </div>
 
             {/* Nome da Transportadora */}
