@@ -972,12 +972,7 @@ export function PainelGestao({
       </div>
 
       {/* Métricas Rápidas (Oculto na impressão) */}
-      <div className="no-print" style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: 12,
-        marginBottom: 20
-      }}>
+      <div className="no-print stats-grid-container">
         <div className="glass-panel" style={{ padding: '14px 16px' }}>
           <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
             Total Registrado
@@ -1256,7 +1251,7 @@ export function PainelGestao({
           </div>
         )}
 
-        <div style={{ overflowX: 'auto' }}>
+        <div className="table-responsive-container">
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
             <thead>
               <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>

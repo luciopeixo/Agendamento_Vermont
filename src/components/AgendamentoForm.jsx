@@ -638,7 +638,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         background: 'rgba(20, 28, 24, 0.7)',
         padding: 6,
         borderRadius: 14,
-        border: '1px solid var(--vermont-green-border)'
+        border: '1px solid var(--vermont-green-border)',
+        flexWrap: 'wrap'
       }}>
         <button
           type="button"
@@ -788,7 +789,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <h2 style={{ fontSize: '1.15rem', margin: 0 }}>1. Localização, Material & Bloco</h2>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+              <div className="form-grid-2">
                 {/* Escolha da Pedreira */}
                 <div className="form-group">
                   <label className="form-label form-label-required">Pedreira de Carregamento</label>
@@ -895,7 +896,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <h2 style={{ fontSize: '1.15rem', margin: 0 }}>2. Data & Horário de Carregamento</h2>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+              <div className="form-grid-2">
                 {/* Seletor de Data */}
                 <div className="form-group">
                   <label className="form-label form-label-required">Data do Agendamento</label>
@@ -1037,7 +1038,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <span className="badge badge-vermont" style={{ fontSize: '0.72rem' }}>Primeira Coleta</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+              <div className="form-grid-2">
                 {/* Pedreira 1 */}
                 <div className="form-group">
                   <label className="form-label form-label-required">Pedreira (1º Ponto)</label>
@@ -1184,7 +1185,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 }}>Segunda Coleta</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+              <div className="form-grid-2">
                 {/* Pedreira 2 */}
                 <div className="form-group">
                   <label className="form-label form-label-required">Pedreira (2º Ponto)</label>
@@ -1380,7 +1381,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   }}>Terceira Coleta</span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+                <div className="form-grid-2">
                   {/* Pedreira 3 */}
                   <div className="form-group">
                     <label className="form-label form-label-required">Pedreira (3º Ponto)</label>
@@ -1540,7 +1541,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             </h2>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+          <div className="form-grid-2">
             {/* Cliente Destinatário (Apenas modo Simples) */}
             {tipoCarregamento === 'simples' && (
               <div className="form-group">

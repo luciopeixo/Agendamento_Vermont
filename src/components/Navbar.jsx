@@ -4,56 +4,27 @@ import { Calendar, ListChecks, Lock, LogOut, Palette } from 'lucide-react';
 export function Navbar({ 
   abaAtiva, 
   setAbaAtiva, 
-  onAbrirRegras, 
   isAdmin, 
   onLogout,
   temaFundo = 'negresco',
   setTemaFundo
 }) {
   return (
-    <header className="navbar-container" style={{
-      position: 'sticky',
-      top: 0,
-      zIndex: 100,
-      background: 'rgba(9, 13, 16, 0.95)',
-      backdropFilter: 'blur(18px)',
-      borderBottom: '1px solid rgba(0, 118, 44, 0.35)',
-      padding: '12px 24px',
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
-    }}>
-      <div style={{
-        maxWidth: 1280,
-        margin: '0 auto',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 16
-      }}>
+    <header className="navbar-container">
+      <div className="navbar-inner">
         {/* Logo & Marca Vermont Mineração - Atalho Clicável para Página Inicial */}
         <div 
           onClick={() => setAbaAtiva('agendar')}
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 14, 
-            cursor: 'pointer',
-            transition: 'transform 0.2s ease, opacity 0.2s ease'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-          onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+          className="navbar-brand"
           title="Clique para ir à página inicial (Novo Agendamento)"
         >
           <img 
             src="https://vermontmineracao.com/wp-content/uploads/2022/07/logo-vermont-site-1.png" 
             alt="Vermont Mineração"
+            className="navbar-logo-img"
             onError={(e) => {
               e.target.style.display = 'none';
               e.target.nextSibling.style.display = 'flex';
-            }}
-            style={{
-              height: 42,
-              objectFit: 'contain'
             }}
           />
           <div style={{
@@ -85,53 +56,26 @@ export function Navbar({
             </div>
           </div>
 
-          <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.14)', paddingLeft: 14 }}>
-            <span className="badge badge-vermont" style={{ fontSize: '0.68rem', padding: '2px 8px' }}>
+          <div className="navbar-brand-info">
+            <span className="badge badge-vermont navbar-badge">
               POLO CEARÁ
             </span>
-            <p style={{ 
-              margin: '3px 0 0 0', 
-              fontSize: '0.86rem', 
-              fontWeight: 600,
-              color: '#e2e8f0',
-              letterSpacing: '0.01em'
-            }}>
-              Portal de Agendamento - Grupo Vermont Mineração
+            <p className="navbar-brand-title">
+              Portal de Agendamento • Grupo Vermont
             </p>
           </div>
         </div>
 
         {/* Navegação entre Abas & Seletor de Fundo Visual */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div className="navbar-actions">
           {/* Seletor de Fundo Nobre */}
           {setTemaFundo && (
-            <div 
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: '8px',
-                padding: '3px 6px'
-              }}
-              title="Alternar textura nobre de fundo"
-            >
+            <div className="navbar-theme-selector" title="Alternar textura nobre de fundo">
               <Palette size={14} color="#00a83e" style={{ marginRight: 2 }} />
               <button
                 type="button"
                 onClick={() => setTemaFundo('negresco')}
-                style={{
-                  background: temaFundo === 'negresco' ? 'var(--vermont-green)' : 'transparent',
-                  color: temaFundo === 'negresco' ? '#fff' : '#94a3b8',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '4px 8px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
+                className={`theme-btn ${temaFundo === 'negresco' ? 'active' : ''}`}
                 title="Tema Dark (Rochas Escuras Nobres)"
               >
                 Dark
@@ -139,17 +83,7 @@ export function Navbar({
               <button
                 type="button"
                 onClick={() => setTemaFundo('tajmahal')}
-                style={{
-                  background: temaFundo === 'tajmahal' ? 'var(--vermont-green)' : 'transparent',
-                  color: temaFundo === 'tajmahal' ? '#fff' : '#94a3b8',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '4px 8px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
+                className={`theme-btn ${temaFundo === 'tajmahal' ? 'active' : ''}`}
                 title="Tema Claro (Quartzito Nobre Translúcido)"
               >
                 Claro
@@ -157,17 +91,7 @@ export function Navbar({
               <button
                 type="button"
                 onClick={() => setTemaFundo('grafite')}
-                style={{
-                  background: temaFundo === 'grafite' ? 'var(--vermont-green)' : 'transparent',
-                  color: temaFundo === 'grafite' ? '#fff' : '#94a3b8',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '4px 8px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
+                className={`theme-btn ${temaFundo === 'grafite' ? 'active' : ''}`}
                 title="Tema Grafite (Fundo Mineral Clean)"
               >
                 Grafite
@@ -178,33 +102,30 @@ export function Navbar({
           <button
             type="button"
             onClick={() => setAbaAtiva('agendar')}
-            className={`btn ${abaAtiva === 'agendar' ? 'btn-vermont' : 'btn-secondary'}`}
-            style={{ fontSize: '0.88rem', padding: '9px 18px' }}
+            className={`btn navbar-btn ${abaAtiva === 'agendar' ? 'btn-vermont' : 'btn-secondary'}`}
           >
-            <Calendar size={18} />
-            Novo Agendamento
+            <Calendar size={17} />
+            <span>Novo Agendamento</span>
           </button>
 
           <button
             type="button"
             onClick={() => setAbaAtiva('painel')}
-            className={`btn ${abaAtiva === 'painel' ? 'btn-vermont' : 'btn-secondary'}`}
-            style={{ fontSize: '0.88rem', padding: '9px 18px' }}
+            className={`btn navbar-btn ${abaAtiva === 'painel' ? 'btn-vermont' : 'btn-secondary'}`}
           >
-            {isAdmin ? <ListChecks size={18} /> : <Lock size={16} color="#4ade80" />}
-            {isAdmin ? 'Painel de Carregamento' : 'Painel Admin'}
+            {isAdmin ? <ListChecks size={17} /> : <Lock size={15} color="#4ade80" />}
+            <span>{isAdmin ? 'Painel de Carregamento' : 'Painel Admin'}</span>
           </button>
 
           {isAdmin && (
             <button
               type="button"
               onClick={onLogout}
-              className="btn btn-danger"
+              className="btn btn-danger navbar-btn-logout"
               title="Sair do modo administrador"
-              style={{ fontSize: '0.84rem', padding: '9px 14px' }}
             >
               <LogOut size={16} />
-              Sair
+              <span>Sair</span>
             </button>
           )}
         </div>
