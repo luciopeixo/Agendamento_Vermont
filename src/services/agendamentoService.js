@@ -1419,7 +1419,9 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
  */
 export async function listarAgendamentos(filtros = {}) {
   try {
-    let resultado = [];
+    let listaSup = [];
+    const locais = obterAgendamentosLocais();
+    const locaisMap = new Map(locais.map(l => [String(l.id), l]));
 
     if (isSupabaseConfigurado()) {
       try {
@@ -1445,11 +1447,8 @@ export async function listarAgendamentos(filtros = {}) {
 
         const { data, error } = await query;
         if (!error && data) {
-          const locais = obterAgendamentosLocais();
-          const locaisMap = new Map(locais.map(l => [l.id, l]));
-
-          let listaSup = data.map(item => {
-            const loc = locaisMap.get(item.id);
+          listaSup = data.map(item => {
+            const loc = locaisMap.get(String(item.id));
             const histSup = normalizarHistoricoStatus(item.historico_status);
             const histLoc = normalizarHistoricoStatus(loc?.historico_status);
             const historicoFinal = histSup.length > 0 ? histSup : histLoc;
@@ -1461,25 +1460,57 @@ export async function listarAgendamentos(filtros = {}) {
             };
           });
 
+          // Identifica registros que existem localmente mas ainda não subiram para o Supabase
+          const supabaseIds = new Set(data.map(d => String(d.id)));
+          const locaisNaoNoSupabase = locais.filter(l => {
+            if (supabaseIds.has(String(l.id))) return false;
+            // Se filtro de data estiver ativo, checa se o agendamento local bate com a data
+            if (filtros.data && l.data_agendamento !== filtros.data) return false;
+            // Se filtro de status estiver ativo, checa status
+            if (filtros.status && filtros.status !== 'todos') {
+              if (filtros.status === 'Liberado para Carregar' && !['Liberado para Carregar', 'Confirmado'].includes(l.status)) return false;
+              if ((filtros.status === 'Finalizado' || filtros.status === 'Carregado') && !['Finalizado', 'Carregado'].includes(l.status)) return false;
+              if (l.status !== filtros.status) return false;
+            }
+            return true;
+          });
+
+          // Une registros do Supabase com registros pendentes locais para NUNCA perder nenhum agendamento
+          let listaUnificada = [...listaSup, ...locaisNaoNoSupabase];
+
           if (filtros.pedreira && filtros.pedreira !== 'todas') {
-            listaSup = listaSup.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
+            listaUnificada = listaUnificada.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
           }
 
-          // Mantém localStorage sempre sincronizado com os dados reais do Supabase sem apagar agendamentos de outras datas
+          // Mantém localStorage sempre sincronizado
           try {
-            const mapaAtualizado = new Map(locais.map(l => [l.id, l]));
-            listaSup.forEach(item => mapaAtualizado.set(item.id, item));
+            const mapaAtualizado = new Map(locais.map(l => [String(l.id), l]));
+            listaSup.forEach(item => mapaAtualizado.set(String(item.id), item));
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(Array.from(mapaAtualizado.values())));
           } catch (e) {}
 
-          return listaSup;
+          // Tenta subir registros pendentes para o Supabase em segundo plano
+          if (locaisNaoNoSupabase.length > 0) {
+            locaisNaoNoSupabase.forEach(async (pendente) => {
+              try {
+                const { error: errInsert } = await supabase
+                  .from('agendamentos_pedreira')
+                  .insert([{ ...pendente, id: pendente.id?.startsWith('VT-') ? undefined : pendente.id }]);
+                if (!errInsert) {
+                  console.info('[Sync] Agendamento local sincronizado com Supabase:', pendente.numero_bloco);
+                }
+              } catch (eSync) {}
+            });
+          }
+
+          return listaUnificada;
         }
       } catch (e) {
         console.warn('Erro ao listar do Supabase, buscando locais:', e);
       }
     }
 
-    resultado = obterAgendamentosLocais();
+    let resultado = obterAgendamentosLocais();
     if (filtros.pedreira && filtros.pedreira !== 'todas') {
       resultado = resultado.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
     }
@@ -1821,7 +1852,37 @@ export async function salvarAgendamento(dados) {
         if (!error && data) {
           agendamentoSalvo = data;
         } else if (error) {
-          console.warn('Falha no insert Supabase, usando armazenamento local:', error);
+          console.warn('Falha no insert Supabase completo, tentando payload essencial:', error.message);
+          // Fallback caso a tabela ainda não tenha colunas opcionais como transportadora_cnpj ou justificativa_outros
+          const payloadEssencial = {
+            pedreira: payload.pedreira,
+            material: payload.material,
+            numero_bloco: payload.numero_bloco,
+            cliente: payload.cliente,
+            transportadora: payload.transportadora,
+            motorista_nome: payload.motorista_nome,
+            motorista_cpf: payload.motorista_cpf,
+            motorista_telefone: payload.motorista_telefone,
+            placa_cavalo: payload.placa_cavalo,
+            placa_carreta: payload.placa_carreta,
+            tipo_veiculo: payload.tipo_veiculo,
+            data_agendamento: payload.data_agendamento,
+            horario_agendamento: payload.horario_agendamento,
+            observacoes: payload.justificativa_outros ? `${payload.observacoes ? payload.observacoes + ' | ' : ''}[Horário: ${payload.justificativa_outros}]` : payload.observacoes,
+            status: payload.status
+          };
+
+          const { data: dataEssencial, error: errorEssencial } = await supabase
+            .from('agendamentos_pedreira')
+            .insert([payloadEssencial])
+            .select()
+            .single();
+
+          if (!errorEssencial && dataEssencial) {
+            agendamentoSalvo = { ...payload, ...dataEssencial };
+          } else {
+            console.error('Falha no insert essencial do Supabase:', errorEssencial);
+          }
         }
       } catch (eSupabase) {
         console.warn('Erro de conexão com Supabase, salvando localmente:', eSupabase);
@@ -1830,6 +1891,9 @@ export async function salvarAgendamento(dados) {
 
     if (!agendamentoSalvo) {
       agendamentoSalvo = salvarAgendamentoLocal(payload);
+    } else {
+      // Garante que o agendamento salvo no Supabase também exista no cache local
+      salvarAgendamentoLocal(agendamentoSalvo);
     }
 
     try {
@@ -1935,7 +1999,36 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
             .insert([payload])
             .select()
             .single();
-          if (!res.error && res.data) dataSalva = res.data;
+          if (!res.error && res.data) {
+            dataSalva = res.data;
+          } else if (res.error) {
+            // Fallback essencial
+            const payloadEssencial = {
+              pedreira: payload.pedreira,
+              material: payload.material,
+              numero_bloco: payload.numero_bloco,
+              cliente: payload.cliente,
+              transportadora: payload.transportadora,
+              motorista_nome: payload.motorista_nome,
+              motorista_cpf: payload.motorista_cpf,
+              motorista_telefone: payload.motorista_telefone,
+              placa_cavalo: payload.placa_cavalo,
+              placa_carreta: payload.placa_carreta,
+              tipo_veiculo: payload.tipo_veiculo,
+              data_agendamento: payload.data_agendamento,
+              horario_agendamento: payload.horario_agendamento,
+              observacoes: payload.observacoes,
+              status: payload.status
+            };
+            const resEssencial = await supabase
+              .from('agendamentos_pedreira')
+              .insert([payloadEssencial])
+              .select()
+              .single();
+            if (!resEssencial.error && resEssencial.data) {
+              dataSalva = { ...payload, ...resEssencial.data };
+            }
+          }
         } catch (eSup) {
           console.warn('Erro ao salvar ponto no Supabase, usando local:', eSup);
         }
@@ -1943,6 +2036,8 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
 
       if (!dataSalva) {
         dataSalva = salvarAgendamentoLocal(payload);
+      } else {
+        salvarAgendamentoLocal(dataSalva);
       }
       resultadosSalvos.push(dataSalva);
     }

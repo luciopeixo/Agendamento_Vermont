@@ -14,6 +14,7 @@ import {
   formatarPlacasExibicao,
   formatarDataBR,
   normalizarHistoricoStatus,
+  obterDataHoraAtualBrasil,
   PEDREIRAS_CEARA, 
   EMAIL_NOTIFICACAO_DESTINO,
   STATUS_AGENDAMENTO
@@ -73,7 +74,8 @@ export function PainelGestao({
   isAdmin = false,
   pedreiraOperador = null
 }) {
-  const hojeStr = new Date().toISOString().split('T')[0];
+  const { dataHoje } = obterDataHoraAtualBrasil();
+  const hojeStr = dataHoje || new Date().toISOString().split('T')[0];
 
   const usuarioInfo = {
     nome: usuario?.user_metadata?.nome || (usuario?.email ? usuario.email.split('@')[0].toUpperCase() : (isAdmin ? 'ADMINISTRADOR GERAL' : 'OPERADOR PEDREIRA')),
@@ -515,18 +517,23 @@ export function PainelGestao({
 
   const agendamentosFiltrados = listaBase.filter(ag => {
     if (!termoBusca.trim()) return true;
-    const busca = termoBusca.toLowerCase();
+    const busca = termoBusca.toLowerCase().trim();
     return (
       (ag.numero_bloco && ag.numero_bloco.toLowerCase().includes(busca)) ||
       (ag.motorista_nome && ag.motorista_nome.toLowerCase().includes(busca)) ||
+      (ag.motorista_cpf && ag.motorista_cpf.toLowerCase().includes(busca)) ||
+      (ag.motorista_telefone && ag.motorista_telefone.toLowerCase().includes(busca)) ||
       (ag.placa_cavalo && ag.placa_cavalo.toLowerCase().includes(busca)) ||
       (ag.placa_carreta && ag.placa_carreta.toLowerCase().includes(busca)) ||
       (ag.placa_carreta_2 && ag.placa_carreta_2.toLowerCase().includes(busca)) ||
       (ag.transportadora && ag.transportadora.toLowerCase().includes(busca)) ||
+      (ag.transportadora_cnpj && ag.transportadora_cnpj.toLowerCase().includes(busca)) ||
       (ag.cliente && ag.cliente.toLowerCase().includes(busca)) ||
       (ag.pedreira && ag.pedreira.toLowerCase().includes(busca)) ||
       (ag.material && ag.material.toLowerCase().includes(busca)) ||
-      (ag.observacoes && ag.observacoes.toLowerCase().includes(busca))
+      (ag.observacoes && ag.observacoes.toLowerCase().includes(busca)) ||
+      (ag.justificativa_outros && ag.justificativa_outros.toLowerCase().includes(busca)) ||
+      (ag.horario_agendamento && ag.horario_agendamento.toLowerCase().includes(busca))
     );
   });
 
@@ -1275,14 +1282,37 @@ export function PainelGestao({
               ) : agendamentosFiltrados.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'var(--slate-400)' }}>
-                    {exibindoPendenciasAnteriores 
-                      ? 'Nenhum carregamento pendente de datas anteriores encontrado.' 
-                      : 'Nenhum agendamento encontrado para os filtros selecionados.'}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                      <p style={{ margin: 0, fontSize: '0.95rem' }}>
+                        {exibindoPendenciasAnteriores 
+                          ? 'Nenhum carregamento pendente de datas anteriores encontrado.' 
+                          : termoBusca 
+                            ? `Nenhum agendamento encontrado para a busca "${termoBusca}".`
+                            : filtroData 
+                              ? `Nenhum agendamento encontrado para a data ${formatarDataBR(filtroData)}.` 
+                              : 'Nenhum agendamento encontrado para os filtros selecionados.'}
+                      </p>
+                      {filtroData && !exibindoPendenciasAnteriores && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFiltroData('');
+                            setFiltroStatus('todos');
+                            setFiltroPedreira(isAdmin ? 'todas' : (pedreiraOperador || 'todas'));
+                          }}
+                          className="btn btn-vermont"
+                          style={{ padding: '6px 14px', fontSize: '0.8rem' }}
+                        >
+                          Ver Agendamentos de Todas as Datas
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (
                 agendamentosFiltrados.map((ag) => {
                   const isSabado = ag.tipo_dia === 'sabado';
+                  const isOutros = ag.horario_agendamento === 'outros' || String(ag.horario_agendamento).toLowerCase().startsWith('outro');
                   const listaPlacasTabela = formatarPlacasExibicao(ag);
                   const estaExcluindo = excluindoId === ag.id;
                   const histArr = normalizarHistoricoStatus(ag.historico_status);
@@ -1302,10 +1332,22 @@ export function PainelGestao({
                       {/* Data / Horário */}
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ fontWeight: 700, color: '#fff' }}>{formatarDataBR(ag.data_agendamento)}</div>
-                        <div style={{ fontSize: '0.8rem', color: isSabado ? '#fbbf24' : '#86efac', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                        <div style={{ 
+                          fontSize: '0.8rem', 
+                          color: isSabado ? '#fbbf24' : isOutros ? '#f59e0b' : '#86efac', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 4, 
+                          marginTop: 2 
+                        }}>
                           <Clock size={13} />
-                          {ag.horario_agendamento}
+                          {isOutros ? 'Outros (Especial)' : ag.horario_agendamento}
                         </div>
+                        {isOutros && ag.justificativa_outros && (
+                          <div style={{ fontSize: '0.72rem', color: '#fde68a', marginTop: 3, lineHeight: '1.2' }} title={ag.justificativa_outros}>
+                            📌 {ag.justificativa_outros}
+                          </div>
+                        )}
                         {isDataAnteriorPendente && (
                           <span style={{
                             display: 'inline-flex',
@@ -1567,16 +1609,21 @@ export function PainelGestao({
                       </td>
 
                       {/* Observações Operacionais */}
-                      <td style={{ padding: '12px 14px', maxWidth: 220 }}>
+                      <td style={{ padding: '12px 14px', maxWidth: 240 }}>
+                        {ag.justificativa_outros && (!ag.observacoes || !ag.observacoes.includes(ag.justificativa_outros)) && (
+                          <div style={{ fontSize: '0.76rem', color: '#fde68a', marginBottom: 4, fontWeight: 600 }}>
+                            📌 Horário Solicitado: {ag.justificativa_outros}
+                          </div>
+                        )}
                         {ag.observacoes ? (
                           <div style={{ fontSize: '0.78rem', color: '#e2e8f0', lineHeight: '1.3' }}>
                             {ag.observacoes}
                           </div>
-                        ) : (
+                        ) : !ag.justificativa_outros ? (
                           <span style={{ fontSize: '0.75rem', color: 'var(--slate-500)', fontStyle: 'italic' }}>
                             Sem observações registradas.
                           </span>
-                        )}
+                        ) : null}
                       </td>
 
                       {/* Ações Administrativas e Operacionais (Oculto na impressão) */}
