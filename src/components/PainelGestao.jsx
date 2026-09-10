@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, RefreshCw, Printer, CheckCircle, CheckCircle2, Clock, Truck, Mail, FileText, 
   AlertCircle, AlertTriangle, Trash2, ShieldCheck, ShieldAlert, RotateCcw, Edit3, CheckCheck, PlayCircle,
-  FileSpreadsheet, Download, History, Bell, BellRing, Volume2, VolumeX, Eye, Check, X
+  FileSpreadsheet, Download, History, Bell, BellRing, Volume2, VolumeX, Eye, Check, X, BarChart3, TrendingUp
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -22,6 +22,7 @@ import {
 import { ModalEditarAgendamento } from './ModalEditarAgendamento';
 import { ModalHistoricoStatus } from './ModalHistoricoStatus';
 import { ModalConfirmarStatus } from './ModalConfirmarStatus';
+import { GraficosBlocosAdmin } from './GraficosBlocosAdmin';
 
 /**
  * Emite som harmônico suave usando a Web Audio API (sem arquivos externos)
@@ -103,6 +104,7 @@ export function PainelGestao({
 
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [filtroData, setFiltroData] = useState(() => hojeStr);
+  const [abaAtiva, setAbaAtiva] = useState('tabela'); // 'tabela' ou 'graficos'
   const [notificandoEmailId, setNotificandoEmailId] = useState(null);
   const [excluindoId, setExcluindoId] = useState(null);
   const [mensagemAviso, setMensagemAviso] = useState('');
@@ -978,17 +980,79 @@ export function PainelGestao({
         )}
       </div>
 
-      {/* Métricas Rápidas (Oculto na impressão) */}
-      <div className="no-print stats-grid-container">
-        <div className="glass-panel" style={{ padding: '14px 16px' }}>
-          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
-            Total Registrado
-          </span>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', marginTop: 4 }}>
-            {agendamentos.length}
-          </div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Carregamentos no Sistema</span>
+      {/* Aba de Navegação Exclusiva para Admin Geral */}
+      {isAdmin && (
+        <div className="no-print" style={{
+          display: 'flex',
+          gap: 10,
+          marginBottom: 20,
+          background: 'rgba(0, 0, 0, 0.45)',
+          padding: '6px',
+          borderRadius: 12,
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          width: 'fit-content'
+        }}>
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('tabela')}
+            className="btn"
+            style={{
+              padding: '9px 18px',
+              fontSize: '0.86rem',
+              fontWeight: 700,
+              gap: 8,
+              borderRadius: 8,
+              background: abaAtiva === 'tabela' ? 'var(--vermont-green-subtle)' : 'transparent',
+              border: abaAtiva === 'tabela' ? '1px solid var(--vermont-green-border)' : '1px solid transparent',
+              color: abaAtiva === 'tabela' ? '#4ade80' : 'var(--slate-400)',
+              boxShadow: abaAtiva === 'tabela' ? '0 0 15px rgba(0, 118, 44, 0.35)' : 'none',
+              transition: 'all 0.2s'
+            }}
+          >
+            <FileText size={16} />
+            Controle de Romaneio & Tabela
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('graficos')}
+            className="btn"
+            style={{
+              padding: '9px 18px',
+              fontSize: '0.86rem',
+              fontWeight: 700,
+              gap: 8,
+              borderRadius: 8,
+              background: abaAtiva === 'graficos' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+              border: abaAtiva === 'graficos' ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid transparent',
+              color: abaAtiva === 'graficos' ? '#38bdf8' : 'var(--slate-400)',
+              boxShadow: abaAtiva === 'graficos' ? '0 0 15px rgba(56, 189, 248, 0.3)' : 'none',
+              transition: 'all 0.2s'
+            }}
+          >
+            <BarChart3 size={16} />
+            Gráficos & Análise de Blocos (Admin)
+          </button>
         </div>
+      )}
+
+      {/* VISÃO 1: GRÁFICOS & ANÁLISE DE BLOCOS (EXCLUSIVO ADMIN) */}
+      {isAdmin && abaAtiva === 'graficos' ? (
+        <GraficosBlocosAdmin agendamentos={agendamentos} />
+      ) : (
+        /* VISÃO 2: TABELA OPERACIONAL & ROMANEIO */
+        <>
+          {/* Métricas Rápidas (Oculto na impressão) */}
+          <div className="no-print stats-grid-container">
+            <div className="glass-panel" style={{ padding: '14px 16px' }}>
+              <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
+                Total Registrado
+              </span>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', marginTop: 4 }}>
+                {agendamentos.length}
+              </div>
+              <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Carregamentos no Sistema</span>
+            </div>
 
         <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #4ade80' }}>
           <span style={{ fontSize: '0.74rem', color: '#4ade80', textTransform: 'uppercase', fontWeight: 700 }}>
@@ -1710,6 +1774,8 @@ export function PainelGestao({
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Modal de Edição de Agendamento */}
       {agendamentoParaEditar && (
