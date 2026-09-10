@@ -1263,6 +1263,49 @@ export function saoMesmaPedreira(p1, p2) {
 }
 
 /**
+ * Retorna o nome canônico e formatado da pedreira a partir de qualquer variação ou chave
+ */
+export function normalizarNomePedreira(nome) {
+  if (!nome) return '';
+  const chave = normalizarChavePedreira(nome);
+  const encontrada = PEDREIRAS_CEARA.find(p => normalizarChavePedreira(p.nome) === chave || p.id === chave.toLowerCase());
+  return encontrada ? encontrada.nome : nome.trim();
+}
+
+/**
+ * Normaliza e padroniza o nome do material (ex: unifica variações de Taj Mahal, Quartzito, etc.)
+ */
+export function normalizarNomeMaterial(material, pedreira = '') {
+  if (!material) return 'Não informado';
+  const clean = String(material).trim();
+  const up = clean.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Taj Mahal e variações (incluindo quando cadastrado como Quartzito ou quando a pedreira for Uruoca)
+  if (
+    up.includes('TAJ MAHAL') || 
+    up.includes('TAJMAHAL') || 
+    up === 'QUARTZITO' || 
+    up.includes('QUARTZITO') ||
+    (pedreira && normalizarChavePedreira(pedreira) === 'URUOCA')
+  ) {
+    return 'Taj Mahal';
+  }
+
+  // Verificar correspondência com materiais oficiais cadastrados
+  for (const lista of Object.values(MATERIAIS_POR_PEDREIRA)) {
+    for (const matOficial of lista) {
+      const upOficial = matOficial.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (up === upOficial || up.replace(/\s+/g, '') === upOficial.replace(/\s+/g, '')) {
+        return matOficial;
+      }
+    }
+  }
+
+  // Se não encontrar na lista oficial, formata em Title Case mantendo legibilidade
+  return clean.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+}
+
+/**
  * Consulta horários que já foram agendados para a pedreira e data selecionadas
  */
 export async function obterHorariosOcupados(dataStr, pedreira) {

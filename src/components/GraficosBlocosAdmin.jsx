@@ -8,7 +8,9 @@ import {
   PEDREIRAS_CEARA, 
   saoMesmaPedreira, 
   formatarDataBR, 
-  obterMateriaisPorPedreira 
+  obterMateriaisPorPedreira,
+  normalizarNomePedreira,
+  normalizarNomeMaterial
 } from '../services/agendamentoService';
 
 export function GraficosBlocosAdmin({ agendamentos = [] }) {
@@ -33,7 +35,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
     return Array.from(setC).sort();
   }, [agendamentos]);
 
-  // Lista dinâmica de Materiais baseada na pedreira selecionada ou geral
+  // Lista dinâmica de Materiais baseada na pedreira selecionada ou geral (com normalização e deduplicação)
   const listaMateriaisDisponiveis = useMemo(() => {
     if (filtroPedreira && filtroPedreira !== 'todas') {
       const mats = obterMateriaisPorPedreira(filtroPedreira);
@@ -41,8 +43,9 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
     }
     const setM = new Set();
     agendamentos.forEach(a => {
-      if (a.material && a.material.trim()) {
-        setM.add(a.material.trim());
+      const matNorm = normalizarNomeMaterial(a.material, a.pedreira);
+      if (matNorm && matNorm !== 'Não informado') {
+        setM.add(matNorm);
       }
     });
     return Array.from(setM).sort();
@@ -99,9 +102,12 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
         return false;
       }
 
-      // Filtro de Material
-      if (filtroMaterial !== 'todos' && ag.material?.trim().toLowerCase() !== filtroMaterial.trim().toLowerCase()) {
-        return false;
+      // Filtro de Material (compara nome normalizado)
+      if (filtroMaterial !== 'todos') {
+        const matNormalizado = normalizarNomeMaterial(ag.material, ag.pedreira);
+        if (matNormalizado.toLowerCase() !== filtroMaterial.trim().toLowerCase()) {
+          return false;
+        }
       }
 
       // Filtro de Cliente
@@ -132,11 +138,11 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
     }));
   }, [agendamentosFiltrados]);
 
-  // Agrupamento por Pedreira
+  // Agrupamento por Pedreira (com nomes canônicos)
   const dadosPorPedreira = useMemo(() => {
     const mapa = {};
     agendamentosFiltrados.forEach(ag => {
-      const ped = ag.pedreira || 'Outra';
+      const ped = normalizarNomePedreira(ag.pedreira) || 'Outra';
       mapa[ped] = (mapa[ped] || 0) + 1;
     });
 
@@ -149,11 +155,11 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
       .sort((a, b) => b.qtd - a.qtd);
   }, [agendamentosFiltrados, totalBlocos]);
 
-  // Agrupamento por Material
+  // Agrupamento por Material (com normalização para unificar Taj Mahal, Quartzito, etc.)
   const dadosPorMaterial = useMemo(() => {
     const mapa = {};
     agendamentosFiltrados.forEach(ag => {
-      const mat = (ag.material || 'Não informado').trim();
+      const mat = normalizarNomeMaterial(ag.material, ag.pedreira);
       mapa[mat] = (mapa[mat] || 0) + 1;
     });
 
@@ -210,8 +216,8 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
     const dados = agendamentosFiltrados.map(ag => ({
       'Data do Carregamento': formatarDataBR(ag.data_agendamento),
       'Horário': ag.horario_agendamento || '',
-      'Pedreira': ag.pedreira || '',
-      'Material': ag.material || '',
+      'Pedreira': normalizarNomePedreira(ag.pedreira) || ag.pedreira || '',
+      'Material': normalizarNomeMaterial(ag.material, ag.pedreira) || ag.material || '',
       'Nº do Bloco': ag.numero_bloco || '',
       'Cliente Destinatário': ag.cliente || '',
       'Transportadora': ag.transportadora || '',
