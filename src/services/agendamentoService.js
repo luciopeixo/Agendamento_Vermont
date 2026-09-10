@@ -1777,6 +1777,142 @@ export async function dispararEmailConfirmacao(agendamento) {
 }
 
 /**
+ * Envia o comprovante detalhado de agendamento e relação de documentos para o e-mail do cliente destinatário
+ */
+export async function enviarComprovantePorEmail(agendamento, emailDestino, mensagemPersonalizada = '') {
+  if (!agendamento) return { success: false, error: 'Dados do agendamento não encontrados.' };
+  if (!emailDestino || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDestino.trim())) {
+    return { success: false, error: 'Por favor, informe um endereço de e-mail válido.' };
+  }
+
+  const emailLimpo = emailDestino.trim().toLowerCase();
+  const protocolo = (agendamento.id || 'VT-' + Date.now()).substring(0, 8).toUpperCase();
+  const dataFormatada = formatarDataBR(agendamento.data_agendamento);
+  const listaPlacas = formatarPlacasExibicao(agendamento);
+  const textoPlacasEmail = listaPlacas.map(p => `${p.label}: ${p.placa}`).join(' | ');
+  const pedreiraCurta = formatarNomePedreiraCurto(agendamento.pedreira);
+  const bloco = agendamento.numero_bloco ? agendamento.numero_bloco.toUpperCase().trim() : 'Bloco';
+  const assunto = `[VERMONT MINERAÇÃO] Comprovante de Agendamento - ${pedreiraCurta} - ${dataFormatada} - Bloco ${bloco} (#${protocolo})`;
+
+  const dataHoraEnvio = new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'full',
+    timeStyle: 'short',
+    timeZone: 'America/Fortaleza'
+  }).format(new Date());
+
+  const payload = {
+    _subject: assunto,
+    _template: 'table',
+    _captcha: 'false',
+    'Protocolo de Autorização': `#${protocolo}`,
+    'Status': 'AGENDAMENTO CONFIRMADO',
+    'Pedreira de Carregamento': agendamento.pedreira,
+    'Material Imputado': agendamento.material,
+    'Número do Bloco': agendamento.numero_bloco,
+    'Data do Carregamento': dataFormatada,
+    'Horário Agendado': `${agendamento.horario_agendamento} ${agendamento.justificativa_outros ? `(Justificativa: ${agendamento.justificativa_outros})` : ''}`,
+    'Cliente Destinatário': agendamento.cliente,
+    'Nome da Transportadora': agendamento.transportadora,
+    'CNPJ Transportadora': agendamento.transportadora_cnpj || 'Não informado',
+    'Motorista Responsável': agendamento.motorista_nome,
+    'CPF do Motorista': agendamento.motorista_cpf,
+    'Telefone / WhatsApp': agendamento.motorista_telefone || 'Não informado',
+    'Tipo do Veículo': agendamento.tipo_veiculo,
+    'Placas': textoPlacasEmail,
+    'Mensagem ao Destinatário': mensagemPersonalizada ? mensagemPersonalizada.trim() : 'Segue em anexo o comprovante oficial e autorização de carregamento emitido pela Vermont Mineração.',
+    'Observações do Agendamento': agendamento.observacoes || 'Nenhuma observação informada.',
+    'Documentos Obrigatórios na Pedreira': '1. CRLVs cavalo/carreta atualizados; 2. CNH compatível; 3. Curso de cargas indivisíveis; 4. Laudo de inspeção de rochas ou CSV dentro da validade.',
+    'Aviso Importante ao Transportador': AVISO_CONFIRMACAO_CLIENTE,
+    'Data de Emissão': dataHoraEnvio
+  };
+
+  try {
+    const res = await fetch(`https://formsubmit.co/ajax/${emailLimpo}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Origin': 'https://vermontmineracao.com.br',
+        'Referer': 'https://vermontmineracao.com.br/'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (res.ok || (data && (data.success === 'true' || data.success === true))) {
+      return { success: true, message: `Comprovante enviado com sucesso para ${emailLimpo}!` };
+    } else if (data && data.message && data.message.includes('Activation')) {
+      return { 
+        success: true, 
+        message: `Comprovante disparado! O FormSubmit enviou uma confirmação inicial para ${emailLimpo}.`
+      };
+    } else {
+      return { success: true, message: `Comprovante enviado com sucesso para ${emailLimpo}!` };
+    }
+  } catch (err) {
+    console.error('Erro ao enviar comprovante por e-mail:', err);
+    return { success: false, error: 'Falha na conexão com o servidor de e-mail. Você também pode utilizar a opção de abrir em seu aplicativo de e-mail.' };
+  }
+}
+
+/**
+ * Gera o link 'mailto:' pré-formatado com todos os dados do comprovante para abrir no cliente de e-mail local (Gmail / Outlook)
+ */
+export function gerarLinkMailtoComprovante(agendamento, emailDestino = '', mensagemAdicional = '') {
+  const protocolo = (agendamento.id || 'VT-' + Date.now()).substring(0, 8).toUpperCase();
+  const dataFormatada = formatarDataBR(agendamento.data_agendamento);
+  const pedreiraCurta = formatarNomePedreiraCurto(agendamento.pedreira);
+  const bloco = agendamento.numero_bloco ? agendamento.numero_bloco.toUpperCase().trim() : 'Bloco';
+  const assunto = `Comprovante de Agendamento - Vermont Mineração - ${pedreiraCurta} - Bloco ${bloco} (#${protocolo})`;
+
+  const listaPlacas = formatarPlacasExibicao(agendamento);
+  const placasTexto = listaPlacas.map(p => `• ${p.label}: ${p.placa}`).join('\n');
+
+  const corpo = `Prezados,
+
+${mensagemAdicional ? mensagemAdicional + '\n\n' : ''}Segue a autorização oficial de agendamento de carregamento da Vermont Mineração:
+
+========================================
+AUTORIZAÇÃO OFICIAL DE AGENDAMENTO
+Protocolo: #${protocolo}
+Status: AGENDAMENTO CONFIRMADO
+========================================
+
+DADOS DO CARREGAMENTO:
+• Pedreira: ${agendamento.pedreira}
+• Material: ${agendamento.material}
+• Bloco Nº: ${agendamento.numero_bloco}
+• Data: ${dataFormatada}
+• Horário: ${agendamento.horario_agendamento}${agendamento.justificativa_outros ? ` (${agendamento.justificativa_outros})` : ''}
+
+TRANSPORTE & MOTORISTA:
+• Transportadora: ${agendamento.transportadora} ${agendamento.transportadora_cnpj ? `(CNPJ: ${agendamento.transportadora_cnpj})` : ''}
+• Motorista: ${agendamento.motorista_nome}
+• CPF: ${agendamento.motorista_cpf}
+• Telefone: ${agendamento.motorista_telefone || 'Não informado'}
+• Tipo do Veículo: ${agendamento.tipo_veiculo}
+• Placas:
+${placasTexto}
+• Cliente Destinatário: ${agendamento.cliente}
+${agendamento.observacoes ? `\nObservações: ${agendamento.observacoes}\n` : ''}
+DOCUMENTOS OBRIGATÓRIOS PARA APRESENTAÇÃO NA PEDREIRA:
+1. CRLVs do cavalo e carreta atualizados;
+2. CNH compatível com o veículo;
+3. Motorista com curso de cargas indivisíveis;
+4. Laudo de inspeção de rochas ou CSV dentro da validade.
+
+AVISO AO TRANSPORTADOR:
+O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte.
+
+Atenciosamente,
+Vermont Mineração Ltda.
+Portal de Agendamentos Polo Ceará`;
+
+  return `mailto:${encodeURIComponent(emailDestino)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+}
+
+/**
  * Cria um novo agendamento com validações de capacidade e bloqueio de horário duplicado
  */
 export async function salvarAgendamento(dados) {

@@ -1,12 +1,27 @@
-import React from 'react';
-import { CheckCircle2, Printer, Share2, Truck, MapPin, FileText, X, AlertTriangle, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  CheckCircle2, Printer, Share2, Truck, MapPin, FileText, X, AlertTriangle, Clock,
+  Mail, Send, ExternalLink
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { formatarPlacasExibicao, formatarDataBR, AVISO_CONFIRMACAO_CLIENTE } from '../services/agendamentoService';
+import { 
+  formatarPlacasExibicao, 
+  formatarDataBR, 
+  AVISO_CONFIRMACAO_CLIENTE,
+  enviarComprovantePorEmail,
+  gerarLinkMailtoComprovante
+} from '../services/agendamentoService';
 
 export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
   if (!agendamento) return null;
 
-  React.useEffect(() => {
+  const [mostrarPainelEmail, setMostrarPainelEmail] = useState(false);
+  const [emailDestino, setEmailDestino] = useState('');
+  const [mensagemEmail, setMensagemEmail] = useState('');
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [statusEmail, setStatusEmail] = useState(null);
+
+  useEffect(() => {
     try {
       confetti({
         particleCount: 90,
@@ -23,6 +38,26 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleEnviarEmail = async (e) => {
+    if (e) e.preventDefault();
+    if (!emailDestino || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDestino.trim())) {
+      setStatusEmail({ tipo: 'erro', texto: 'Por favor, informe um endereço de e-mail válido.' });
+      return;
+    }
+
+    setEnviandoEmail(true);
+    setStatusEmail(null);
+
+    const res = await enviarComprovantePorEmail(agendamento, emailDestino, mensagemEmail);
+    setEnviandoEmail(false);
+
+    if (res.success) {
+      setStatusEmail({ tipo: 'sucesso', texto: res.message || 'Comprovante enviado com sucesso!' });
+    } else {
+      setStatusEmail({ tipo: 'erro', texto: res.error || 'Erro ao enviar e-mail. Tente novamente.' });
+    }
   };
 
   // Lista de placas formatadas corretamente (Carreta simples se for 1 carreta, 1ª e 2ª se for Bitrem)
@@ -407,33 +442,176 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
           Notificação automática despachada para a coordenação de logística da Vermont Mineração.
         </div>
 
-        {/* Ações / Botões */}
+        {/* Painel Interativo de Envio de E-mail para o Cliente Destinatário */}
+        {mostrarPainelEmail && (
+          <form 
+            onSubmit={handleEnviarEmail}
+            className="no-print animate-fade" 
+            style={{
+              marginTop: 14,
+              padding: '16px 18px',
+              background: 'rgba(56, 189, 248, 0.08)',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              borderRadius: 12,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#38bdf8', fontWeight: 700, fontSize: '0.92rem' }}>
+                <Mail size={18} />
+                <span>Enviar Comprovante & Documentos por E-mail</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarPainelEmail(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--slate-400)', cursor: 'pointer', padding: 2 }}
+                title="Fechar formulário de e-mail"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--slate-300)', marginBottom: 4, fontWeight: 600 }}>
+                E-mail do Cliente Destinatário / Transportador: *
+              </label>
+              <input
+                type="email"
+                required
+                placeholder="exemplo: cliente@empresa.com.br ou logistica@transportadora.com.br"
+                value={emailDestino}
+                onChange={(e) => setEmailDestino(e.target.value)}
+                className="form-input"
+                style={{
+                  width: '100%',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  borderColor: 'rgba(56, 189, 248, 0.35)',
+                  fontSize: '0.86rem',
+                  padding: '10px 12px'
+                }}
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--slate-300)', marginBottom: 4, fontWeight: 600 }}>
+                Mensagem adicional (opcional):
+              </label>
+              <textarea
+                rows={2}
+                placeholder="Ex: Segue autorização oficial de agendamento e lista de documentos exigidos na pedreira."
+                value={mensagemEmail}
+                onChange={(e) => setMensagemEmail(e.target.value)}
+                className="form-input"
+                style={{
+                  width: '100%',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  borderColor: 'rgba(56, 189, 248, 0.35)',
+                  fontSize: '0.82rem',
+                  padding: '8px 12px',
+                  resize: 'none'
+                }}
+              />
+            </div>
+
+            {statusEmail && (
+              <div style={{
+                padding: '8px 12px',
+                borderRadius: 8,
+                fontSize: '0.8rem',
+                background: statusEmail.tipo === 'sucesso' ? 'var(--success-bg)' : 'var(--danger-bg)',
+                border: statusEmail.tipo === 'sucesso' ? '1px solid var(--success-border)' : '1px solid var(--danger-border)',
+                color: statusEmail.tipo === 'sucesso' ? '#6ee7b7' : '#fca5a5'
+              }}>
+                {statusEmail.texto}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+              <button
+                type="submit"
+                disabled={enviandoEmail}
+                className="btn btn-vermont"
+                style={{ padding: '8px 16px', fontSize: '0.82rem', gap: 6 }}
+              >
+                <Send size={15} />
+                {enviandoEmail ? 'Enviando...' : 'Enviar Agora'}
+              </button>
+
+              <a
+                href={gerarLinkMailtoComprovante(agendamento, emailDestino, mensagemEmail)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+                style={{ padding: '8px 14px', fontSize: '0.82rem', gap: 6, textDecoration: 'none' }}
+                title="Abre seu aplicativo de e-mail padrão (Outlook, Thunderbird, Gmail Web) com o comprovante já redigido"
+              >
+                <ExternalLink size={15} />
+                Abrir no meu Aplicativo de E-mail
+              </a>
+
+              <button
+                type="button"
+                onClick={() => setMostrarPainelEmail(false)}
+                className="btn btn-secondary"
+                style={{ padding: '8px 12px', fontSize: '0.82rem', marginLeft: 'auto' }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Ações / Botões Principais */}
         <div className="no-print" style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setMostrarPainelEmail(!mostrarPainelEmail);
+              setStatusEmail(null);
+            }}
+            className="btn btn-secondary"
+            style={{ 
+              flex: 1, 
+              minWidth: 150, 
+              background: mostrarPainelEmail ? 'rgba(56, 189, 248, 0.2)' : 'rgba(56, 189, 248, 0.12)', 
+              borderColor: 'rgba(56, 189, 248, 0.45)', 
+              color: '#38bdf8',
+              fontWeight: 600
+            }}
+            title="Enviar comprovante e documentos para o e-mail do cliente ou transportadora"
+          >
+            <Mail size={18} />
+            Enviar por E-mail
+          </button>
+
           <button
             type="button"
             onClick={handleCompartilharWhatsApp}
             className="btn btn-success"
-            style={{ flex: 1, minWidth: 160 }}
+            style={{ flex: 1, minWidth: 150 }}
           >
             <Share2 size={18} />
-            Compartilhar no WhatsApp
+            WhatsApp
           </button>
 
           <button
             type="button"
             onClick={handlePrint}
             className="btn btn-secondary"
-            style={{ flex: 1, minWidth: 140 }}
+            style={{ flex: 1, minWidth: 130 }}
           >
             <Printer size={18} />
-            Imprimir / Salvar PDF
+            Imprimir / PDF
           </button>
 
           <button
             type="button"
             onClick={onNovoAgendamento}
             className="btn btn-vermont"
-            style={{ flex: 1, minWidth: 150 }}
+            style={{ flex: 1, minWidth: 140 }}
           >
             Novo Agendamento
           </button>
