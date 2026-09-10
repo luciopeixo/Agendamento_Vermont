@@ -349,9 +349,49 @@ export async function consultarMotoristaPorCPF(cpf = '') {
     return { valido: true, encontrado: true, origem: 'historico_local', motorista: mot };
   }
 
-  // 4. Se Supabase configurado, busca no histórico de agendamentos no Supabase
+  // 4. Se Supabase configurado, busca na base de motoristas e no histórico do Supabase
   if (isSupabaseConfigurado()) {
     try {
+      // 4.1 Consulta via RPC segura (função SQL com SECURITY DEFINER contra vazamento de dados)
+      const { data: dataRpc, error: errorRpc } = await supabase
+        .rpc('consultar_motorista', { p_cpf: cpfLimpo });
+
+      if (!errorRpc && dataRpc && dataRpc.length > 0 && dataRpc[0].nome) {
+        const mot = {
+          nome: dataRpc[0].nome,
+          telefone: dataRpc[0].telefone || '',
+          transportadora: dataRpc[0].transportadora || '',
+          tipo_veiculo: '',
+          placa_cavalo: '',
+          placa_carreta: '',
+          placa_carreta_2: ''
+        };
+        salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
+        return { valido: true, encontrado: true, origem: 'base_supabase', motorista: mot };
+      }
+
+      // 4.2 Consulta direta na tabela base_motoristas (caso RLS com SELECT esteja ativo)
+      const { data: dataBase, error: errorBase } = await supabase
+        .from('base_motoristas')
+        .select('nome, telefone, transportadora')
+        .eq('cpf', cpfLimpo)
+        .limit(1);
+
+      if (!errorBase && dataBase && dataBase.length > 0 && dataBase[0].nome) {
+        const mot = {
+          nome: dataBase[0].nome,
+          telefone: dataBase[0].telefone || '',
+          transportadora: dataBase[0].transportadora || '',
+          tipo_veiculo: '',
+          placa_cavalo: '',
+          placa_carreta: '',
+          placa_carreta_2: ''
+        };
+        salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
+        return { valido: true, encontrado: true, origem: 'base_supabase', motorista: mot };
+      }
+
+      // 4.3 Consulta no histórico de agendamentos salvos no Supabase
       const { data, error } = await supabase
         .from('agendamentos_pedreira')
         .select('motorista_nome, motorista_telefone, transportadora, tipo_veiculo, placa_cavalo, placa_carreta, placa_carreta_2')
@@ -370,7 +410,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
           placa_carreta_2: data[0].placa_carreta_2 || ''
         };
         salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
-        return { valido: true, encontrado: true, origem: 'supabase', motorista: mot };
+        return { valido: true, encontrado: true, origem: 'historico_supabase', motorista: mot };
       }
     } catch (e) {
       console.warn('Erro ao consultar motorista no Supabase:', e);
