@@ -5,7 +5,7 @@ import { PainelGestao } from './components/PainelGestao';
 import { AdminLogin } from './components/AdminLogin';
 import { ComprovanteModal } from './components/ComprovanteModal';
 import { RegrasModal } from './components/RegrasModal';
-import { ShieldCheck, Mail } from 'lucide-react';
+import { ShieldCheck, Mail, MapPin } from 'lucide-react';
 import { EMAIL_NOTIFICACAO_DESTINO, isSupabaseConfigurado } from './services/agendamentoService';
 import { supabase } from './lib/supabase';
 
@@ -179,37 +179,91 @@ export function App() {
 
       {/* Rodapé Institucional Vermont Mineração */}
       <footer className="no-print" style={{
-        background: 'rgba(10, 14, 18, 0.98)',
-        borderTop: '1px solid rgba(0, 118, 44, 0.3)',
-        padding: '24px 16px',
-        fontSize: '0.84rem',
+        background: 'linear-gradient(180deg, rgba(8, 12, 16, 0.95) 0%, rgba(5, 8, 10, 0.99) 100%)',
+        borderTop: '1px solid rgba(0, 118, 44, 0.25)',
+        padding: '32px 20px 28px',
         color: 'var(--slate-400)',
-        marginTop: 40
+        marginTop: 48,
+        textAlign: 'center'
       }}>
         <div style={{
-          maxWidth: 1280,
+          maxWidth: 1080,
           margin: '0 auto',
           display: 'flex',
-          justifyContent: 'space-between',
+          flexDirection: 'column',
           alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 16
+          gap: 14
         }}>
-          <div>
-            <strong style={{ color: '#fff', fontSize: '0.92rem' }}>VERMONT MINERAÇÃO LTDA.</strong>
-            <p style={{ margin: '3px 0 0 0', fontSize: '0.78rem' }}>
-              Polo Operacional Ceará: Uruoca (Taj Mahal) • Massapê (Negresco) • Massapê (Del Mare) • Sobral (Jaibaras) • São Gonçalo do Amarante (Serrote) • Beberibe
-            </p>
+          {/* Título da Empresa com destaque elegante */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <span style={{
+              display: 'inline-block',
+              width: 28,
+              height: 1,
+              background: 'linear-gradient(90deg, transparent, #4ade80)'
+            }} />
+            <strong style={{
+              color: '#ffffff',
+              fontSize: '0.98rem',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              fontFamily: 'var(--font-heading)',
+              textShadow: '0 2px 10px rgba(0, 118, 44, 0.35)'
+            }}>
+              VERMONT MINERAÇÃO LTDA.
+            </strong>
+            <span style={{
+              display: 'inline-block',
+              width: 28,
+              height: 1,
+              background: 'linear-gradient(90deg, #4ade80, transparent)'
+            }} />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: '0.8rem' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--slate-300)' }}>
-              <Mail size={15} color="#4ade80" />
-              Notificações: <strong style={{ color: '#4ade80' }}>E-mail da logística</strong>
+          {/* Polo Operacional Ceará e Unidades */}
+          <div style={{
+            fontSize: '0.84rem',
+            lineHeight: 1.6,
+            color: 'var(--slate-300)',
+            maxWidth: 920,
+            padding: '10px 20px',
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: 12
+          }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#4ade80', fontWeight: 700, marginRight: 8 }}>
+              <MapPin size={14} color="#4ade80" />
+              <span>Polo Operacional Ceará:</span>
+            </div>
+            <span>
+              Uruoca (Taj Mahal) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
+              Massapê (Negresco) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
+              Massapê (Del Mare) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
+              Sobral (Jaibaras) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
+              São Gonçalo do Amarante (Serrote) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
+              Beberibe
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--slate-400)' }}>
-              <ShieldCheck size={15} color="#34d399" />
-              Portal Oficial de Agendamentos
+          </div>
+
+          {/* Metadados e links institucionais */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexWrap: 'wrap',
+            gap: 16,
+            fontSize: '0.78rem',
+            color: 'var(--slate-400)',
+            marginTop: 4
+          }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <ShieldCheck size={14} color="#34d399" />
+              Portal Oficial de Agendamentos & Logística
+            </span>
+            <span style={{ color: 'rgba(255, 255, 255, 0.15)' }}>•</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Mail size={14} color="#4ade80" />
+              Notificações: <strong style={{ color: '#86efac' }}>E-mail da logística</strong>
             </span>
           </div>
         </div>
