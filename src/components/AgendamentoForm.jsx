@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Truck, Calendar, Clock, MapPin, AlertTriangle, Send, Info, Mail, FileCheck, Layers, ArrowRight,
-  CheckCircle, UserCheck, Sparkles, Search, Building2
+  CheckCircle, UserCheck, Sparkles, Building2
 } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
@@ -27,8 +27,7 @@ import {
   consultarMotoristaPorCPF,
   MOTORISTAS_SEED,
   validarCNPJ,
-  consultarCNPJReceita,
-  TRANSPORTADORAS_SEED
+  consultarCNPJReceita
 } from '../services/agendamentoService';
 
 export function AgendamentoForm({ onAgendamentoSucesso }) {
@@ -1794,32 +1793,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 </div>
               )}
 
-              {/* Exemplos Rápidos de CNPJ para Teste Local */}
-              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--slate-400)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <Search size={11} /> Testar CNPJ:
-                </span>
-                {TRANSPORTADORAS_SEED.map((t, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleCNPJChange(t.cnpj)}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid rgba(0, 118, 44, 0.35)',
-                      color: '#86efac',
-                      fontSize: '0.68rem',
-                      padding: '2px 6px',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                    title={`Clique para testar com ${t.nome}`}
-                  >
-                    {formatarCNPJ(t.cnpj)} ({t.nome.split(' ')[0]})
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Nome da Transportadora */}
