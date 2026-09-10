@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Truck, Calendar, Clock, MapPin, AlertTriangle, Send, Info, Mail, FileCheck, Layers, ArrowRight
+  Truck, Calendar, Clock, MapPin, AlertTriangle, Send, Info, Mail, FileCheck, Layers, ArrowRight,
+  CheckCircle, UserCheck, Sparkles, Search
 } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
@@ -21,7 +22,10 @@ import {
   obterDataHoraAtualBrasil,
   formatarDataBR,
   detectarMultiplosBlocos,
-  extrairBlocosDigitados
+  extrairBlocosDigitados,
+  validarCPF,
+  consultarMotoristaPorCPF,
+  MOTORISTAS_SEED
 } from '../services/agendamentoService';
 
 export function AgendamentoForm({ onAgendamentoSucesso }) {
@@ -101,6 +105,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   // Configuração dinâmica de placas baseada no tipo de veículo selecionado
   const configPlacas = obterConfigPlacas(formData.tipo_veiculo);
 
+  // Estado da validação e busca de CPF em tempo real
+  const [statusCPF, setStatusCPF] = useState({
+    buscando: false,
+    valido: null,
+    erro: '',
+    encontrado: false,
+    nomeEncontrado: '',
+    origem: ''
+  });
+
   // Máscaras de formatação
   const formatarCPF = (valor) => {
     const nums = valor.replace(/\D/g, '').slice(0, 11);
@@ -124,6 +138,63 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return `${clean.slice(0, 3)}-${clean.slice(3)}`;
     }
     return clean;
+  };
+
+  // Busca e validação automática do motorista por CPF
+  const handleCPFChange = async (valor) => {
+    const formatado = formatarCPF(valor);
+    handleChange('motorista_cpf', formatado);
+
+    const limpo = formatado.replace(/\D/g, '');
+    if (limpo.length === 11) {
+      setStatusCPF(prev => ({ ...prev, buscando: true, erro: '' }));
+      const resultado = await consultarMotoristaPorCPF(limpo);
+
+      if (!resultado.valido) {
+        setStatusCPF({
+          buscando: false,
+          valido: false,
+          erro: resultado.erro || 'CPF inválido (dígitos verificadores incorretos).',
+          encontrado: false,
+          nomeEncontrado: '',
+          origem: ''
+        });
+      } else if (resultado.encontrado && resultado.motorista) {
+        setStatusCPF({
+          buscando: false,
+          valido: true,
+          erro: '',
+          encontrado: true,
+          nomeEncontrado: resultado.motorista.nome,
+          origem: resultado.origem || 'base_interna'
+        });
+        // Preenchimento automático dos dados do motorista a partir da base
+        setFormData(prev => ({
+          ...prev,
+          motorista_nome: resultado.motorista.nome || prev.motorista_nome,
+          motorista_telefone: resultado.motorista.telefone ? formatarTelefone(resultado.motorista.telefone) : prev.motorista_telefone,
+          transportadora: prev.transportadora ? prev.transportadora : (resultado.motorista.transportadora || prev.transportadora)
+        }));
+      } else {
+        setStatusCPF({
+          buscando: false,
+          valido: true,
+          erro: '',
+          encontrado: false,
+          nomeEncontrado: '',
+          origem: ''
+        });
+      }
+    } else {
+      setStatusCPF({
+        buscando: false,
+        valido: null,
+        erro: '',
+        encontrado: false,
+        nomeEncontrado: '',
+        origem: ''
+      });
+    }
   };
 
   // Avalia o tipo de dia e carrega vagas de sábado ou horários ocupados para o PONTO 1
@@ -479,8 +550,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return;
     }
 
-    if (formData.motorista_cpf.replace(/\D/g, '').length !== 11) {
+    const cpfLimpo = formData.motorista_cpf.replace(/\D/g, '');
+    if (cpfLimpo.length !== 11) {
       setMensagemErro('CPF do motorista incompleto. Digite os 11 dígitos.');
+      return;
+    }
+
+    if (!validarCPF(cpfLimpo)) {
+      setMensagemErro('O CPF informado para o motorista é inválido (dígitos verificadores incorretos). Por favor, confira o número.');
       return;
     }
 
@@ -1570,9 +1647,108 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               />
             </div>
 
+            {/* CPF do Motorista com Validação & Busca em Tempo Real */}
+            <div className="form-group animate-fade">
+              <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
+                <span>CPF do Motorista</span>
+                {statusCPF.buscando && (
+                  <span style={{ fontSize: '0.72rem', color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} /> Consultando base...
+                  </span>
+                )}
+                {statusCPF.valido === false && (
+                  <span style={{ fontSize: '0.72rem', color: '#f87171', fontWeight: 600 }}>
+                    ❌ CPF Inválido
+                  </span>
+                )}
+                {statusCPF.encontrado && (
+                  <span style={{ fontSize: '0.72rem', color: '#4ade80', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <CheckCircle size={12} /> Localizado na base
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="000.000.000-00"
+                maxLength={14}
+                value={formData.motorista_cpf}
+                onChange={(e) => handleCPFChange(e.target.value)}
+                required
+                style={{
+                  borderColor: statusCPF.valido === false ? '#ef4444' : statusCPF.encontrado ? '#00a83e' : undefined
+                }}
+              />
+
+              {/* Mensagem de Feedback da Busca */}
+              {statusCPF.valido === false && (
+                <span className="animate-fade" style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 2, fontWeight: 600 }}>
+                  ⚠️ {statusCPF.erro}
+                </span>
+              )}
+              {statusCPF.encontrado && (
+                <div className="animate-fade" style={{
+                  marginTop: 4,
+                  padding: '6px 10px',
+                  background: 'rgba(0, 118, 44, 0.15)',
+                  border: '1px solid rgba(0, 118, 44, 0.4)',
+                  borderRadius: 6,
+                  fontSize: '0.74rem',
+                  color: '#86efac',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <Sparkles size={14} color="#4ade80" />
+                  <span>
+                    Motorista <strong>{statusCPF.nomeEncontrado}</strong> localizado na base! Nome e telefone preenchidos.
+                  </span>
+                </div>
+              )}
+              {statusCPF.valido === true && !statusCPF.encontrado && (
+                <span className="animate-fade" style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>
+                  ℹ️ Novo motorista. Os dados informados serão salvos na base interna para os próximos agendamentos.
+                </span>
+              )}
+
+              {/* Exemplos Rápidos para Teste Local */}
+              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--slate-400)', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <Search size={11} /> Testar CPF:
+                </span>
+                {MOTORISTAS_SEED.slice(0, 3).map((m, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleCPFChange(m.cpf)}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(0, 118, 44, 0.35)',
+                      color: '#86efac',
+                      fontSize: '0.68rem',
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                    title={`Clique para testar com ${m.nome}`}
+                  >
+                    {formatarCPF(m.cpf)} ({m.nome.split(' ')[0]})
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Nome do Motorista */}
             <div className="form-group">
-              <label className="form-label form-label-required">Nome do Motorista</label>
+              <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
+                <span>Nome do Motorista</span>
+                {statusCPF.encontrado && (
+                  <span style={{ fontSize: '0.7rem', color: '#86efac', fontWeight: 500 }}>
+                    Auto-preenchido
+                  </span>
+                )}
+              </label>
               <input
                 type="text"
                 className="form-input"
@@ -1583,23 +1759,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               />
             </div>
 
-            {/* CPF do Motorista */}
-            <div className="form-group">
-              <label className="form-label form-label-required">CPF do Motorista</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="000.000.000-00"
-                maxLength={14}
-                value={formData.motorista_cpf}
-                onChange={(e) => handleChange('motorista_cpf', formatarCPF(e.target.value))}
-                required
-              />
-            </div>
-
             {/* Telefone / WhatsApp */}
             <div className="form-group">
-              <label className="form-label">Telefone / WhatsApp (Motorista)</label>
+              <label className="form-label" style={{ justifyContent: 'space-between' }}>
+                <span>Telefone / WhatsApp (Motorista)</span>
+                {statusCPF.encontrado && formData.motorista_telefone && (
+                  <span style={{ fontSize: '0.7rem', color: '#86efac', fontWeight: 500 }}>
+                    Auto-preenchido
+                  </span>
+                )}
+              </label>
               <input
                 type="text"
                 className="form-input"

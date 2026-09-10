@@ -204,6 +204,228 @@ export function isHorarioPassado(dataStr, horarioId) {
   return false;
 }
 
+// ==========================================
+// VALIDAÇÃO & CONSULTA DE CPF DE MOTORISTAS
+// ==========================================
+
+export const MOTORISTAS_BASE_KEY = 'vermont_base_motoristas';
+
+/**
+ * Base inicial / semente com motoristas de teste para demonstração e preenchimento ágil
+ */
+export const MOTORISTAS_SEED = [
+  {
+    cpf: '12345678909',
+    nome: 'FRANCISCO DAS CHAGAS SILVA',
+    telefone: '(85) 99876-5432',
+    transportadora: 'TRANSVERMONT LOGÍSTICA',
+    tipo_veiculo: 'Bitrem 7 Eixos (2 Carretas)',
+    placa_cavalo: 'NQL-4A12',
+    placa_carreta: 'OSB-8C34',
+    placa_carreta_2: 'HXK-9D56'
+  },
+  {
+    cpf: '98765432100',
+    nome: 'ANTONIO CARLOS DE OLIVEIRA',
+    telefone: '(88) 98123-4567',
+    transportadora: 'RODOVIÁRIO CEARÁ EXPRESS',
+    tipo_veiculo: 'Carreta Simples / LS (1 Carreta)',
+    placa_cavalo: 'HYT-7B89',
+    placa_carreta: 'PNM-3E45'
+  },
+  {
+    cpf: '11144477735',
+    nome: 'JOSÉ ROBERTO FERREIRA LIMA',
+    telefone: '(85) 98765-1122',
+    transportadora: 'TRANS ROCHAS NORDESTE',
+    tipo_veiculo: 'Rodotrem 9 Eixos (2 Carretas)',
+    placa_cavalo: 'RIQ-2F34',
+    placa_carreta: 'HXP-5G67',
+    placa_carreta_2: 'OSD-1H23'
+  },
+  {
+    cpf: '01234567890',
+    nome: 'MANOEL PEREIRA DOS SANTOS',
+    telefone: '(88) 99456-7890',
+    transportadora: 'LOGÍSTICA VERMONT',
+    tipo_veiculo: 'Truck / Bitruck (Veículo Único)',
+    placa_cavalo: 'PMA-8J90'
+  }
+];
+
+/**
+ * Validação algorítmica oficial de CPF (módulo 11 da Receita Federal)
+ */
+export function validarCPF(cpf = '') {
+  if (!cpf) return false;
+  const limpo = String(cpf).replace(/\D/g, '');
+  if (limpo.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(limpo)) return false;
+
+  let soma = 0;
+  for (let i = 0; i < 9; i++) {
+    soma += parseInt(limpo.charAt(i), 10) * (10 - i);
+  }
+  let resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(limpo.charAt(9), 10)) return false;
+
+  soma = 0;
+  for (let i = 0; i < 10; i++) {
+    soma += parseInt(limpo.charAt(i), 10) * (11 - i);
+  }
+  resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== parseInt(limpo.charAt(10), 10)) return false;
+
+  return true;
+}
+
+/**
+ * Retorna todos os motoristas salvos na base local e inicializa com sementes se vazio
+ */
+export function obterBaseMotoristas() {
+  try {
+    const raw = localStorage.getItem(MOTORISTAS_BASE_KEY);
+    if (!raw) {
+      localStorage.setItem(MOTORISTAS_BASE_KEY, JSON.stringify(MOTORISTAS_SEED));
+      return [...MOTORISTAS_SEED];
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [...MOTORISTAS_SEED];
+  } catch (e) {
+    return [...MOTORISTAS_SEED];
+  }
+}
+
+/**
+ * Salva ou atualiza um motorista na base cadastral
+ */
+export function salvarMotoristaNaBase(dadosMotorista = {}) {
+  try {
+    const rawCpf = dadosMotorista.motorista_cpf || dadosMotorista.cpf;
+    if (!rawCpf) return;
+    const cpfLimpo = String(rawCpf).replace(/\D/g, '');
+    if (cpfLimpo.length !== 11) return;
+
+    const base = obterBaseMotoristas();
+    const index = base.findIndex(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
+
+    const novoRegistro = {
+      cpf: cpfLimpo,
+      nome: (dadosMotorista.motorista_nome || dadosMotorista.nome || '').trim().toUpperCase(),
+      telefone: dadosMotorista.motorista_telefone || dadosMotorista.telefone || null,
+      transportadora: (dadosMotorista.transportadora || '').trim().toUpperCase() || null,
+      tipo_veiculo: dadosMotorista.tipo_veiculo || null,
+      placa_cavalo: dadosMotorista.placa_cavalo || null,
+      placa_carreta: dadosMotorista.placa_carreta || null,
+      placa_carreta_2: dadosMotorista.placa_carreta_2 || null,
+      atualizado_em: new Date().toISOString()
+    };
+
+    if (index !== -1) {
+      base[index] = { ...base[index], ...novoRegistro };
+    } else {
+      base.push(novoRegistro);
+    }
+
+    localStorage.setItem(MOTORISTAS_BASE_KEY, JSON.stringify(base));
+  } catch (e) {
+    console.warn('Erro ao salvar motorista na base:', e);
+  }
+}
+
+/**
+ * Consulta um motorista pelo CPF na base interna e no histórico
+ */
+export async function consultarMotoristaPorCPF(cpf = '') {
+  if (!cpf) return { valido: null, encontrado: false, motorista: null };
+  const cpfLimpo = String(cpf).replace(/\D/g, '');
+
+  if (cpfLimpo.length < 11) {
+    return { valido: null, encontrado: false, motorista: null };
+  }
+
+  // 1. Validação matemática oficial
+  const ehValido = validarCPF(cpfLimpo);
+  if (!ehValido) {
+    return {
+      valido: false,
+      erro: 'CPF inválido (dígitos verificadores incorretos).',
+      encontrado: false,
+      motorista: null
+    };
+  }
+
+  // 2. Busca na base local (cadastros e sementes)
+  const baseLocal = obterBaseMotoristas();
+  const encontradoLocal = baseLocal.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
+
+  if (encontradoLocal && encontradoLocal.nome) {
+    return {
+      valido: true,
+      encontrado: true,
+      origem: 'base_local',
+      motorista: {
+        nome: encontradoLocal.nome,
+        telefone: encontradoLocal.telefone || '',
+        transportadora: encontradoLocal.transportadora || '',
+        tipo_veiculo: encontradoLocal.tipo_veiculo || '',
+        placa_cavalo: encontradoLocal.placa_cavalo || '',
+        placa_carreta: encontradoLocal.placa_carreta || '',
+        placa_carreta_2: encontradoLocal.placa_carreta_2 || ''
+      }
+    };
+  }
+
+  // 3. Busca no histórico de agendamentos locais
+  const agendamentosLocais = obterAgendamentosLocais();
+  const agLocal = agendamentosLocais.find(a => a.motorista_cpf && a.motorista_cpf.replace(/\D/g, '') === cpfLimpo && a.motorista_nome);
+  if (agLocal) {
+    const mot = {
+      nome: agLocal.motorista_nome,
+      telefone: agLocal.motorista_telefone || '',
+      transportadora: agLocal.transportadora || '',
+      tipo_veiculo: agLocal.tipo_veiculo || '',
+      placa_cavalo: agLocal.placa_cavalo || '',
+      placa_carreta: agLocal.placa_carreta || '',
+      placa_carreta_2: agLocal.placa_carreta_2 || ''
+    };
+    salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
+    return { valido: true, encontrado: true, origem: 'historico_local', motorista: mot };
+  }
+
+  // 4. Se Supabase configurado, busca no histórico de agendamentos no Supabase
+  if (isSupabaseConfigurado()) {
+    try {
+      const { data, error } = await supabase
+        .from('agendamentos_pedreira')
+        .select('motorista_nome, motorista_telefone, transportadora, tipo_veiculo, placa_cavalo, placa_carreta, placa_carreta_2')
+        .eq('motorista_cpf', cpfLimpo)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!error && data && data.length > 0 && data[0].motorista_nome) {
+        const mot = {
+          nome: data[0].motorista_nome,
+          telefone: data[0].motorista_telefone || '',
+          transportadora: data[0].transportadora || '',
+          tipo_veiculo: data[0].tipo_veiculo || '',
+          placa_cavalo: data[0].placa_cavalo || '',
+          placa_carreta: data[0].placa_carreta || '',
+          placa_carreta_2: data[0].placa_carreta_2 || ''
+        };
+        salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
+        return { valido: true, encontrado: true, origem: 'supabase', motorista: mot };
+      }
+    } catch (e) {
+      console.warn('Erro ao consultar motorista no Supabase:', e);
+    }
+  }
+
+  return { valido: true, encontrado: false, motorista: null };
+}
+
 /**
  * Retorna o primeiro horário livre e válido (não ocupado e não expirado) para uma pedreira e data
  */
@@ -1474,6 +1696,9 @@ export async function salvarAgendamento(dados) {
       console.warn('Alerta ao disparar e-mail de confirmação:', eEmail);
     }
 
+    // Salva ou atualiza os dados do motorista na base de consulta rápida
+    salvarMotoristaNaBase(payload);
+
     return { success: true, agendamento: agendamentoSalvo };
   } catch (err) {
     console.error('Erro ao gravar agendamento:', err);
@@ -1583,6 +1808,9 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
     await Promise.allSettled(
       resultadosSalvos.map(item => dispararEmailConfirmacao(item))
     );
+
+    // Salva ou atualiza os dados do motorista na base de consulta rápida
+    salvarMotoristaNaBase({ ...veiculo, motorista_cpf: veiculo.motorista_cpf });
 
     return {
       success: true,
