@@ -1,11 +1,11 @@
 import React from 'react';
 import { History, X, User, Clock, ArrowRight, CheckCircle2, AlertCircle, Shield } from 'lucide-react';
-import { formatarDataBR } from '../services/agendamentoService';
+import { formatarDataBR, normalizarHistoricoStatus } from '../services/agendamentoService';
 
 export function ModalHistoricoStatus({ agendamento, onFechar }) {
   if (!agendamento) return null;
 
-  const historico = Array.isArray(agendamento.historico_status) ? agendamento.historico_status : [];
+  const historico = normalizarHistoricoStatus(agendamento.historico_status);
   const protocolo = (agendamento.id || '').substring(0, 8).toUpperCase();
 
   const formatarDataHoraCompleta = (isoString) => {

@@ -515,10 +515,35 @@ export function isSupabaseConfigurado() {
   return Boolean(url && key && !url.includes('seu-projeto.supabase.co') && !key.includes('sua-chave-anon'));
 }
 
+/**
+ * Garante que o histórico de status seja sempre um array válido de objetos,
+ * mesmo se retornado como string JSON pelo Supabase ou localStorage
+ */
+export function normalizarHistoricoStatus(hist) {
+  if (!hist) return [];
+  if (Array.isArray(hist)) return hist;
+  if (typeof hist === 'string') {
+    try {
+      const parsed = JSON.parse(hist);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+}
+
 export function obterAgendamentosLocais() {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const lista = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(lista)) {
+      return lista.map(item => ({
+        ...item,
+        historico_status: normalizarHistoricoStatus(item.historico_status)
+      }));
+    }
+    return [];
   } catch (e) {
     return [];
   }
@@ -531,6 +556,7 @@ export function salvarAgendamentoLocal(registro) {
     const novo = {
       ...registro,
       id: registro.id || `VT-${protocoloNumero}`,
+      historico_status: normalizarHistoricoStatus(registro.historico_status),
       created_at: new Date().toISOString()
     };
     lista.unshift(novo);
@@ -540,6 +566,7 @@ export function salvarAgendamentoLocal(registro) {
     return {
       ...registro,
       id: registro.id || `VT-${Math.floor(100000 + Math.random() * 900000)}`,
+      historico_status: normalizarHistoricoStatus(registro.historico_status),
       created_at: new Date().toISOString()
     };
   }
@@ -610,9 +637,12 @@ export function registrarHistoricoEdicao(itemAtual = {}, itemAtualizado = {}, us
   const alteracoes = detectarAlteracoesCampos(itemAtual, itemAtualizado);
   const statusMudou = itemAtualizado.status && itemAtual.status && itemAtualizado.status !== itemAtual.status;
 
-  let historicoBase = Array.isArray(itemAtualizado.historico_status) 
-    ? [...itemAtualizado.historico_status]
-    : (Array.isArray(itemAtual.historico_status) ? [...itemAtual.historico_status] : []);
+  const histItemAtualizado = normalizarHistoricoStatus(itemAtualizado.historico_status);
+  const histItemAtual = normalizarHistoricoStatus(itemAtual.historico_status);
+
+  let historicoBase = histItemAtualizado.length > 0
+    ? [...histItemAtualizado]
+    : (histItemAtual.length > 0 ? [...histItemAtual] : []);
 
   const dataHora = new Date().toISOString();
   const usuarioNome = usuarioInfo.nome || usuarioInfo.email?.split('@')[0]?.toUpperCase() || 'SISTEMA';
@@ -658,8 +688,10 @@ export function registrarHistoricoEdicao(itemAtual = {}, itemAtualizado = {}, us
  */
 export function registrarHistoricoStatus(agendamentoAtual, novoStatus, usuarioInfo = {}) {
   const statusAnterior = agendamentoAtual.status || 'Aguardando Liberação';
+  const historicoExistente = normalizarHistoricoStatus(agendamentoAtual.historico_status);
+
   if (statusAnterior === novoStatus) {
-    return Array.isArray(agendamentoAtual.historico_status) ? agendamentoAtual.historico_status : [];
+    return historicoExistente;
   }
 
   const novaEntrada = {
@@ -673,7 +705,6 @@ export function registrarHistoricoStatus(agendamentoAtual, novoStatus, usuarioIn
     data_hora: new Date().toISOString()
   };
 
-  const historicoExistente = Array.isArray(agendamentoAtual.historico_status) ? agendamentoAtual.historico_status : [];
   return [novaEntrada, ...historicoExistente];
 }
 
@@ -702,7 +733,9 @@ export function atualizarAgendamentoLocalCompleto(agendamentoAtualizado, usuario
     const index = lista.findIndex(item => item.id === agendamentoAtualizado.id);
     if (index !== -1) {
       const itemAtual = lista[index];
-      const historico = agendamentoAtualizado.historico_status || registrarHistoricoEdicao(itemAtual, agendamentoAtualizado, usuarioInfo);
+      const historico = normalizarHistoricoStatus(agendamentoAtualizado.historico_status).length > 0 
+        ? normalizarHistoricoStatus(agendamentoAtualizado.historico_status) 
+        : registrarHistoricoEdicao(itemAtual, agendamentoAtualizado, usuarioInfo);
       lista[index] = { 
         ...lista[index], 
         ...agendamentoAtualizado, 
@@ -713,9 +746,13 @@ export function atualizarAgendamentoLocalCompleto(agendamentoAtualizado, usuario
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lista));
       return lista[index];
     } else {
-      lista.unshift(agendamentoAtualizado);
+      const novoItem = {
+        ...agendamentoAtualizado,
+        historico_status: normalizarHistoricoStatus(agendamentoAtualizado.historico_status)
+      };
+      lista.unshift(novoItem);
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lista));
-      return agendamentoAtualizado;
+      return novoItem;
     }
   } catch (e) {
     return agendamentoAtualizado;
@@ -948,6 +985,65 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
 }
 
 /**
+ * Consulta agendamentos de datas anteriores a hoje que ainda não foram finalizados nem cancelados
+ */
+export async function obterPendenciasAnteriores({ pedreira = 'todas', dataReferencia = null } = {}) {
+  try {
+    const hoje = dataReferencia || new Date().toISOString().split('T')[0];
+
+    if (isSupabaseConfigurado()) {
+      try {
+        let query = supabase
+          .from('agendamentos_pedreira')
+          .select('*')
+          .lt('data_agendamento', hoje)
+          .not('status', 'in', '("Finalizado","Carregado","Cancelado")')
+          .order('data_agendamento', { ascending: false })
+          .order('horario_agendamento', { ascending: true });
+
+        const { data, error } = await query;
+        if (!error && Array.isArray(data)) {
+          const locais = obterAgendamentosLocais();
+          const locaisMap = new Map(locais.map(l => [l.id, l]));
+
+          let lista = data.map(item => {
+            const loc = locaisMap.get(item.id);
+            const histSup = normalizarHistoricoStatus(item.historico_status);
+            const histLoc = normalizarHistoricoStatus(loc?.historico_status);
+            const historicoFinal = histSup.length > 0 ? histSup : histLoc;
+
+            return {
+              ...item,
+              historico_status: historicoFinal,
+              ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || (historicoFinal.length > 0 ? historicoFinal[0].usuario_nome : null)
+            };
+          });
+
+          if (pedreira && pedreira !== 'todas') {
+            lista = lista.filter(item => saoMesmaPedreira(item.pedreira, pedreira));
+          }
+
+          return lista;
+        }
+      } catch (e) {
+        console.warn('Erro ao consultar pendências anteriores no Supabase:', e);
+      }
+    }
+
+    const locais = obterAgendamentosLocais();
+    return locais.filter(item => {
+      const isAnterior = item.data_agendamento && item.data_agendamento < hoje;
+      const isPendente = item.status && !['Finalizado', 'Carregado', 'Cancelado'].includes(item.status);
+      const matchPedreira = (!pedreira || pedreira === 'todas') ? true : saoMesmaPedreira(item.pedreira, pedreira);
+      return isAnterior && isPendente && matchPedreira;
+    }).sort((a, b) => (b.data_agendamento || '').localeCompare(a.data_agendamento || ''));
+  } catch (err) {
+    console.error('Erro ao consultar pendências anteriores:', err);
+    return [];
+  }
+}
+
+/**
  * Lista todos os agendamentos com filtros
  */
 export async function listarAgendamentos(filtros = {}) {
@@ -983,10 +1079,14 @@ export async function listarAgendamentos(filtros = {}) {
 
           let listaSup = data.map(item => {
             const loc = locaisMap.get(item.id);
+            const histSup = normalizarHistoricoStatus(item.historico_status);
+            const histLoc = normalizarHistoricoStatus(loc?.historico_status);
+            const historicoFinal = histSup.length > 0 ? histSup : histLoc;
+
             return {
               ...item,
-              historico_status: (item.historico_status && item.historico_status.length > 0) ? item.historico_status : (loc?.historico_status || []),
-              ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || null
+              historico_status: historicoFinal,
+              ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || (historicoFinal.length > 0 ? historicoFinal[0].usuario_nome : null)
             };
           });
 
@@ -994,9 +1094,11 @@ export async function listarAgendamentos(filtros = {}) {
             listaSup = listaSup.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
           }
 
-          // Mantém localStorage sempre sincronizado com os dados reais do Supabase
+          // Mantém localStorage sempre sincronizado com os dados reais do Supabase sem apagar agendamentos de outras datas
           try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(listaSup));
+            const mapaAtualizado = new Map(locais.map(l => [l.id, l]));
+            listaSup.forEach(item => mapaAtualizado.set(item.id, item));
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(Array.from(mapaAtualizado.values())));
           } catch (e) {}
 
           return listaSup;
@@ -1061,6 +1163,8 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
       itemAtual = { id, status: 'Aguardando Liberação', historico_status: [] };
     }
 
+    itemAtual.historico_status = normalizarHistoricoStatus(itemAtual.historico_status);
+
     // 2. Gera o novo histórico com status_anterior correto
     const historicoAtualizado = registrarHistoricoStatus(itemAtual, novoStatus, usuarioInfo);
 
@@ -1081,7 +1185,10 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
           .single();
 
         if (!error && data) {
-          atualizado = data;
+          atualizado = {
+            ...data,
+            historico_status: normalizarHistoricoStatus(data.historico_status || historicoAtualizado)
+          };
         } else if (error) {
           console.warn('Tentando atualizar apenas status básico no Supabase:', error.message);
           // 2. Se falhar (ex: colunas extras inexistentes no Supabase), atualiza apenas o status

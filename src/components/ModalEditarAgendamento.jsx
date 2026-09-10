@@ -7,7 +7,8 @@ import {
   STATUS_AGENDAMENTO,
   obterMateriaisPorPedreira,
   obterConfigPlacas,
-  salvarEdicaoAgendamento
+  salvarEdicaoAgendamento,
+  normalizarHistoricoStatus
 } from '../services/agendamentoService';
 
 export function ModalEditarAgendamento({ 
@@ -459,7 +460,7 @@ export function ModalEditarAgendamento({
           </div>
 
           {/* Seção 5: Registro de Auditoria / Histórico de Alterações */}
-          {Array.isArray(agendamento.historico_status) && agendamento.historico_status.length > 0 && (
+          {normalizarHistoricoStatus(agendamento.historico_status).length > 0 && (
             <div style={{
               background: 'rgba(15, 23, 42, 0.65)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -467,10 +468,10 @@ export function ModalEditarAgendamento({
               padding: '14px 18px'
             }}>
               <label className="form-label" style={{ color: '#38bdf8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <History size={15} /> Histórico de Alterações ({agendamento.historico_status.length})
+                <History size={15} /> Histórico de Alterações ({normalizarHistoricoStatus(agendamento.historico_status).length})
               </label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
-                {agendamento.historico_status.slice(0, 6).map((h, i) => {
+                {normalizarHistoricoStatus(agendamento.historico_status).slice(0, 8).map((h, i) => {
                   const isEdicao = h.tipo === 'edicao_dados' || (Array.isArray(h.alteracoes) && h.alteracoes.length > 0);
 
                   return (

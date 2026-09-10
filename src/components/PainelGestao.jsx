@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Search, RefreshCw, Printer, CheckCircle, CheckCircle2, Clock, Truck, Mail, FileText, 
-  AlertCircle, Trash2, ShieldCheck, ShieldAlert, RotateCcw, Edit3, CheckCheck, PlayCircle,
+  AlertCircle, AlertTriangle, Trash2, ShieldCheck, ShieldAlert, RotateCcw, Edit3, CheckCheck, PlayCircle,
   FileSpreadsheet, Download, History, Bell, BellRing, Volume2, VolumeX, Eye, Check, X
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
   listarAgendamentos, 
+  obterPendenciasAnteriores,
   atualizarStatusAgendamento, 
   excluirAgendamento,
   dispararEmailConfirmacao,
   formatarPlacasExibicao,
   formatarDataBR,
+  normalizarHistoricoStatus,
   PEDREIRAS_CEARA, 
   EMAIL_NOTIFICACAO_DESTINO,
   STATUS_AGENDAMENTO
@@ -81,6 +83,8 @@ export function PainelGestao({
   };
 
   const [agendamentos, setAgendamentos] = useState([]);
+  const [pendenciasAnteriores, setPendenciasAnteriores] = useState([]);
+  const [exibindoPendenciasAnteriores, setExibindoPendenciasAnteriores] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [termoBusca, setTermoBusca] = useState('');
   
@@ -141,11 +145,19 @@ export function PainelGestao({
   const carregarDados = async (isManual = true) => {
     if (isManual) setCarregando(true);
     try {
-      const lista = await listarAgendamentos({
-        pedreira: filtroPedreira,
-        status: filtroStatus,
-        data: filtroData || null
-      });
+      const [lista, pendentes] = await Promise.all([
+        listarAgendamentos({
+          pedreira: filtroPedreira,
+          status: filtroStatus,
+          data: filtroData || null
+        }),
+        obterPendenciasAnteriores({
+          pedreira: filtroPedreira,
+          dataReferencia: hojeStr
+        })
+      ]);
+
+      setPendenciasAnteriores(pendentes);
 
       const mapaAnterior = statusAnterioresMapRef.current;
       const novosCarregamentos = [];
@@ -269,8 +281,9 @@ export function PainelGestao({
         ? 'SIM (Carga Mista / Combinada)' 
         : 'NÃO (Simples)';
 
-      const histTexto = Array.isArray(ag.historico_status) && ag.historico_status.length > 0
-        ? ag.historico_status.map(h => {
+      const historicoArr = normalizarHistoricoStatus(ag.historico_status);
+      const histTexto = historicoArr.length > 0
+        ? historicoArr.map(h => {
             const dataFmt = h.data_hora ? new Date(h.data_hora).toLocaleString('pt-BR') : '';
             if (h.tipo === 'edicao_dados' || (Array.isArray(h.alteracoes) && h.alteracoes.length > 0)) {
               const mudancas = Array.isArray(h.alteracoes) 
@@ -282,7 +295,7 @@ export function PainelGestao({
           }).join(' | ')
         : 'Sem alterações registradas';
 
-      const ultimoEditor = ag.ultimo_editor || (ag.historico_status && ag.historico_status.length > 0 ? ag.historico_status[0].usuario_nome : 'Sistema');
+      const ultimoEditor = ag.ultimo_editor || (historicoArr.length > 0 ? historicoArr[0].usuario_nome : 'Sistema');
 
       return {
         'Protocolo': (ag.id || '').substring(0, 8).toUpperCase(),
@@ -350,17 +363,24 @@ export function PainelGestao({
     setMudancaStatusPendente(null);
 
     if (res.success) {
-      setAgendamentos(prev => prev.map(ag => {
-        if (ag.id === agendamento.id) {
-          return { 
-            ...ag, 
-            status: novoStatus, 
-            historico_status: res.data?.historico_status || ag.historico_status,
-            ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema'
-          };
+      const historicoAtualizado = normalizarHistoricoStatus(res.data?.historico_status || agendamento.historico_status);
+      const agAtualizado = { 
+        ...agendamento, 
+        status: novoStatus, 
+        historico_status: historicoAtualizado,
+        ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema'
+      };
+
+      setAgendamentos(prev => prev.map(ag => ag.id === agendamento.id ? agAtualizado : ag));
+
+      // Mantém a lista de pendências anteriores sincronizada
+      setPendenciasAnteriores(prev => {
+        if (['Finalizado', 'Carregado', 'Cancelado'].includes(novoStatus)) {
+          return prev.filter(ag => ag.id !== agendamento.id);
         }
-        return ag;
-      }));
+        return prev.map(ag => ag.id === agendamento.id ? agAtualizado : ag);
+      });
+
       setMensagemAviso(`Status do Bloco ${agendamento.numero_bloco} atualizado para "${novoStatus}" com sucesso.`);
       setTimeout(() => setMensagemAviso(''), 6000);
     } else {
@@ -373,8 +393,27 @@ export function PainelGestao({
   };
 
   const handleSalvoEdicao = (agendamentoAtualizado) => {
-    setAgendamentos(prev => prev.map(ag => ag.id === agendamentoAtualizado.id ? agendamentoAtualizado : ag));
-    setMensagemAviso(`Informações do Bloco ${agendamentoAtualizado.numero_bloco} atualizadas com sucesso!`);
+    const itemFormatado = {
+      ...agendamentoAtualizado,
+      historico_status: normalizarHistoricoStatus(agendamentoAtualizado.historico_status)
+    };
+
+    setAgendamentos(prev => prev.map(ag => ag.id === itemFormatado.id ? itemFormatado : ag));
+
+    setPendenciasAnteriores(prev => {
+      const isAnterior = itemFormatado.data_agendamento && itemFormatado.data_agendamento < hojeStr;
+      const isPendente = itemFormatado.status && !['Finalizado', 'Carregado', 'Cancelado'].includes(itemFormatado.status);
+      if (!isAnterior || !isPendente) {
+        return prev.filter(ag => ag.id !== itemFormatado.id);
+      }
+      const existe = prev.some(ag => ag.id === itemFormatado.id);
+      if (existe) {
+        return prev.map(ag => ag.id === itemFormatado.id ? itemFormatado : ag);
+      }
+      return [itemFormatado, ...prev];
+    });
+
+    setMensagemAviso(`Informações do Bloco ${itemFormatado.numero_bloco} atualizadas com sucesso!`);
     setTimeout(() => setMensagemAviso(''), 6000);
   };
 
@@ -472,7 +511,9 @@ export function PainelGestao({
     }
   };
 
-  const agendamentosFiltrados = agendamentos.filter(ag => {
+  const listaBase = exibindoPendenciasAnteriores ? pendenciasAnteriores : agendamentos;
+
+  const agendamentosFiltrados = listaBase.filter(ag => {
     if (!termoBusca.trim()) return true;
     const busca = termoBusca.toLowerCase();
     return (
@@ -493,6 +534,87 @@ export function PainelGestao({
 
   return (
     <div style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 0' }}>
+
+      {/* Banner de Aviso de Carregamentos Pendentes de Dias Anteriores */}
+      {pendenciasAnteriores.length > 0 && (
+        <div className="glass-panel no-print animate-fade" style={{
+          padding: '14px 20px',
+          marginBottom: 20,
+          background: exibindoPendenciasAnteriores 
+            ? 'linear-gradient(90deg, rgba(245, 158, 11, 0.22) 0%, rgba(217, 119, 6, 0.18) 100%)'
+            : 'linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(180, 83, 9, 0.08) 100%)',
+          border: '1px solid rgba(245, 158, 11, 0.45)',
+          borderRadius: 14,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12,
+          boxShadow: '0 4px 20px rgba(245, 158, 11, 0.15)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 42,
+              height: 42,
+              borderRadius: 10,
+              background: 'rgba(245, 158, 11, 0.25)',
+              border: '1px solid rgba(245, 158, 11, 0.5)',
+              color: '#fbbf24',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#fef3c7', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>
+                  {pendenciasAnteriores.length === 1
+                    ? '1 veículo de data anterior ainda não foi finalizado'
+                    : `${pendenciasAnteriores.length} veículos de datas anteriores ainda não foram finalizados`}
+                </span>
+                <span className="badge" style={{
+                  background: 'rgba(245, 158, 11, 0.3)',
+                  border: '1px solid #f59e0b',
+                  color: '#fbbf24',
+                  fontSize: '0.72rem',
+                  fontWeight: 800
+                }}>
+                  Atenção Operacional
+                </span>
+              </div>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#fde68a' }}>
+                Existem agendamentos de dias anteriores a hoje ({formatarDataBR(hojeStr)}) pendentes de carregamento ou liberação.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setExibindoPendenciasAnteriores(!exibindoPendenciasAnteriores)}
+              className="btn"
+              style={{
+                background: exibindoPendenciasAnteriores ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)',
+                color: exibindoPendenciasAnteriores ? '#111827' : '#fbbf24',
+                border: '1px solid #f59e0b',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                padding: '8px 16px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              <Eye size={16} />
+              {exibindoPendenciasAnteriores ? 'Voltar para Visão do Dia' : `Ver ${pendenciasAnteriores.length} Pendências Anteriores`}
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Cabeçalho do Painel (Oculto na impressão) */}
       <div className="glass-panel no-print" style={{
@@ -852,7 +974,7 @@ export function PainelGestao({
       {/* Métricas Rápidas (Oculto na impressão) */}
       <div className="no-print" style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
         gap: 12,
         marginBottom: 20
       }}>
@@ -874,6 +996,31 @@ export function PainelGestao({
             {agendamentosHoje.length}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Previstos para hoje</span>
+        </div>
+
+        {/* Card de Alerta de Pendências de Dias Anteriores */}
+        <div 
+          className="glass-panel" 
+          onClick={() => setExibindoPendenciasAnteriores(prev => !prev)}
+          style={{ 
+            padding: '14px 16px', 
+            borderLeft: '4px solid #f59e0b',
+            cursor: 'pointer',
+            background: exibindoPendenciasAnteriores ? 'rgba(245, 158, 11, 0.18)' : undefined,
+            boxShadow: exibindoPendenciasAnteriores ? '0 0 15px rgba(245, 158, 11, 0.3)' : undefined,
+            transition: 'all 0.2s'
+          }}
+          title="Clique para alternar entre ver a lista normal ou as pendências de datas anteriores"
+        >
+          <span style={{ fontSize: '0.74rem', color: '#fbbf24', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <AlertTriangle size={13} /> Pendentes Anteriores
+          </span>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: pendenciasAnteriores.length > 0 ? '#fbbf24' : '#94a3b8', marginTop: 4 }}>
+            {pendenciasAnteriores.length}
+          </div>
+          <span style={{ fontSize: '0.72rem', color: exibindoPendenciasAnteriores ? '#fbbf24' : 'var(--slate-400)', fontWeight: exibindoPendenciasAnteriores ? 700 : 400 }}>
+            {exibindoPendenciasAnteriores ? 'Visualizando agora 👁️' : 'Não finalizados de ontem/antes'}
+          </span>
         </div>
 
         <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
@@ -967,6 +1114,7 @@ export function PainelGestao({
               className="form-select"
               value={filtroStatus}
               onChange={(e) => setFiltroStatus(e.target.value)}
+              disabled={exibindoPendenciasAnteriores}
             >
               <option value="todos">Todos os Status</option>
               <option value="Aguardando Liberação">🟡 Aguardando Liberação</option>
@@ -982,7 +1130,11 @@ export function PainelGestao({
               type="date"
               className="form-input"
               value={filtroData}
-              onChange={(e) => setFiltroData(e.target.value)}
+              onChange={(e) => {
+                setFiltroData(e.target.value);
+                setExibindoPendenciasAnteriores(false);
+              }}
+              disabled={exibindoPendenciasAnteriores}
               style={{ colorScheme: 'dark' }}
               title="Filtrar por data específica (Padrão: Hoje)"
             />
@@ -990,7 +1142,10 @@ export function PainelGestao({
 
           {filtroData ? (
             <button
-              onClick={() => setFiltroData('')}
+              onClick={() => {
+                setFiltroData('');
+                setExibindoPendenciasAnteriores(false);
+              }}
               className="btn btn-secondary"
               style={{ padding: '9px 14px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
               title="Ver agendamentos de todas as datas (remover filtro de data)"
@@ -999,12 +1154,39 @@ export function PainelGestao({
             </button>
           ) : (
             <button
-              onClick={() => setFiltroData(hojeStr)}
+              onClick={() => {
+                setFiltroData(hojeStr);
+                setExibindoPendenciasAnteriores(false);
+              }}
               className="btn btn-secondary"
               style={{ padding: '9px 14px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
               title="Filtrar agendamentos de hoje"
             >
               Ver Hoje
+            </button>
+          )}
+
+          {pendenciasAnteriores.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setExibindoPendenciasAnteriores(prev => !prev)}
+              className="btn"
+              style={{
+                padding: '9px 14px',
+                fontSize: '0.8rem',
+                whiteSpace: 'nowrap',
+                background: exibindoPendenciasAnteriores ? '#f59e0b' : 'rgba(245, 158, 11, 0.18)',
+                color: exibindoPendenciasAnteriores ? '#111827' : '#fbbf24',
+                border: '1px solid #f59e0b',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+              title="Ver ou ocultar agendamentos de dias anteriores não finalizados"
+            >
+              <AlertTriangle size={14} />
+              {exibindoPendenciasAnteriores ? 'Voltar para o Dia' : `Pendências Anteriores (${pendenciasAnteriores.length})`}
             </button>
           )}
         </div>
@@ -1045,6 +1227,35 @@ export function PainelGestao({
           </div>
         </div>
 
+        {/* Aviso de contextualização quando filtrando pendências anteriores */}
+        {exibindoPendenciasAnteriores && (
+          <div className="no-print" style={{
+            padding: '10px 20px',
+            background: 'rgba(245, 158, 11, 0.12)',
+            borderBottom: '1px solid rgba(245, 158, 11, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 10
+          }}>
+            <div style={{ fontSize: '0.84rem', color: '#fef3c7', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertTriangle size={16} color="#fbbf24" />
+              <span>
+                Visualizando <strong>{agendamentosFiltrados.length}</strong> carregamento(s) de datas anteriores a hoje que ainda não foram finalizados.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExibindoPendenciasAnteriores(false)}
+              className="btn btn-secondary"
+              style={{ padding: '4px 10px', fontSize: '0.76rem', gap: 4 }}
+            >
+              <RotateCcw size={12} /> Voltar para Carregamentos de Hoje
+            </button>
+          </div>
+        )}
+
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
             <thead>
@@ -1069,7 +1280,9 @@ export function PainelGestao({
               ) : agendamentosFiltrados.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'var(--slate-400)' }}>
-                    Nenhum agendamento encontrado para os filtros selecionados.
+                    {exibindoPendenciasAnteriores 
+                      ? 'Nenhum carregamento pendente de datas anteriores encontrado.' 
+                      : 'Nenhum agendamento encontrado para os filtros selecionados.'}
                   </td>
                 </tr>
               ) : (
@@ -1077,16 +1290,19 @@ export function PainelGestao({
                   const isSabado = ag.tipo_dia === 'sabado';
                   const listaPlacasTabela = formatarPlacasExibicao(ag);
                   const estaExcluindo = excluindoId === ag.id;
+                  const histArr = normalizarHistoricoStatus(ag.historico_status);
+                  const isDataAnteriorPendente = ag.data_agendamento && ag.data_agendamento < hojeStr && !['Finalizado', 'Carregado', 'Cancelado'].includes(ag.status);
 
                   return (
                     <tr 
                       key={ag.id}
                       style={{
                         borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                        transition: 'background-color 0.15s'
+                        transition: 'background-color 0.15s',
+                        backgroundColor: isDataAnteriorPendente ? 'rgba(245, 158, 11, 0.03)' : undefined
                       }}
                       onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.02)'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isDataAnteriorPendente ? 'rgba(245, 158, 11, 0.03)' : 'transparent'}
                     >
                       {/* Data / Horário */}
                       <td style={{ padding: '12px 14px' }}>
@@ -1095,6 +1311,24 @@ export function PainelGestao({
                           <Clock size={13} />
                           {ag.horario_agendamento}
                         </div>
+                        {isDataAnteriorPendente && (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 3,
+                            background: 'rgba(245, 158, 11, 0.2)',
+                            border: '1px solid rgba(245, 158, 11, 0.5)',
+                            color: '#fbbf24',
+                            fontSize: '0.66rem',
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: 4,
+                            marginTop: 4,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <AlertTriangle size={10} /> Pendente Anterior
+                          </span>
+                        )}
                         {isSabado && (
                           <span className="badge badge-warning" style={{ fontSize: '0.65rem', padding: '1px 6px', marginTop: 4 }}>
                             Sábado
@@ -1286,7 +1520,7 @@ export function PainelGestao({
 
                         {/* Link / Botão para Histórico de Alterações de Status */}
                         <div className="no-print">
-                          {Array.isArray(ag.historico_status) && ag.historico_status.length > 0 ? (
+                          {histArr.length > 0 ? (
                             <button
                               type="button"
                               onClick={() => setAgendamentoParaHistorico(ag)}
@@ -1309,7 +1543,7 @@ export function PainelGestao({
                               }}
                               title="Ver histórico completo de quem alterou o status e data/hora"
                             >
-                              <History size={11} /> {ag.historico_status.length} {ag.historico_status.length === 1 ? 'alteração' : 'alterações'}
+                              <History size={11} /> {histArr.length} {histArr.length === 1 ? 'alteração' : 'alterações'}
                             </button>
                           ) : (
                             <button
