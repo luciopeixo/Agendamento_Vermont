@@ -22,6 +22,7 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
   const [statusEmail, setStatusEmail] = useState(null);
 
   useEffect(() => {
+    document.body.classList.add('modal-comprovante-aberto');
     try {
       confetti({
         particleCount: 90,
@@ -32,12 +33,27 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
     } catch (e) {
       // silencioso se não suportado
     }
+
+    const handleAfterPrint = () => {
+      document.body.classList.remove('imprimindo-comprovante');
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
+
+    return () => {
+      document.body.classList.remove('modal-comprovante-aberto');
+      document.body.classList.remove('imprimindo-comprovante');
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
   }, []);
 
   const protocolo = (agendamento.id || 'VT-' + Date.now()).substring(0, 8).toUpperCase();
 
   const handlePrint = () => {
+    document.body.classList.add('imprimindo-comprovante');
     window.print();
+    setTimeout(() => {
+      document.body.classList.remove('imprimindo-comprovante');
+    }, 1500);
   };
 
   const handleEnviarEmail = async (e) => {
@@ -167,7 +183,7 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
   };
 
   return (
-    <div style={{
+    <div className="modal-comprovante-overlay" style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -183,13 +199,13 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
     }}>
       <div 
         id="comprovante-imprimir"
-        className="glass-panel animate-fade"
+        className="glass-panel animate-fade comprovante-box"
         style={{
           width: '100%',
-          maxWidth: 640,
+          maxWidth: 680,
           maxHeight: '92vh',
           overflowY: 'auto',
-          padding: '26px 30px',
+          padding: '24px 28px',
           background: '#0e1412',
           border: '1px solid var(--vermont-green-border)',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), var(--vermont-green-glow)',
@@ -217,10 +233,24 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
         </button>
 
         {/* Cabeçalho do Comprovante com Logo Vermont */}
-        <div style={{ textAlign: 'center', paddingBottom: 18, borderBottom: '1px dashed rgba(0, 118, 44, 0.4)' }}>
-          <div style={{
-            width: 56,
-            height: 56,
+        <div className="comprovante-header-section" style={{ textAlign: 'center', paddingBottom: 16, borderBottom: '1px dashed rgba(0, 118, 44, 0.4)' }}>
+          {/* Logo / Emblema Vermont */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 }}>
+            <img 
+              src="https://vermontmineracao.com/wp-content/uploads/2022/07/logo-vermont-site-1.png" 
+              alt="Vermont Mineração" 
+              className="comprovante-logo-print"
+              style={{ maxHeight: 38, objectFit: 'contain' }}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <span style={{ fontWeight: 800, fontSize: '1.2rem', color: '#fff', letterSpacing: '0.04em' }} className="comprovante-empresa-titulo">
+              VERMONT MINERAÇÃO
+            </span>
+          </div>
+
+          <div className="no-print" style={{
+            width: 48,
+            height: 48,
             borderRadius: '50%',
             background: 'rgba(0, 118, 44, 0.2)',
             border: '1px solid #009e3b',
@@ -228,24 +258,24 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: 10
+            marginBottom: 8
           }}>
-            <CheckCircle2 size={34} />
+            <CheckCircle2 size={30} />
           </div>
 
-          <h2 style={{ fontSize: '1.45rem', margin: '0 0 4px 0', color: '#fff' }}>
+          <h2 className="comprovante-titulo" style={{ fontSize: '1.35rem', margin: '0 0 4px 0', color: '#fff' }}>
             {isCombinado ? 'Agendamento Combinado Confirmado!' : 'Agendamento Confirmado!'}
           </h2>
-          <p style={{ margin: 0, fontSize: '0.86rem', color: '#86efac' }}>
+          <p className="comprovante-subtitulo" style={{ margin: 0, fontSize: '0.86rem', color: '#86efac' }}>
             {isCombinado 
-              ? `Autorização Oficial de Entrada & Rota Combinada (${listaPontos.length} Pedreiras / Blocos) • Vermont Mineração` 
-              : 'Autorização Oficial de Entrada & Carregamento • Vermont Mineração'}
+              ? `Autorização Oficial de Entrada & Rota Combinada (${listaPontos.length} Pedreiras / Blocos) • Polo Ceará` 
+              : 'Autorização Oficial de Entrada & Carregamento • Polo Ceará'}
           </p>
 
-          <div style={{
+          <div className="comprovante-protocolo-badge" style={{
             display: 'inline-block',
-            marginTop: 12,
-            padding: '6px 18px',
+            marginTop: 10,
+            padding: '6px 20px',
             background: 'rgba(0, 118, 44, 0.2)',
             border: '1px solid var(--vermont-green-border)',
             borderRadius: 8,
@@ -259,25 +289,25 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
         </div>
 
         {/* Detalhes do Agendamento */}
-        <div style={{ padding: '18px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="comprovante-corpo-grid" style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
           
           {/* Se for Carga Combinada: Roteiro dos Pontos */}
           {isCombinado && listaPontos.length > 0 ? (
-            <div style={{
+            <div className="comprovante-card comprovante-card-combinado" style={{
               background: 'rgba(255, 255, 255, 0.03)',
               border: '1px solid var(--vermont-green-border)',
               borderRadius: 10,
-              padding: 16
+              padding: 14
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80' }} className="comprovante-card-titulo">
                   <MapPin size={18} />
-                  <strong style={{ fontSize: '0.96rem' }}>Roteiro de Carregamento ({listaPontos.length} Pedreiras / Blocos)</strong>
+                  <strong style={{ fontSize: '0.94rem' }}>Roteiro de Carregamento ({listaPontos.length} Pedreiras / Blocos)</strong>
                 </div>
                 <span className="badge badge-vermont" style={{ fontSize: '0.72rem' }}>Carga Combinada</span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {listaPontos.map((pt, idx) => {
                   const themeColors = [
                     { bg: 'rgba(0, 118, 44, 0.12)', border: 'rgba(0, 118, 44, 0.35)', text: '#86efac', circle: '#00762c' },
@@ -286,7 +316,7 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
                   ][idx % 3];
 
                   return (
-                    <div key={idx} style={{
+                    <div key={idx} className="comprovante-subcard-ponto" style={{
                       background: themeColors.bg,
                       border: `1px solid ${themeColors.border}`,
                       borderRadius: 8,
@@ -299,10 +329,10 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
                         {idx + 1}º Ponto de Carregamento
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 6, fontSize: '0.86rem' }}>
-                        <div><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }}>{pt.pedreira}</strong></div>
-                        <div><span style={{ color: 'var(--slate-400)' }}>Material:</span> <strong style={{ color: themeColors.text }}>{pt.material}</strong></div>
-                        <div><span style={{ color: 'var(--slate-400)' }}>Bloco:</span> <strong style={{ color: '#fff' }}>{pt.numero_bloco}</strong></div>
-                        <div><span style={{ color: 'var(--slate-400)' }}>Data & Horário:</span> <strong style={{ color: themeColors.text }}>{formatarDataBR(pt.data_agendamento)} às {pt.horario_agendamento}</strong></div>
+                        <div><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }} className="print-text-dark">{pt.pedreira}</strong></div>
+                        <div><span style={{ color: 'var(--slate-400)' }}>Material:</span> <strong style={{ color: themeColors.text }} className="print-text-dark">{pt.material}</strong></div>
+                        <div><span style={{ color: 'var(--slate-400)' }}>Bloco:</span> <strong style={{ color: '#fff' }} className="print-text-dark">{pt.numero_bloco}</strong></div>
+                        <div><span style={{ color: 'var(--slate-400)' }}>Data & Horário:</span> <strong style={{ color: themeColors.text }} className="print-text-dark">{formatarDataBR(pt.data_agendamento)} às {pt.horario_agendamento}</strong></div>
                       </div>
                     </div>
                   );
@@ -312,22 +342,22 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
           ) : (
             <>
               {/* Local e Data Simples */}
-              <div style={{
+              <div className="comprovante-card comprovante-card-local" style={{
                 background: 'rgba(255, 255, 255, 0.03)',
                 border: '1px solid rgba(255, 255, 255, 0.07)',
                 borderRadius: 10,
-                padding: 14
+                padding: 12
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#4ade80', marginBottom: 8 }} className="comprovante-card-titulo">
                   <MapPin size={18} />
                   <strong style={{ fontSize: '0.92rem' }}>Local & Horário de Carregamento</strong>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
-                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }}>{agendamento.pedreira}</strong></div>
-                  <div><span style={{ color: 'var(--slate-400)' }}>Data:</span> <strong>{formatarDataBR(agendamento.data_agendamento)}</strong></div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
+                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }} className="print-text-dark">{agendamento.pedreira}</strong></div>
+                  <div><span style={{ color: 'var(--slate-400)' }}>Data do Carregamento:</span> <strong className="print-text-dark">{formatarDataBR(agendamento.data_agendamento)}</strong></div>
                   <div>
-                    <span style={{ color: 'var(--slate-400)' }}>Horário:</span>{' '}
-                    <strong style={{ color: '#4ade80' }}>
+                    <span style={{ color: 'var(--slate-400)' }}>Horário Agendado:</span>{' '}
+                    <strong style={{ color: '#4ade80' }} className="print-text-dark">
                       {agendamento.horario_agendamento} {agendamento.justificativa_outros ? `(${agendamento.justificativa_outros})` : ''}
                     </strong>
                   </div>
@@ -335,70 +365,88 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
               </div>
 
               {/* Dados da Carga Simples */}
-              <div style={{
+              <div className="comprovante-card comprovante-card-carga" style={{
                 background: 'rgba(255, 255, 255, 0.03)',
                 border: '1px solid rgba(255, 255, 255, 0.07)',
                 borderRadius: 10,
-                padding: 14
+                padding: 12
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fbbf24', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fbbf24', marginBottom: 8 }} className="comprovante-card-titulo">
                   <FileText size={18} />
-                  <strong style={{ fontSize: '0.92rem' }}>Informações do Bloco & Cliente</strong>
+                  <strong style={{ fontSize: '0.92rem' }}>Informações do Bloco & Material</strong>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
-                  <div><span style={{ color: 'var(--slate-400)' }}>Bloco Nº:</span> <strong style={{ color: '#fff' }}>{agendamento.numero_bloco}</strong></div>
-                  <div><span style={{ color: 'var(--slate-400)' }}>Material Imputado:</span> <strong style={{ color: '#fff' }}>{agendamento.material}</strong></div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <span style={{ color: 'var(--slate-400)' }}>Cliente Destinatário:</span> <strong>{agendamento.cliente}</strong> {agendamento.cliente_cnpj && <span style={{ color: 'var(--slate-400)', fontSize: '0.82rem' }}>({agendamento.cliente_cnpj})</span>}
-                  </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
+                  <div><span style={{ color: 'var(--slate-400)' }}>Nº do Bloco:</span> <strong style={{ color: '#fff' }} className="print-text-dark">{agendamento.numero_bloco}</strong></div>
+                  <div><span style={{ color: 'var(--slate-400)' }}>Material:</span> <strong style={{ color: '#fff' }} className="print-text-dark">{agendamento.material}</strong></div>
                 </div>
               </div>
             </>
           )}
 
-          {/* Dados do Transporte */}
-          <div style={{
+          {/* Dados do Transporte, Veículo e Cliente */}
+          <div className="comprovante-card comprovante-card-transporte" style={{
             background: 'rgba(255, 255, 255, 0.03)',
             border: '1px solid rgba(255, 255, 255, 0.07)',
             borderRadius: 10,
-            padding: 14
+            padding: 12
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#38bdf8', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#38bdf8', marginBottom: 8 }} className="comprovante-card-titulo">
               <Truck size={18} />
-              <strong style={{ fontSize: '0.92rem' }}>Veículo, Motorista & Cliente</strong>
+              <strong style={{ fontSize: '0.92rem' }}>Dados do Transporte, Veículo & Destinatário</strong>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
-              <div><span style={{ color: 'var(--slate-400)' }}>Transportadora:</span> <strong>{agendamento.transportadora}</strong> {agendamento.transportadora_cnpj && <span style={{ color: 'var(--slate-400)', fontSize: '0.8rem' }}>({agendamento.transportadora_cnpj})</span>}</div>
-              <div><span style={{ color: 'var(--slate-400)' }}>Cliente:</span> <strong>{agendamento.cliente}</strong> {agendamento.cliente_cnpj && <span style={{ color: 'var(--slate-400)', fontSize: '0.8rem' }}>({agendamento.cliente_cnpj})</span>}</div>
-              <div><span style={{ color: 'var(--slate-400)' }}>Motorista:</span> <strong>{agendamento.motorista_nome}</strong></div>
-              <div><span style={{ color: 'var(--slate-400)' }}>CPF:</span> <strong>{agendamento.motorista_cpf}</strong></div>
-              <div><span style={{ color: 'var(--slate-400)' }}>Telefone:</span> <strong>{agendamento.motorista_telefone || 'Não informado'}</strong></div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <span style={{ color: 'var(--slate-400)' }}>Tipo do Veículo:</span> <strong style={{ color: '#4ade80' }}>{agendamento.tipo_veiculo}</strong>
+              <div>
+                <span style={{ color: 'var(--slate-400)' }}>Cliente Destinatário:</span> <strong className="print-text-dark">{agendamento.cliente}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--slate-400)' }}>CNPJ Destinatário:</span> <strong className="print-text-dark" style={{ fontFamily: 'monospace' }}>{agendamento.cliente_cnpj || 'Não informado'}</strong>
+              </div>
+
+              <div>
+                <span style={{ color: 'var(--slate-400)' }}>Transportadora:</span> <strong className="print-text-dark">{agendamento.transportadora}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--slate-400)' }}>CNPJ Transportadora:</span> <strong className="print-text-dark" style={{ fontFamily: 'monospace' }}>{agendamento.transportadora_cnpj || 'Não informado'}</strong>
+              </div>
+
+              <div><span style={{ color: 'var(--slate-400)' }}>Motorista:</span> <strong className="print-text-dark">{agendamento.motorista_nome}</strong></div>
+              <div><span style={{ color: 'var(--slate-400)' }}>CPF Motorista:</span> <strong className="print-text-dark" style={{ fontFamily: 'monospace' }}>{agendamento.motorista_cpf}</strong></div>
+              <div><span style={{ color: 'var(--slate-400)' }}>WhatsApp / Contato:</span> <strong className="print-text-dark">{agendamento.motorista_telefone || 'Não informado'}</strong></div>
+              <div>
+                <span style={{ color: 'var(--slate-400)' }}>Tipo do Veículo:</span> <strong style={{ color: '#4ade80' }} className="print-text-dark">{agendamento.tipo_veiculo}</strong>
               </div>
 
               {/* Placas com rótulo correto: "Carreta" para 1 carreta, "1ª / 2ª" para Bitrem */}
-              {listaPlacas.map((item, idx) => (
-                <div key={idx}>
-                  <span style={{ color: 'var(--slate-400)' }}>{item.label}:</span>{' '}
-                  <strong style={{ fontFamily: 'monospace', color: '#fff' }}>{item.placa}</strong>
+              <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 2, padding: '6px 10px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 6 }} className="comprovante-placas-box">
+                {listaPlacas.map((item, idx) => (
+                  <div key={idx}>
+                    <span style={{ color: 'var(--slate-400)' }}>{item.label}:</span>{' '}
+                    <strong style={{ fontFamily: 'monospace', color: '#fff' }} className="print-text-dark">{item.placa}</strong>
+                  </div>
+                ))}
+              </div>
+
+              {agendamento.observacoes && (
+                <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>
+                  <span style={{ color: 'var(--slate-400)' }}>Observações:</span>{' '}
+                  <span style={{ color: 'var(--slate-300)' }} className="print-text-dark">{agendamento.observacoes}</span>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
           {/* Documentos Obrigatórios na Pedreira */}
-          <div style={{
+          <div className="comprovante-card comprovante-card-docs" style={{
             background: 'rgba(0, 118, 44, 0.08)',
             border: '1px solid rgba(0, 118, 44, 0.3)',
             borderRadius: 10,
             padding: 12,
             fontSize: '0.82rem'
           }}>
-            <strong style={{ color: '#4ade80', display: 'block', marginBottom: 4 }}>
+            <strong style={{ color: '#4ade80', display: 'block', marginBottom: 4 }} className="comprovante-docs-titulo">
               📄 Documentação Obrigatória para Apresentação na Pedreira:
             </strong>
-            <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--slate-300)', lineHeight: '1.5' }}>
+            <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--slate-300)', lineHeight: '1.45' }} className="comprovante-docs-lista">
               <li>Obrigatório apresentação de CRLVs do cavalo e carreta atualizados;</li>
               <li>CNH compatível com o veículo;</li>
               <li>Motorista deve possuir o curso de cargas indivisíveis;</li>
@@ -406,7 +454,7 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
             </ul>
 
             {/* Alerta Operacional: Confirmação Prévia com Clientes */}
-            <div style={{
+            <div className="comprovante-alerta-box" style={{
               marginTop: 10,
               padding: '8px 10px',
               background: 'rgba(245, 158, 11, 0.12)',
@@ -423,16 +471,35 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
               <div>
                 <strong style={{ color: '#fde047' }}>Atenção Transportador:</strong>{' '}
                 O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte.
-                <div style={{ marginTop: 2, color: '#fde68a', fontWeight: 500, fontSize: '0.74rem' }}>
-                  Essa confirmação é fundamental para evitar imprevistos, atrasos ou problemas durante o carregamento e o transporte.
+              </div>
+            </div>
+          </div>
+
+          {/* Assinaturas Oficiais para o Documento Impresso / PDF */}
+          <div className="comprovante-assinaturas-print" style={{ display: 'none' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 30, marginTop: 18, paddingTop: 14 }}>
+              <div>
+                <div style={{ borderBottom: '1px solid #334155', height: 32, marginBottom: 4 }}></div>
+                <div style={{ fontSize: '11px', textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>
+                  Assinatura do Motorista ({agendamento.motorista_nome})
                 </div>
               </div>
+              <div>
+                <div style={{ borderBottom: '1px solid #334155', height: 32, marginBottom: 4 }}></div>
+                <div style={{ fontSize: '11px', textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>
+                  Visto da Portaria / Balança Vermont Mineração
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12, textAlign: 'center', fontSize: '10px', color: '#64748b' }}>
+              Emitido eletronicamente via Portal Oficial de Agendamentos Vermont Mineração em {new Date().toLocaleString('pt-BR')} • Protocolo: #{protocolo}
             </div>
           </div>
         </div>
 
         {/* Aviso de Confirmação por e-mail */}
-        <div style={{
+        <div className="no-print" style={{
           fontSize: '0.78rem',
           color: 'var(--slate-400)',
           textAlign: 'center',

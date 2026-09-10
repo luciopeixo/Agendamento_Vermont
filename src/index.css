@@ -602,51 +602,215 @@ h1, h2, h3, h4, h5, h6 {
 
 @media print {
   @page {
-    size: A4 landscape;
+    size: A4 portrait;
     margin: 8mm 8mm 8mm 8mm;
   }
 
-  body {
+  /* Reset global para impressão em papel e PDF */
+  html, body {
     background: #ffffff !important;
     color: #0f172a !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  /* Oculta elementos que não devem ser impressos */
+  /* Oculta elementos que NÃO devem ser impressos */
   .no-print,
   nav,
   footer,
-  header {
+  header,
+  .navbar-container,
+  button,
+  .stats-grid-container {
     display: none !important;
   }
 
-  /* Torna visíveis as áreas de impressão oficiais */
-  #comprovante-imprimir,
-  #comprovante-imprimir *,
-  #relatorio-imprimir,
-  #relatorio-imprimir * {
-    visibility: visible !important;
-    color: #0f172a !important;
+  /* ===================================================
+     1. IMPRESSÃO DO COMPROVANTE DE AGENDAMENTO (VOUCHER)
+     =================================================== */
+  body.modal-comprovante-aberto,
+  body.imprimindo-comprovante {
+    background: #ffffff !important;
   }
 
-  #comprovante-imprimir {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+  /* Quando o modal de comprovante estiver ativo, esconde TODO o resto da página (evita sobreposição e duplicação) */
+  body.modal-comprovante-aberto main,
+  body.imprimindo-comprovante main,
+  body.modal-comprovante-aberto #relatorio-imprimir,
+  body.imprimindo-comprovante #relatorio-imprimir {
+    display: none !important;
+  }
+
+  /* Desativa o backdrop escuro do modal na impressão */
+  .modal-comprovante-overlay {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    z-index: auto !important;
+  }
+
+  /* Container principal do Comprovante */
+  #comprovante-imprimir.comprovante-box {
+    display: block !important;
+    position: static !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 !important;
-    padding: 10px 14px !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 auto !important;
+    padding: 14px 18px !important;
     background: #ffffff !important;
-    color: #111827 !important;
+    color: #0f172a !important;
     border: 2px solid #00762c !important;
     border-radius: 8px !important;
     box-shadow: none !important;
-    overflow: visible !important;
-    max-height: none !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+
+  /* Cabeçalho do Comprovante */
+  .comprovante-header-section {
+    border-bottom: 2px solid #00762c !important;
+    padding-bottom: 10px !important;
+    margin-bottom: 12px !important;
+    text-align: center !important;
+  }
+
+  .comprovante-logo-print {
+    display: inline-block !important;
+    max-height: 42px !important;
+  }
+
+  .comprovante-empresa-titulo {
+    color: #00762c !important;
+    font-size: 1.3rem !important;
+    font-weight: 800 !important;
+  }
+
+  .comprovante-titulo {
+    color: #0f172a !important;
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    margin: 4px 0 2px 0 !important;
+  }
+
+  .comprovante-subtitulo {
+    color: #00762c !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+  }
+
+  .comprovante-protocolo-badge {
+    background: #f0fdf4 !important;
+    border: 1.5px solid #00762c !important;
+    color: #00762c !important;
+    font-weight: 800 !important;
+    font-size: 1.05rem !important;
+    padding: 4px 16px !important;
+    border-radius: 6px !important;
+    display: inline-block !important;
+    margin-top: 6px !important;
+  }
+
+  /* Grid e Cards Internos do Comprovante */
+  .comprovante-corpo-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 0 !important;
+  }
+
+  .comprovante-card {
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    color: #0f172a !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .comprovante-card-titulo {
+    color: #00762c !important;
+    font-size: 0.88rem !important;
+    font-weight: 700 !important;
+    margin-bottom: 6px !important;
+  }
+
+  .comprovante-subcard-ponto {
+    background: #ffffff !important;
+    border: 1px solid #94a3b8 !important;
+    border-radius: 6px !important;
+    padding: 6px 10px !important;
+    margin-bottom: 4px !important;
+    color: #0f172a !important;
+  }
+
+  .comprovante-placas-box {
+    background: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    margin-top: 4px !important;
+  }
+
+  .comprovante-card-docs {
+    background: #f0fdf4 !important;
+    border: 1px solid #86efac !important;
+    padding: 8px 12px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .comprovante-docs-titulo {
+    color: #00762c !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+  }
+
+  .comprovante-docs-lista {
+    color: #1e293b !important;
+    padding-left: 16px !important;
+    margin: 2px 0 0 0 !important;
+  }
+
+  .comprovante-alerta-box {
+    background: #fffbeb !important;
+    border: 1px solid #f59e0b !important;
+    color: #78350f !important;
+    padding: 6px 8px !important;
+    font-size: 0.75rem !important;
+    margin-top: 6px !important;
+    border-radius: 4px !important;
+  }
+
+  .comprovante-assinaturas-print {
+    display: block !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-text-dark {
+    color: #0f172a !important;
+    font-weight: 600 !important;
+  }
+
+  /* ===================================================
+     2. IMPRESSÃO DO RELATÓRIO DE GESTÃO / ROMANEIO BALANÇA
+     =================================================== */
+  body.imprimindo-relatorio {
+    background: #ffffff !important;
   }
 
   #relatorio-imprimir {
@@ -656,26 +820,37 @@ h1, h2, h3, h4, h5, h6 {
     color: #0f172a !important;
     padding: 0 !important;
     margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
   #relatorio-imprimir table {
     width: 100% !important;
     border-collapse: collapse !important;
-    font-size: 11px !important;
+    font-size: 10.5px !important;
+  }
+
+  #relatorio-imprimir thead {
+    display: table-header-group !important;
+  }
+
+  #relatorio-imprimir tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   #relatorio-imprimir th {
     background: #f1f5f9 !important;
     color: #0f172a !important;
     border: 1px solid #64748b !important;
-    padding: 6px 8px !important;
+    padding: 5px 6px !important;
     font-weight: 700 !important;
     text-align: left !important;
   }
 
   #relatorio-imprimir td {
     border: 1px solid #cbd5e1 !important;
-    padding: 6px 8px !important;
+    padding: 5px 6px !important;
     color: #1e293b !important;
     background: #ffffff !important;
   }

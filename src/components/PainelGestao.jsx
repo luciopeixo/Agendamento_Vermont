@@ -255,6 +255,14 @@ export function PainelGestao({
     setNotificacoes([]);
   };
 
+  const handleImprimirRelatorio = () => {
+    document.body.classList.add('imprimindo-relatorio');
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove('imprimindo-relatorio');
+    }, 1500);
+  };
+
   const handleExportarExcel = () => {
     if (agendamentosFiltrados.length === 0) {
       alert('Nenhum agendamento para exportar com os filtros atuais.');
@@ -819,7 +827,7 @@ export function PainelGestao({
           </button>
 
           <button
-            onClick={() => window.print()}
+            onClick={handleImprimirRelatorio}
             className="btn btn-secondary"
             style={{ padding: '9px 16px', fontWeight: 600, gap: 8 }}
             title="Imprimir romaneio e lista de carregamentos para a balança"
