@@ -211,49 +211,6 @@ export function isHorarioPassado(dataStr, horarioId) {
 export const MOTORISTAS_BASE_KEY = 'vermont_base_motoristas';
 
 /**
- * Base inicial / semente com motoristas de teste para demonstração e preenchimento ágil
- */
-export const MOTORISTAS_SEED = [
-  {
-    cpf: '12345678909',
-    nome: 'FRANCISCO DAS CHAGAS SILVA',
-    telefone: '(85) 99876-5432',
-    transportadora: 'TRANSVERMONT LOGÍSTICA',
-    tipo_veiculo: 'Bitrem 7 Eixos (2 Carretas)',
-    placa_cavalo: 'NQL-4A12',
-    placa_carreta: 'OSB-8C34',
-    placa_carreta_2: 'HXK-9D56'
-  },
-  {
-    cpf: '98765432100',
-    nome: 'ANTONIO CARLOS DE OLIVEIRA',
-    telefone: '(88) 98123-4567',
-    transportadora: 'RODOVIÁRIO CEARÁ EXPRESS',
-    tipo_veiculo: 'Carreta Simples / LS (1 Carreta)',
-    placa_cavalo: 'HYT-7B89',
-    placa_carreta: 'PNM-3E45'
-  },
-  {
-    cpf: '11144477735',
-    nome: 'JOSÉ ROBERTO FERREIRA LIMA',
-    telefone: '(85) 98765-1122',
-    transportadora: 'TRANS ROCHAS NORDESTE',
-    tipo_veiculo: 'Rodotrem 9 Eixos (2 Carretas)',
-    placa_cavalo: 'RIQ-2F34',
-    placa_carreta: 'HXP-5G67',
-    placa_carreta_2: 'OSD-1H23'
-  },
-  {
-    cpf: '01234567890',
-    nome: 'MANOEL PEREIRA DOS SANTOS',
-    telefone: '(88) 99456-7890',
-    transportadora: 'LOGÍSTICA VERMONT',
-    tipo_veiculo: 'Truck / Bitruck (Veículo Único)',
-    placa_cavalo: 'PMA-8J90'
-  }
-];
-
-/**
  * Validação algorítmica oficial de CPF (módulo 11 da Receita Federal)
  */
 export function validarCPF(cpf = '') {
@@ -282,19 +239,16 @@ export function validarCPF(cpf = '') {
 }
 
 /**
- * Retorna todos os motoristas salvos na base local e inicializa com sementes se vazio
+ * Retorna todos os motoristas salvos na base local interna
  */
 export function obterBaseMotoristas() {
   try {
     const raw = localStorage.getItem(MOTORISTAS_BASE_KEY);
-    if (!raw) {
-      localStorage.setItem(MOTORISTAS_BASE_KEY, JSON.stringify(MOTORISTAS_SEED));
-      return [...MOTORISTAS_SEED];
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [...MOTORISTAS_SEED];
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
-    return [...MOTORISTAS_SEED];
+    return [];
   }
 }
 
@@ -431,28 +385,6 @@ export async function consultarMotoristaPorCPF(cpf = '') {
 // ==========================================
 
 export const TRANSPORTADORAS_BASE_KEY = 'vermont_base_transportadoras';
-
-/**
- * Exemplos de CNPJ para teste rápido de consulta à Receita Federal
- */
-export const TRANSPORTADORAS_SEED = [
-  {
-    cnpj: '07526557000100', // Vermont Mineração
-    nome: 'VERMONT MINERAÇÃO LTDA.'
-  },
-  {
-    cnpj: '00000000000191', // Banco do Brasil
-    nome: 'BANCO DO BRASIL S.A.'
-  },
-  {
-    cnpj: '33000167000101', // Petrobras
-    nome: 'PETROLEO BRASILEIRO S.A. PETROBRAS'
-  },
-  {
-    cnpj: '02558157000162', // Exemplo Logística / Transporte
-    nome: 'RODONAVES TRANSPORTES E ENCOMENDAS LTDA'
-  }
-];
 
 /**
  * Validação algorítmica oficial de dígitos verificadores do CNPJ (módulo 11)

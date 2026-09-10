@@ -25,7 +25,6 @@ import {
   extrairBlocosDigitados,
   validarCPF,
   consultarMotoristaPorCPF,
-  MOTORISTAS_SEED,
   validarCNPJ,
   consultarCNPJReceita
 } from '../services/agendamentoService';
@@ -1879,32 +1878,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 </span>
               )}
 
-              {/* Exemplos Rápidos para Teste Local */}
-              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--slate-400)', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <Search size={11} /> Testar CPF:
-                </span>
-                {MOTORISTAS_SEED.slice(0, 3).map((m, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleCPFChange(m.cpf)}
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid rgba(0, 118, 44, 0.35)',
-                      color: '#86efac',
-                      fontSize: '0.68rem',
-                      padding: '2px 6px',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                    title={`Clique para testar com ${m.nome}`}
-                  >
-                    {formatarCPF(m.cpf)} ({m.nome.split(' ')[0]})
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Nome do Motorista */}
