@@ -8,7 +8,10 @@ import {
   obterMateriaisPorPedreira,
   obterConfigPlacas,
   salvarEdicaoAgendamento,
-  normalizarHistoricoStatus
+  normalizarHistoricoStatus,
+  resolverCnpjCliente,
+  resolverCnpjTransportadora,
+  limparNomeEmpresa
 } from '../services/agendamentoService';
 
 export function ModalEditarAgendamento({ 
@@ -25,10 +28,10 @@ export function ModalEditarAgendamento({
     numero_bloco: agendamento.numero_bloco || '',
     material: agendamento.material || '',
     pedreira: agendamento.pedreira || PEDREIRAS_CEARA[0].nome,
-    cliente_cnpj: agendamento.cliente_cnpj || '',
-    cliente: agendamento.cliente || '',
-    transportadora_cnpj: agendamento.transportadora_cnpj || '',
-    transportadora: agendamento.transportadora || '',
+    cliente_cnpj: agendamento.cliente_cnpj || resolverCnpjCliente(agendamento) || '',
+    cliente: limparNomeEmpresa(agendamento.cliente) || '',
+    transportadora_cnpj: agendamento.transportadora_cnpj || resolverCnpjTransportadora(agendamento) || '',
+    transportadora: limparNomeEmpresa(agendamento.transportadora) || '',
     motorista_nome: agendamento.motorista_nome || '',
     motorista_cpf: agendamento.motorista_cpf || '',
     motorista_telefone: agendamento.motorista_telefone || '',

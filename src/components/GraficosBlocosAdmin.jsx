@@ -10,7 +10,10 @@ import {
   formatarDataBR, 
   obterMateriaisPorPedreira,
   normalizarNomePedreira,
-  normalizarNomeMaterial
+  normalizarNomeMaterial,
+  resolverCnpjCliente,
+  resolverCnpjTransportadora,
+  limparNomeEmpresa
 } from '../services/agendamentoService';
 
 export function GraficosBlocosAdmin({ agendamentos = [] }) {
@@ -28,8 +31,9 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
   const listaClientesUnicos = useMemo(() => {
     const setC = new Set();
     agendamentos.forEach(a => {
-      if (a.cliente && a.cliente.trim()) {
-        setC.add(a.cliente.trim().toUpperCase());
+      const nomeLimpo = limparNomeEmpresa(a.cliente);
+      if (nomeLimpo && nomeLimpo.trim()) {
+        setC.add(nomeLimpo.trim().toUpperCase());
       }
     });
     return Array.from(setC).sort();
@@ -203,6 +207,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
       'Material',
       'Nº do Bloco',
       'Cliente Destinatário',
+      'CNPJ Destinatário',
       'Transportadora',
       'CNPJ Transportadora',
       'Motorista',
@@ -219,9 +224,10 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
       'Pedreira': normalizarNomePedreira(ag.pedreira) || ag.pedreira || '',
       'Material': normalizarNomeMaterial(ag.material, ag.pedreira) || ag.material || '',
       'Nº do Bloco': ag.numero_bloco || '',
-      'Cliente Destinatário': ag.cliente || '',
-      'Transportadora': ag.transportadora || '',
-      'CNPJ Transportadora': ag.transportadora_cnpj || '',
+      'Cliente Destinatário': limparNomeEmpresa(ag.cliente) || '',
+      'CNPJ Destinatário': ag.cliente_cnpj || resolverCnpjCliente(ag) || '',
+      'Transportadora': limparNomeEmpresa(ag.transportadora) || '',
+      'CNPJ Transportadora': ag.transportadora_cnpj || resolverCnpjTransportadora(ag) || '',
       'Motorista': ag.motorista_nome || '',
       'CPF Motorista': ag.motorista_cpf || '',
       'Placa Cavalo': ag.placa_cavalo || '',

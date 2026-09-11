@@ -265,11 +265,15 @@ export function salvarMotoristaNaBase(dadosMotorista = {}) {
     const base = obterBaseMotoristas();
     const index = base.findIndex(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
 
+    const transpLimpa = limparNomeEmpresa(dadosMotorista.transportadora || dadosMotorista.nome_transportadora || '').toUpperCase() || null;
+    const transpCnpj = dadosMotorista.transportadora_cnpj || extrairCnpj(dadosMotorista.transportadora) || obterCnpjEmpresaCache(transpLimpa) || null;
+
     const novoRegistro = {
       cpf: cpfLimpo,
       nome: (dadosMotorista.motorista_nome || dadosMotorista.nome || '').trim().toUpperCase(),
       telefone: dadosMotorista.motorista_telefone || dadosMotorista.telefone || null,
-      transportadora: (dadosMotorista.transportadora || '').trim().toUpperCase() || null,
+      transportadora: transpLimpa,
+      transportadora_cnpj: transpCnpj,
       tipo_veiculo: dadosMotorista.tipo_veiculo || null,
       placa_cavalo: dadosMotorista.placa_cavalo || null,
       placa_carreta: dadosMotorista.placa_carreta || null,
@@ -316,6 +320,8 @@ export async function consultarMotoristaPorCPF(cpf = '') {
   const encontradoLocal = baseLocal.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
 
   if (encontradoLocal && encontradoLocal.nome) {
+    const transpNome = limparNomeEmpresa(encontradoLocal.transportadora || '');
+    const transpCnpj = encontradoLocal.transportadora_cnpj || obterCnpjEmpresaCache(transpNome) || null;
     return {
       valido: true,
       encontrado: true,
@@ -323,7 +329,8 @@ export async function consultarMotoristaPorCPF(cpf = '') {
       motorista: {
         nome: encontradoLocal.nome,
         telefone: encontradoLocal.telefone || '',
-        transportadora: encontradoLocal.transportadora || '',
+        transportadora: transpNome,
+        transportadora_cnpj: transpCnpj,
         tipo_veiculo: encontradoLocal.tipo_veiculo || '',
         placa_cavalo: encontradoLocal.placa_cavalo || '',
         placa_carreta: encontradoLocal.placa_carreta || '',
@@ -336,10 +343,13 @@ export async function consultarMotoristaPorCPF(cpf = '') {
   const agendamentosLocais = obterAgendamentosLocais();
   const agLocal = agendamentosLocais.find(a => a.motorista_cpf && a.motorista_cpf.replace(/\D/g, '') === cpfLimpo && a.motorista_nome);
   if (agLocal) {
+    const transpNome = limparNomeEmpresa(agLocal.transportadora || '');
+    const transpCnpj = agLocal.transportadora_cnpj || resolverCnpjTransportadora(agLocal) || null;
     const mot = {
       nome: agLocal.motorista_nome,
       telefone: agLocal.motorista_telefone || '',
-      transportadora: agLocal.transportadora || '',
+      transportadora: transpNome,
+      transportadora_cnpj: transpCnpj,
       tipo_veiculo: agLocal.tipo_veiculo || '',
       placa_cavalo: agLocal.placa_cavalo || '',
       placa_carreta: agLocal.placa_carreta || '',
@@ -423,10 +433,237 @@ export async function consultarMotoristaPorCPF(cpf = '') {
 }
 
 // ==========================================
-// VALIDAÇÃO & CONSULTA DE CNPJ NA RECEITA FEDERAL
+// FORMATAÇÃO, EXTRAÇÃO & CACHE INTELIGENTE DE CNPJ
 // ==========================================
 
 export const TRANSPORTADORAS_BASE_KEY = 'vermont_base_transportadoras';
+export const CNPJ_EMPRESAS_KEY = 'vermont_cnpj_empresas_cache';
+
+/**
+ * Formata qualquer número ou sequência como CNPJ padrão brasileiro XX.XXX.XXX/XXXX-XX
+ */
+export function formatarCNPJ(valor = '') {
+  if (!valor) return '';
+  const nums = String(valor).replace(/\D/g, '').slice(0, 14);
+  if (!nums) return '';
+  let fmt = nums;
+  if (nums.length > 2) fmt = `${nums.slice(0, 2)}.${nums.slice(2)}`;
+  if (nums.length > 5) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5)}`;
+  if (nums.length > 8) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8)}`;
+  if (nums.length > 12) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8, 12)}-${nums.slice(12)}`;
+  return fmt;
+}
+
+/**
+ * Limpa o nome da empresa removendo CNPJs anexados ou resíduos textuais
+ */
+export function limparNomeEmpresa(nome = '') {
+  if (!nome || typeof nome !== 'string') return '';
+  return nome
+    .replace(/\s*[-–/|]?\s*\(?\s*CNPJ[\s:.-]*[0-9./-]+\s*\)?/gi, '')
+    .replace(/\s*\(\s*\)\s*$/, '')
+    .trim();
+}
+
+/**
+ * Normaliza o nome da empresa para chave de busca no cache
+ */
+export function normalizarNomeEmpresaChave(nome = '') {
+  if (!nome || typeof nome !== 'string') return '';
+  const limpo = limparNomeEmpresa(nome);
+  return limpo
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]/g, '')
+    .trim();
+}
+
+/**
+ * Base oficial de CNPJs de empresas parceiras frequentes e da própria Vermont
+ */
+const CNPJ_CONHECIDOS_PADRAO = {
+  // Vermont Mineração Ltda
+  'VERMONTMINERACAOLTDA': '07.498.412/0001-30',
+  'VERMONTMINERACAO': '07.498.412/0001-30',
+  'VERMONT': '07.498.412/0001-30',
+  // Brasigran Brasileira de Granitos Ltda
+  'BRASIGRANBRASILEIRADEGRANITOSLTDA': '32.476.525/0001-94',
+  'BRASIGRAN': '32.476.525/0001-94',
+  'BRASIGRANLTDA': '32.476.525/0001-94',
+  // J. M. Bergamini Transportes
+  'JMBERGAMINITRANSPORTESEIRELI': '13.051.611/0002-91',
+  'JMBERGAMINI': '13.051.611/0002-91',
+  'BERGAMINITRANSPORTES': '13.051.611/0002-91',
+  'BERGAMINI': '13.051.611/0002-91',
+  // FBS Logística e Transporte
+  'FBSLOGISTICATRANSPORTELTDA': '49.131.491/0001-07',
+  'FBSLOGISTICAETRANSPORTELTDA': '49.131.491/0001-07',
+  'FBSLOGISTICA': '49.131.491/0001-07',
+  'FBSLOGISTICALTDA': '49.131.491/0001-07',
+  'FBSTRANSPORTES': '49.131.491/0001-07'
+};
+
+/**
+ * Busca CNPJ salvo no cache ou na lista oficial de conhecidos
+ */
+export function obterCnpjEmpresaCache(nomeEmpresa = '') {
+  if (!nomeEmpresa) return null;
+  const chave = normalizarNomeEmpresaChave(nomeEmpresa);
+  if (!chave) return null;
+
+  if (CNPJ_CONHECIDOS_PADRAO[chave]) {
+    return CNPJ_CONHECIDOS_PADRAO[chave];
+  }
+
+  for (const [k, cnpj] of Object.entries(CNPJ_CONHECIDOS_PADRAO)) {
+    if (chave === k || (chave.length >= 7 && (chave.includes(k) || k.includes(chave)))) {
+      return cnpj;
+    }
+  }
+
+  try {
+    const raw = localStorage.getItem(CNPJ_EMPRESAS_KEY);
+    if (raw) {
+      const mapa = JSON.parse(raw);
+      if (mapa[chave]) return mapa[chave];
+      for (const [k, cnpj] of Object.entries(mapa)) {
+        if (chave === k || (chave.length >= 7 && (chave.includes(k) || k.includes(chave)))) {
+          return cnpj;
+        }
+      }
+    }
+  } catch (e) {}
+
+  return null;
+}
+
+/**
+ * Salva no cache persistente a associação entre o nome da empresa e seu CNPJ
+ */
+export function salvarEmpresaCnpjCache(nomeEmpresa = '', cnpj = '') {
+  if (!nomeEmpresa || !cnpj) return;
+  const chave = normalizarNomeEmpresaChave(nomeEmpresa);
+  const digitos = String(cnpj).replace(/\D/g, '');
+  if (!chave || digitos.length !== 14) return;
+
+  const cnpjFormatado = formatarCNPJ(digitos);
+
+  try {
+    const raw = localStorage.getItem(CNPJ_EMPRESAS_KEY);
+    const mapa = raw ? JSON.parse(raw) : {};
+    mapa[chave] = cnpjFormatado;
+    localStorage.setItem(CNPJ_EMPRESAS_KEY, JSON.stringify(mapa));
+  } catch (e) {}
+}
+
+/**
+ * Extrai CNPJ válido de qualquer string (inclusive se inserido dentro do nome ou observações)
+ */
+export function extrairCnpj(texto = '') {
+  if (!texto || typeof texto !== 'string') return null;
+
+  // 1. Padrão formatado exato: XX.XXX.XXX/XXXX-XX
+  const matchFormatado = texto.match(/\b(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/);
+  if (matchFormatado) {
+    return matchFormatado[1];
+  }
+
+  // 2. Menção a CNPJ textual
+  const matchCnpjTexto = texto.match(/CNPJ[\s:.-]*([0-9./-]{14,18})/i);
+  if (matchCnpjTexto) {
+    const digitos = matchCnpjTexto[1].replace(/\D/g, '');
+    if (digitos.length === 14) {
+      return formatarCNPJ(digitos);
+    }
+  }
+
+  // 3. Sequência numérica de 14 dígitos
+  const match14 = texto.match(/\b\d{14}\b/);
+  if (match14 && validarCNPJ(match14[0])) {
+    return formatarCNPJ(match14[0]);
+  }
+
+  return null;
+}
+
+/**
+ * Resolução completa em cascata para obter o CNPJ do Cliente Destinatário
+ */
+export function resolverCnpjCliente(agendamento = {}, localItem = null) {
+  if (!agendamento) return null;
+
+  const direto = agendamento.cliente_cnpj ? String(agendamento.cliente_cnpj).trim() : null;
+  if (direto && direto.replace(/\D/g, '').length === 14) {
+    const fmt = formatarCNPJ(direto);
+    salvarEmpresaCnpjCache(agendamento.cliente, fmt);
+    return fmt;
+  }
+
+  const localCnpj = localItem?.cliente_cnpj ? String(localItem.cliente_cnpj).trim() : null;
+  if (localCnpj && localCnpj.replace(/\D/g, '').length === 14) {
+    const fmt = formatarCNPJ(localCnpj);
+    salvarEmpresaCnpjCache(agendamento.cliente || localItem.cliente, fmt);
+    return fmt;
+  }
+
+  const extraidoNome = extrairCnpj(agendamento.cliente || localItem?.cliente);
+  if (extraidoNome) {
+    salvarEmpresaCnpjCache(agendamento.cliente || localItem?.cliente, extraidoNome);
+    return extraidoNome;
+  }
+
+  const doCache = obterCnpjEmpresaCache(agendamento.cliente || localItem?.cliente);
+  if (doCache) {
+    return doCache;
+  }
+
+  const extraidoObs = extrairCnpj(agendamento.observacoes || localItem?.observacoes);
+  if (extraidoObs) {
+    return extraidoObs;
+  }
+
+  return null;
+}
+
+/**
+ * Resolução completa em cascata para obter o CNPJ da Transportadora
+ */
+export function resolverCnpjTransportadora(agendamento = {}, localItem = null) {
+  if (!agendamento) return null;
+
+  const direto = agendamento.transportadora_cnpj ? String(agendamento.transportadora_cnpj).trim() : null;
+  if (direto && direto.replace(/\D/g, '').length === 14) {
+    const fmt = formatarCNPJ(direto);
+    salvarEmpresaCnpjCache(agendamento.transportadora, fmt);
+    return fmt;
+  }
+
+  const localCnpj = localItem?.transportadora_cnpj ? String(localItem.transportadora_cnpj).trim() : null;
+  if (localCnpj && localCnpj.replace(/\D/g, '').length === 14) {
+    const fmt = formatarCNPJ(localCnpj);
+    salvarEmpresaCnpjCache(agendamento.transportadora || localItem.transportadora, fmt);
+    return fmt;
+  }
+
+  const extraidoNome = extrairCnpj(agendamento.transportadora || localItem?.transportadora);
+  if (extraidoNome) {
+    salvarEmpresaCnpjCache(agendamento.transportadora || localItem?.transportadora, extraidoNome);
+    return extraidoNome;
+  }
+
+  const doCache = obterCnpjEmpresaCache(agendamento.transportadora || localItem?.transportadora);
+  if (doCache) {
+    return doCache;
+  }
+
+  const extraidoObs = extrairCnpj(agendamento.observacoes || localItem?.observacoes);
+  if (extraidoObs) {
+    return extraidoObs;
+  }
+
+  return null;
+}
 
 /**
  * Validação algorítmica oficial de dígitos verificadores do CNPJ (módulo 11)
@@ -917,19 +1154,40 @@ export function salvarAgendamentoLocal(registro) {
   try {
     const lista = obterAgendamentosLocais();
     const protocoloNumero = Math.floor(100000 + Math.random() * 900000);
-    const novo = {
+    const idFinal = registro.id || `VT-${protocoloNumero}`;
+    const idxExistente = lista.findIndex(item => String(item.id) === String(idFinal));
+
+    const clienteCnpj = registro.cliente_cnpj || (idxExistente !== -1 ? lista[idxExistente].cliente_cnpj : null) || resolverCnpjCliente(registro);
+    const transportadoraCnpj = registro.transportadora_cnpj || (idxExistente !== -1 ? lista[idxExistente].transportadora_cnpj : null) || resolverCnpjTransportadora(registro);
+
+    const itemMesclado = {
+      ...(idxExistente !== -1 ? lista[idxExistente] : {}),
       ...registro,
-      id: registro.id || `VT-${protocoloNumero}`,
+      id: idFinal,
+      cliente: limparNomeEmpresa(registro.cliente || (idxExistente !== -1 ? lista[idxExistente].cliente : '')),
+      cliente_cnpj: clienteCnpj || null,
+      transportadora: limparNomeEmpresa(registro.transportadora || (idxExistente !== -1 ? lista[idxExistente].transportadora : '')),
+      transportadora_cnpj: transportadoraCnpj || null,
       historico_status: normalizarHistoricoStatus(registro.historico_status),
-      created_at: new Date().toISOString()
+      created_at: (idxExistente !== -1 ? lista[idxExistente].created_at : null) || registro.created_at || new Date().toISOString()
     };
-    lista.unshift(novo);
+
+    if (idxExistente !== -1) {
+      lista[idxExistente] = itemMesclado;
+    } else {
+      lista.unshift(itemMesclado);
+    }
+
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lista));
-    return novo;
+    return itemMesclado;
   } catch (e) {
     return {
       ...registro,
       id: registro.id || `VT-${Math.floor(100000 + Math.random() * 900000)}`,
+      cliente: limparNomeEmpresa(registro.cliente),
+      cliente_cnpj: registro.cliente_cnpj || resolverCnpjCliente(registro) || null,
+      transportadora: limparNomeEmpresa(registro.transportadora),
+      transportadora_cnpj: registro.transportadora_cnpj || resolverCnpjTransportadora(registro) || null,
       historico_status: normalizarHistoricoStatus(registro.historico_status),
       created_at: new Date().toISOString()
     };
@@ -1214,7 +1472,23 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
           if (!errorPadrao && dataPadrao) {
             resultado = { ...dataPadrao, historico_status: historicoAtualizado, ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema' };
           } else if (errorPadrao) {
-            console.error('Erro definitivo ao atualizar agendamento no Supabase:', errorPadrao);
+            console.warn('Tentando atualizar payload essencial no Supabase sem colunas opcionais de CNPJ:', errorPadrao.message);
+            const payloadSemCnpj = { ...payloadBase };
+            delete payloadSemCnpj.cliente_cnpj;
+            delete payloadSemCnpj.transportadora_cnpj;
+
+            const { data: dataSemCnpj, error: errorSemCnpj } = await supabase
+              .from('agendamentos_pedreira')
+              .update(payloadSemCnpj)
+              .eq('id', agendamentoAtualizado.id)
+              .select()
+              .single();
+
+            if (!errorSemCnpj && dataSemCnpj) {
+              resultado = { ...dataSemCnpj, historico_status: historicoAtualizado, ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema' };
+            } else if (errorSemCnpj) {
+              console.error('Erro definitivo ao atualizar agendamento no Supabase:', errorSemCnpj);
+            }
           }
         }
       } catch (eSup) {
@@ -1222,8 +1496,31 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
       }
     }
 
-    const localAtualizado = atualizarAgendamentoLocalCompleto(agendamentoAtualizado, usuarioInfo);
-    return { success: true, data: resultado || localAtualizado || agendamentoAtualizado };
+    if (agendamentoAtualizado.cliente && agendamentoAtualizado.cliente_cnpj) {
+      salvarEmpresaCnpjCache(agendamentoAtualizado.cliente, agendamentoAtualizado.cliente_cnpj);
+    }
+    if (agendamentoAtualizado.transportadora && agendamentoAtualizado.transportadora_cnpj) {
+      salvarEmpresaCnpjCache(agendamentoAtualizado.transportadora, agendamentoAtualizado.transportadora_cnpj);
+    }
+
+    const clienteLimpo = limparNomeEmpresa(agendamentoAtualizado.cliente || (itemAtual && itemAtual.cliente));
+    const transpLimpa = limparNomeEmpresa(agendamentoAtualizado.transportadora || (itemAtual && itemAtual.transportadora));
+    const clienteCnpj = agendamentoAtualizado.cliente_cnpj || (resultado && resultado.cliente_cnpj) || (itemAtual && itemAtual.cliente_cnpj) || resolverCnpjCliente(agendamentoAtualizado);
+    const transpCnpj = agendamentoAtualizado.transportadora_cnpj || (resultado && resultado.transportadora_cnpj) || (itemAtual && itemAtual.transportadora_cnpj) || resolverCnpjTransportadora(agendamentoAtualizado);
+
+    const dadosConsolidados = {
+      ...itemAtual,
+      ...agendamentoAtualizado,
+      ...(resultado || {}),
+      cliente: clienteLimpo,
+      cliente_cnpj: clienteCnpj || null,
+      transportadora: transpLimpa,
+      transportadora_cnpj: transpCnpj || null,
+      historico_status: historicoAtualizado
+    };
+
+    const localAtualizado = atualizarAgendamentoLocalCompleto(dadosConsolidados, usuarioInfo);
+    return { success: true, data: { ...localAtualizado, ...dadosConsolidados } };
   } catch (err) {
     console.error('Erro ao salvar edição de agendamento:', err);
     return { success: false, error: err.message };
@@ -1499,8 +1796,18 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
             const histLoc = normalizarHistoricoStatus(loc?.historico_status);
             const historicoFinal = histSup.length > 0 ? histSup : histLoc;
 
+            const clienteCnpj = resolverCnpjCliente(item, loc);
+            const transpCnpj = resolverCnpjTransportadora(item, loc);
+            const clienteLimpo = limparNomeEmpresa(item.cliente || loc?.cliente || '');
+            const transpLimpa = limparNomeEmpresa(item.transportadora || loc?.transportadora || '');
+
             return {
+              ...(loc || {}),
               ...item,
+              cliente: clienteLimpo || item.cliente,
+              cliente_cnpj: clienteCnpj || null,
+              transportadora: transpLimpa || item.transportadora,
+              transportadora_cnpj: transpCnpj || null,
               historico_status: historicoFinal,
               ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || (historicoFinal.length > 0 ? historicoFinal[0].usuario_nome : null)
             };
@@ -1517,7 +1824,14 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
       }
     }
 
-    const locais = obterAgendamentosLocais();
+    const locais = obterAgendamentosLocais().map(item => ({
+      ...item,
+      cliente: limparNomeEmpresa(item.cliente),
+      cliente_cnpj: item.cliente_cnpj || resolverCnpjCliente(item) || null,
+      transportadora: limparNomeEmpresa(item.transportadora),
+      transportadora_cnpj: item.transportadora_cnpj || resolverCnpjTransportadora(item) || null
+    }));
+
     return locais.filter(item => {
       const isAnterior = item.data_agendamento && item.data_agendamento < hoje;
       const isPendente = item.status && !['Finalizado', 'Carregado', 'Cancelado'].includes(item.status);
@@ -1569,8 +1883,18 @@ export async function listarAgendamentos(filtros = {}) {
             const histLoc = normalizarHistoricoStatus(loc?.historico_status);
             const historicoFinal = histSup.length > 0 ? histSup : histLoc;
 
+            const clienteCnpj = resolverCnpjCliente(item, loc);
+            const transpCnpj = resolverCnpjTransportadora(item, loc);
+            const clienteLimpo = limparNomeEmpresa(item.cliente || loc?.cliente || '');
+            const transpLimpa = limparNomeEmpresa(item.transportadora || loc?.transportadora || '');
+
             return {
+              ...(loc || {}),
               ...item,
+              cliente: clienteLimpo || item.cliente,
+              cliente_cnpj: clienteCnpj || null,
+              transportadora: transpLimpa || item.transportadora,
+              transportadora_cnpj: transpCnpj || null,
               historico_status: historicoFinal,
               ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || (historicoFinal.length > 0 ? historicoFinal[0].usuario_nome : null)
             };
@@ -1589,7 +1913,13 @@ export async function listarAgendamentos(filtros = {}) {
               if (l.status !== filtros.status) return false;
             }
             return true;
-          });
+          }).map(l => ({
+            ...l,
+            cliente: limparNomeEmpresa(l.cliente),
+            cliente_cnpj: l.cliente_cnpj || resolverCnpjCliente(l) || null,
+            transportadora: limparNomeEmpresa(l.transportadora),
+            transportadora_cnpj: l.transportadora_cnpj || resolverCnpjTransportadora(l) || null
+          }));
 
           // Une registros do Supabase com registros pendentes locais para NUNCA perder nenhum agendamento
           let listaUnificada = [...listaSup, ...locaisNaoNoSupabase];
@@ -1598,10 +1928,20 @@ export async function listarAgendamentos(filtros = {}) {
             listaUnificada = listaUnificada.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
           }
 
-          // Mantém localStorage sempre sincronizado
+          // Mantém localStorage sempre sincronizado sem perder dados enriquecidos
           try {
             const mapaAtualizado = new Map(locais.map(l => [String(l.id), l]));
-            listaSup.forEach(item => mapaAtualizado.set(String(item.id), item));
+            listaSup.forEach(item => {
+              const anterior = mapaAtualizado.get(String(item.id)) || {};
+              mapaAtualizado.set(String(item.id), {
+                ...anterior,
+                ...item,
+                cliente: item.cliente || anterior.cliente,
+                cliente_cnpj: item.cliente_cnpj || anterior.cliente_cnpj || null,
+                transportadora: item.transportadora || anterior.transportadora,
+                transportadora_cnpj: item.transportadora_cnpj || anterior.transportadora_cnpj || null
+              });
+            });
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(Array.from(mapaAtualizado.values())));
           } catch (e) {}
 
@@ -1626,7 +1966,13 @@ export async function listarAgendamentos(filtros = {}) {
       }
     }
 
-    let resultado = obterAgendamentosLocais();
+    let resultado = obterAgendamentosLocais().map(item => ({
+      ...item,
+      cliente: limparNomeEmpresa(item.cliente),
+      cliente_cnpj: item.cliente_cnpj || resolverCnpjCliente(item) || null,
+      transportadora: limparNomeEmpresa(item.transportadora),
+      transportadora_cnpj: item.transportadora_cnpj || resolverCnpjTransportadora(item) || null
+    }));
     if (filtros.pedreira && filtros.pedreira !== 'todas') {
       resultado = resultado.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
     }
@@ -1727,7 +2073,22 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
     }
 
     const local = atualizarAgendamentoLocal(id, novoStatus, usuarioInfo);
-    return { success: true, data: atualizado || local || { id, status: novoStatus, historico_status: historicoAtualizado } };
+    const clienteCnpj = (itemAtual && itemAtual.cliente_cnpj) || (local && local.cliente_cnpj) || (atualizado && atualizado.cliente_cnpj) || resolverCnpjCliente(itemAtual);
+    const transpCnpj = (itemAtual && itemAtual.transportadora_cnpj) || (local && local.transportadora_cnpj) || (atualizado && atualizado.transportadora_cnpj) || resolverCnpjTransportadora(itemAtual);
+
+    const objetoRetorno = {
+      ...(itemAtual || {}),
+      ...(atualizado || local || {}),
+      id,
+      status: novoStatus,
+      historico_status: historicoAtualizado,
+      cliente: limparNomeEmpresa(itemAtual?.cliente || local?.cliente || atualizado?.cliente),
+      cliente_cnpj: clienteCnpj || null,
+      transportadora: limparNomeEmpresa(itemAtual?.transportadora || local?.transportadora || atualizado?.transportadora),
+      transportadora_cnpj: transpCnpj || null
+    };
+
+    return { success: true, data: objetoRetorno };
   } catch (err) {
     console.error('Erro ao atualizar status:', err);
     return { success: false, error: err.message };
@@ -2104,7 +2465,12 @@ export async function salvarAgendamento(dados) {
           .single();
 
         if (!error && data) {
-          agendamentoSalvo = data;
+          agendamentoSalvo = {
+            ...payload,
+            ...data,
+            cliente_cnpj: payload.cliente_cnpj || data.cliente_cnpj || null,
+            transportadora_cnpj: payload.transportadora_cnpj || data.transportadora_cnpj || null
+          };
         } else if (error) {
           console.warn('Falha no insert Supabase completo, tentando payload essencial:', error.message);
           // Fallback caso a tabela ainda não tenha colunas opcionais como transportadora_cnpj ou cliente_cnpj
@@ -2133,7 +2499,13 @@ export async function salvarAgendamento(dados) {
             .single();
 
           if (!errorEssencial && dataEssencial) {
-            agendamentoSalvo = { ...payload, ...dataEssencial };
+            agendamentoSalvo = {
+              ...dataEssencial,
+              ...payload,
+              id: dataEssencial.id || payload.id,
+              cliente_cnpj: payload.cliente_cnpj || dataEssencial.cliente_cnpj || null,
+              transportadora_cnpj: payload.transportadora_cnpj || dataEssencial.transportadora_cnpj || null
+            };
           } else {
             console.error('Falha no insert essencial do Supabase:', errorEssencial);
           }
@@ -2141,6 +2513,13 @@ export async function salvarAgendamento(dados) {
       } catch (eSupabase) {
         console.warn('Erro de conexão com Supabase, salvando localmente:', eSupabase);
       }
+    }
+
+    if (payload.cliente && payload.cliente_cnpj) {
+      salvarEmpresaCnpjCache(payload.cliente, payload.cliente_cnpj);
+    }
+    if (payload.transportadora && payload.transportadora_cnpj) {
+      salvarEmpresaCnpjCache(payload.transportadora, payload.transportadora_cnpj);
     }
 
     if (!agendamentoSalvo) {
@@ -2255,7 +2634,12 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
             .select()
             .single();
           if (!res.error && res.data) {
-            dataSalva = res.data;
+            dataSalva = {
+              ...payload,
+              ...res.data,
+              cliente_cnpj: payload.cliente_cnpj || res.data.cliente_cnpj || null,
+              transportadora_cnpj: payload.transportadora_cnpj || res.data.transportadora_cnpj || null
+            };
           } else if (res.error) {
             // Fallback essencial
             const payloadEssencial = {
@@ -2281,12 +2665,25 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
               .select()
               .single();
             if (!resEssencial.error && resEssencial.data) {
-              dataSalva = { ...payload, ...resEssencial.data };
+              dataSalva = {
+                ...resEssencial.data,
+                ...payload,
+                id: resEssencial.data.id || payload.id,
+                cliente_cnpj: payload.cliente_cnpj || resEssencial.data.cliente_cnpj || null,
+                transportadora_cnpj: payload.transportadora_cnpj || resEssencial.data.transportadora_cnpj || null
+              };
             }
           }
         } catch (eSup) {
           console.warn('Erro ao salvar ponto no Supabase, usando local:', eSup);
         }
+      }
+
+      if (payload.cliente && payload.cliente_cnpj) {
+        salvarEmpresaCnpjCache(payload.cliente, payload.cliente_cnpj);
+      }
+      if (payload.transportadora && payload.transportadora_cnpj) {
+        salvarEmpresaCnpjCache(payload.transportadora, payload.transportadora_cnpj);
       }
 
       if (!dataSalva) {

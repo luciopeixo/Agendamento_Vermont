@@ -20,7 +20,10 @@ import {
   isPedreiraUruoca,
   PEDREIRAS_CEARA, 
   EMAIL_NOTIFICACAO_DESTINO,
-  STATUS_AGENDAMENTO
+  STATUS_AGENDAMENTO,
+  resolverCnpjCliente,
+  resolverCnpjTransportadora,
+  limparNomeEmpresa
 } from '../services/agendamentoService';
 import { ModalEditarAgendamento } from './ModalEditarAgendamento';
 import { ModalHistoricoStatus } from './ModalHistoricoStatus';
@@ -326,10 +329,10 @@ export function PainelGestao({
         'Material': ag.material || '',
         'Nº Bloco': ag.numero_bloco || '',
         'Carga Mista / Combinada': isMisto,
-        'Cliente Destinatário': ag.cliente || '',
-        'CNPJ Destinatário': ag.cliente_cnpj || '',
-        'Transportadora': ag.transportadora || '',
-        'CNPJ Transportadora': ag.transportadora_cnpj || '',
+        'Cliente Destinatário': limparNomeEmpresa(ag.cliente) || '',
+        'CNPJ Destinatário': ag.cliente_cnpj || resolverCnpjCliente(ag) || '',
+        'Transportadora': limparNomeEmpresa(ag.transportadora) || '',
+        'CNPJ Transportadora': ag.transportadora_cnpj || resolverCnpjTransportadora(ag) || '',
         'Motorista': ag.motorista_nome || '',
         'CPF Motorista': ag.motorista_cpf || '',
         'Telefone Motorista': ag.motorista_telefone || '',
@@ -1553,10 +1556,10 @@ export function PainelGestao({
                           Bloco: {ag.numero_bloco}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
-                          Cliente: <strong style={{ color: 'var(--slate-200)' }}>{ag.cliente}</strong> {ag.cliente_cnpj && <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)', fontFamily: 'monospace' }}>({ag.cliente_cnpj})</span>}
+                          Cliente: <strong style={{ color: 'var(--slate-200)' }}>{limparNomeEmpresa(ag.cliente)}</strong> {(ag.cliente_cnpj || resolverCnpjCliente(ag)) && <span style={{ fontSize: '0.72rem', color: '#60a5fa', fontFamily: 'monospace' }}>({ag.cliente_cnpj || resolverCnpjCliente(ag)})</span>}
                         </div>
                         <div style={{ fontSize: '0.74rem', color: 'var(--slate-500)' }}>
-                          Transp: {ag.transportadora} {ag.transportadora_cnpj && <span style={{ fontSize: '0.70rem', color: 'var(--slate-400)', fontFamily: 'monospace' }}>({ag.transportadora_cnpj})</span>}
+                          Transp: {limparNomeEmpresa(ag.transportadora)} {(ag.transportadora_cnpj || resolverCnpjTransportadora(ag)) && <span style={{ fontSize: '0.70rem', color: '#60a5fa', fontFamily: 'monospace' }}>({ag.transportadora_cnpj || resolverCnpjTransportadora(ag)})</span>}
                         </div>
                       </td>
 

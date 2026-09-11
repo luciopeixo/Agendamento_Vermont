@@ -9,7 +9,10 @@ import {
   formatarDataBR, 
   AVISO_CONFIRMACAO_CLIENTE,
   enviarComprovantePorEmail,
-  gerarLinkMailtoComprovante
+  gerarLinkMailtoComprovante,
+  resolverCnpjCliente,
+  resolverCnpjTransportadora,
+  limparNomeEmpresa
 } from '../services/agendamentoService';
 
 export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
@@ -66,7 +69,15 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
     setEnviandoEmail(true);
     setStatusEmail(null);
 
-    const res = await enviarComprovantePorEmail(agendamento, emailDestino, mensagemEmail);
+    const agendamentoNormalizado = {
+      ...agendamento,
+      cliente: clienteNome,
+      cliente_cnpj: clienteCnpj,
+      transportadora: transportadoraNome,
+      transportadora_cnpj: transportadoraCnpj
+    };
+
+    const res = await enviarComprovantePorEmail(agendamentoNormalizado, emailDestino, mensagemEmail);
     setEnviandoEmail(false);
 
     if (res.success) {
@@ -75,6 +86,12 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
       setStatusEmail({ tipo: 'erro', texto: res.error || 'Erro ao enviar e-mail. Tente novamente.' });
     }
   };
+
+  // Resolução inteligente e robusta de CNPJs e nomes de empresas
+  const clienteNome = limparNomeEmpresa(agendamento.cliente);
+  const clienteCnpj = agendamento.cliente_cnpj || resolverCnpjCliente(agendamento) || null;
+  const transportadoraNome = limparNomeEmpresa(agendamento.transportadora);
+  const transportadoraCnpj = agendamento.transportadora_cnpj || resolverCnpjTransportadora(agendamento) || null;
 
   // Lista de placas formatadas corretamente (Carreta simples se for 1 carreta, 1ª e 2ª se for Bitrem)
   const listaPlacas = formatarPlacasExibicao(agendamento);
@@ -112,14 +129,14 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
 ${roteiroTextoWhats}
 
 🚛 *DADOS DO TRANSPORTE:*
-🏢 *Transportadora:* *${agendamento.transportadora}* ${agendamento.transportadora_cnpj ? `(CNPJ: ${agendamento.transportadora_cnpj})` : ''}
+🏢 *Transportadora:* *${transportadoraNome}* ${transportadoraCnpj ? `(CNPJ: ${transportadoraCnpj})` : ''}
 👤 *Motorista:* *${agendamento.motorista_nome}*
 🪪 *CPF:* ${agendamento.motorista_cpf}
 📱 *WhatsApp/Tel:* ${agendamento.motorista_telefone || 'Não informado'}
 🛣️ *Tipo de Veículo:* *${agendamento.tipo_veiculo}*
 ⚖️ *Placas:*
 ${placasFormatadasWhats}
-💼 *Cliente Destinatário:* *${agendamento.cliente}* ${agendamento.cliente_cnpj ? `(CNPJ: ${agendamento.cliente_cnpj})` : ''}
+💼 *Cliente Destinatário:* *${clienteNome}* ${clienteCnpj ? `(CNPJ: ${clienteCnpj})` : ''}
 ${agendamento.observacoes ? `\n📌 *Observações:* _${agendamento.observacoes}_\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📄 *DOCUMENTOS OBRIGATÓRIOS NA PEDREIRA:*
@@ -149,7 +166,7 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
 ⏰ *Horário:* *${agendamento.horario_agendamento}* ${agendamento.justificativa_outros ? `\n   📝 _Justificativa: ${agendamento.justificativa_outros}_` : ''}
 
 🚛 *DADOS DO TRANSPORTE:*
-🏢 *Transportadora:* *${agendamento.transportadora}* ${agendamento.transportadora_cnpj ? `(CNPJ: ${agendamento.transportadora_cnpj})` : ''}
+🏢 *Transportadora:* *${transportadoraNome}* ${transportadoraCnpj ? `(CNPJ: ${transportadoraCnpj})` : ''}
 👤 *Motorista:* *${agendamento.motorista_nome}*
 🪪 *CPF:* ${agendamento.motorista_cpf}
 📱 *WhatsApp/Tel:* ${agendamento.motorista_telefone || 'Não informado'}
@@ -160,7 +177,7 @@ ${placasFormatadasWhats}
 📦 *DADOS DA CARGA:*
 🪨 *Material:* *${agendamento.material}*
 🏷️ *Nº do Bloco:* *${agendamento.numero_bloco}*
-💼 *Cliente Destinatário:* *${agendamento.cliente}* ${agendamento.cliente_cnpj ? `(CNPJ: ${agendamento.cliente_cnpj})` : ''}
+💼 *Cliente Destinatário:* *${clienteNome}* ${clienteCnpj ? `(CNPJ: ${clienteCnpj})` : ''}
 ${agendamento.observacoes ? `\n📌 *Observações:* _${agendamento.observacoes}_\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📄 *DOCUMENTOS OBRIGATÓRIOS NA PEDREIRA:*
@@ -396,17 +413,17 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.88rem' }}>
               <div>
-                <span style={{ color: 'var(--slate-400)' }}>Cliente Destinatário:</span> <strong className="print-text-dark">{agendamento.cliente}</strong>
+                <span style={{ color: 'var(--slate-400)' }}>Cliente Destinatário:</span> <strong className="print-text-dark">{clienteNome}</strong>
               </div>
               <div>
-                <span style={{ color: 'var(--slate-400)' }}>CNPJ Destinatário:</span> <strong className="print-text-dark" style={{ fontFamily: 'monospace' }}>{agendamento.cliente_cnpj || 'Não informado'}</strong>
+                <span style={{ color: 'var(--slate-400)' }}>CNPJ Destinatário:</span> <strong className="print-text-dark" style={{ fontFamily: 'monospace' }}>{clienteCnpj || 'Não informado'}</strong>
               </div>
 
               <div>
-                <span style={{ color: 'var(--slate-400)' }}>Transportadora:</span> <strong className="print-text-dark">{agendamento.transportadora}</strong>
+                <span style={{ color: 'var(--slate-400)' }}>Transportadora:</span> <strong className="print-text-dark">{transportadoraNome}</strong>
               </div>
               <div>
-                <span style={{ color: 'var(--slate-400)' }}>CNPJ Transportadora:</span> <strong className="print-text-dark" style={{ fontFamily: 'monospace' }}>{agendamento.transportadora_cnpj || 'Não informado'}</strong>
+                <span style={{ color: 'var(--slate-400)' }}>CNPJ Transportadora:</span> <strong className="print-text-dark" style={{ fontFamily: 'monospace' }}>{transportadoraCnpj || 'Não informado'}</strong>
               </div>
 
               <div><span style={{ color: 'var(--slate-400)' }}>Motorista:</span> <strong className="print-text-dark">{agendamento.motorista_nome}</strong></div>
