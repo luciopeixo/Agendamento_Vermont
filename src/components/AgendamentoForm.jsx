@@ -1329,11 +1329,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                         {ocupacaoSabado.lotado ? 'Esgotado (12/12)' : `${ocupacaoSabado.disponivel} vagas livres`}
                       </span>
                     </div>
-                    {ocupacaoSabado.totalBlocos > ocupacaoSabado.total && (
-                      <div style={{ fontSize: '0.76rem', color: 'var(--slate-300)', marginTop: 4 }}>
-                        * Contabilizando {ocupacaoSabado.totalBlocos} blocos distribuídos em {ocupacaoSabado.total} caminhão(ões) agendados.
-                      </div>
-                    )}
                   </div>
                 )}
 

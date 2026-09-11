@@ -1129,7 +1129,7 @@ export function PainelGestao({
             <span style={{ fontSize: '0.72rem', color: estatisticasSabado.lotado ? '#fca5a5' : 'var(--slate-300)', fontWeight: 600 }}>
               {estatisticasSabado.lotado 
                 ? '🚨 Cota de 12 carros atingida' 
-                : `${estatisticasSabado.disponivel} vaga${estatisticasSabado.disponivel === 1 ? '' : 's'} livre${estatisticasSabado.disponivel === 1 ? '' : 's'} (${estatisticasSabado.totalBlocos} bloco${estatisticasSabado.totalBlocos === 1 ? '' : 's'})`}
+                : `${estatisticasSabado.disponivel} vaga${estatisticasSabado.disponivel === 1 ? '' : 's'} restante${estatisticasSabado.disponivel === 1 ? '' : 's'}`}
             </span>
           </div>
         )}
