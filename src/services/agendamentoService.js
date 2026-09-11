@@ -902,8 +902,8 @@ export function sanitizarNumeroBloco(texto = '') {
   if (!texto || typeof texto !== 'string') return '';
   let str = String(texto).trim().toUpperCase();
   
-  // 1. Remove prefixos comuns de bloco como "BLOCO:", "BLOCO", "BL.", "BL", "Nº", "N°", "NUMERO:", "NUMERO", "NUM:", "NUM"
-  str = str.replace(/^(?:BLOCO\s*[:.-]?|BL\s*[:.-]?|N[º°]\s*[:.-]?|N[O0]\s*[:.-]?|NUMERO\s*[:.-]?|NUM\s*[:.-]?)\s*/i, '');
+  // 1. Remove prefixos comuns de bloco simples ou combinados como "BLOCO:", "BL.", "BL. Nº", "Nº", "NUMERO:"
+  str = str.replace(/^(?:(?:BLOCO|BL|N[º°]|N[O0]|NUMERO|NUM)\s*[:.-]?\s*)+/i, '');
   
   // 2. Remove conteúdos explicativos entre parênteses (ex: "1256926 (QUARTZITO)" -> "1256926")
   str = str.replace(/\s*\([^)]*\)/g, '');
@@ -1009,8 +1009,9 @@ export const TIPOS_VEICULO = [
   'Outro'
 ];
 
-export const EMAIL_NOTIFICACAO_DESTINO = import.meta.env.VITE_EMAIL_NOTIFICACAO_DESTINO || '';
-export const WHATSAPP_ADMIN_PADRAO = import.meta.env.VITE_WHATSAPP_ADMIN_NUMERO || '';
+const _env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : (typeof process !== 'undefined' && process.env ? process.env : {});
+export const EMAIL_NOTIFICACAO_DESTINO = _env.VITE_EMAIL_NOTIFICACAO_DESTINO || '';
+export const WHATSAPP_ADMIN_PADRAO = _env.VITE_WHATSAPP_ADMIN_NUMERO || '';
 
 /**
  * Gera mensagem estruturada para notificação via WhatsApp no início do carregamento
@@ -1273,8 +1274,8 @@ export function registrarIdExcluido(id) {
 }
 
 export function isSupabaseConfigurado() {
-  const url = import.meta.env.VITE_SUPABASE_URL || '';
-  const key = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const url = _env.VITE_SUPABASE_URL || '';
+  const key = _env.VITE_SUPABASE_ANON_KEY || '';
   return Boolean(url && key && !url.includes('seu-projeto.supabase.co') && !key.includes('sua-chave-anon'));
 }
 
