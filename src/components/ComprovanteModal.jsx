@@ -498,24 +498,9 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
             </div>
           </div>
 
-          {/* Assinaturas Oficiais para o Documento Impresso / PDF */}
+          {/* Rodapé Eletrônico para o Documento Impresso / PDF */}
           <div className="comprovante-assinaturas-print" style={{ display: 'none' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 30, marginTop: 18, paddingTop: 14 }}>
-              <div>
-                <div style={{ borderBottom: '1px solid #334155', height: 32, marginBottom: 4 }}></div>
-                <div style={{ fontSize: '11px', textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>
-                  Assinatura do Motorista ({agendamento.motorista_nome})
-                </div>
-              </div>
-              <div>
-                <div style={{ borderBottom: '1px solid #334155', height: 32, marginBottom: 4 }}></div>
-                <div style={{ fontSize: '11px', textAlign: 'center', fontWeight: 600, color: '#1e293b' }}>
-                  Visto da Portaria / Balança Vermont Mineração
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: 12, textAlign: 'center', fontSize: '10px', color: '#64748b' }}>
+            <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid #cbd5e1', textAlign: 'center', fontSize: '10px', color: '#64748b' }}>
               Emitido eletronicamente via Portal Oficial de Agendamentos Vermont Mineração em {new Date().toLocaleString('pt-BR')} • Protocolo: #{protocolo}
             </div>
           </div>

@@ -2121,29 +2121,6 @@ export function PainelGestao({
             </tbody>
           </table>
         </div>
-
-        {/* Rodapé Oficial da Balança para Impressão */}
-        <div className="print-only" style={{
-          marginTop: 24,
-          padding: '16px 20px',
-          borderTop: '1px solid #64748b',
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 30
-        }}>
-          <div>
-            <div style={{ borderBottom: '1px solid #334155', height: 36, marginBottom: 6 }} />
-            <div style={{ fontSize: '11px', textAlign: 'center', color: '#1e293b', fontWeight: 600 }}>
-              Assinatura do Conferente / Operador da Balança
-            </div>
-          </div>
-          <div>
-            <div style={{ borderBottom: '1px solid #334155', height: 36, marginBottom: 6 }} />
-            <div style={{ fontSize: '11px', textAlign: 'center', color: '#1e293b', fontWeight: 600 }}>
-              Assinatura do Responsável pela Logística / Expedição
-            </div>
-          </div>
-        </div>
       </div>
       </>
       )}
