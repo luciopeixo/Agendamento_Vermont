@@ -84,6 +84,12 @@ export function ModalEditarAgendamento({
     }
     const dadosParaSalvar = { ...formData, numero_bloco: blocoLimpo };
 
+    if (!isAdmin && agendamento.status === 'Aguardando Liberação' && formData.status !== 'Aguardando Liberação') {
+      setErro('Acesso restrito: Agendamentos com status "Aguardando Liberação" só podem ser liberados ou alterados pelo Administrador Geral.');
+      setSalvando(false);
+      return;
+    }
+
     if (!isAdmin && formData.status === 'Aguardando Liberação' && agendamento.status !== 'Aguardando Liberação') {
       setErro('Acesso restrito: Apenas o Administrador Geral pode reverter o status para "Aguardando Liberação".');
       setSalvando(false);
@@ -271,13 +277,19 @@ export function ModalEditarAgendamento({
                   className="form-select"
                   value={formData.status}
                   onChange={(e) => handleChange('status', e.target.value)}
-                  style={{ fontWeight: 700, color: formData.status === 'Finalizado' ? '#34d399' : formData.status === 'Carregando' ? '#38bdf8' : formData.status === 'Liberado para Carregar' ? '#c084fc' : formData.status === 'Cancelado' ? '#f87171' : '#fbbf24' }}
+                  disabled={!isAdmin && agendamento.status === 'Aguardando Liberação'}
+                  style={{
+                    fontWeight: 700,
+                    color: formData.status === 'Finalizado' ? '#34d399' : formData.status === 'Carregando' ? '#38bdf8' : formData.status === 'Liberado para Carregar' ? '#c084fc' : formData.status === 'Cancelado' ? '#f87171' : '#fbbf24',
+                    cursor: !isAdmin && agendamento.status === 'Aguardando Liberação' ? 'not-allowed' : undefined,
+                    opacity: !isAdmin && agendamento.status === 'Aguardando Liberação' ? 0.75 : undefined
+                  }}
                 >
                   {isAdmin ? (
                     <option value="Aguardando Liberação">🟡 Aguardando Liberação</option>
                   ) : (
                     formData.status === 'Aguardando Liberação' && (
-                      <option value="Aguardando Liberação" disabled>🟡 Aguardando Liberação (Status Atual - Bloqueado p/ Reatribuir)</option>
+                      <option value="Aguardando Liberação">🟡 Aguardando Liberação (Bloqueado)</option>
                     )
                   )}
                   <option value="Liberado para Carregar">🟣 Liberado para Carregar</option>
@@ -285,8 +297,12 @@ export function ModalEditarAgendamento({
                   <option value="Finalizado">🟢 Finalizado</option>
                   <option value="Cancelado">🔴 Cancelado</option>
                 </select>
-                {!isAdmin && (
-                  <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)', marginTop: 2 }}>
+                {!isAdmin && agendamento.status === 'Aguardando Liberação' ? (
+                  <span style={{ fontSize: '0.72rem', color: '#fde68a', fontWeight: 600, display: 'block', marginTop: 4 }}>
+                    🔒 Agendamentos em "Aguardando Liberação" só podem ter o status alterado pelo Administrador Geral.
+                  </span>
+                ) : !isAdmin && (
+                  <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)', marginTop: 2, display: 'block' }}>
                     🔒 Reversão para "Aguardando Liberação" é exclusiva do Administrador Geral.
                   </span>
                 )}

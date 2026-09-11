@@ -372,6 +372,11 @@ export function PainelGestao({
     const statusAtual = agendamento.status === 'Carregado' ? 'Finalizado' : agendamento.status;
     if (novoStatus === statusAtual) return;
 
+    if (!isAdmin && agendamento.status === 'Aguardando Liberação') {
+      alert('Acesso restrito: Agendamentos com status "Aguardando Liberação" só podem ser liberados ou alterados pelo Administrador Geral.');
+      return;
+    }
+
     if (!isAdmin && novoStatus === 'Aguardando Liberação') {
       alert('Acesso restrito: Usuários da pedreira não possuem autorização para reverter o status para "Aguardando Liberação". Esta ação é exclusiva do Administrador Geral.');
       return;
@@ -1675,10 +1680,11 @@ export function PainelGestao({
                             display: 'flex',
                             alignItems: 'center',
                             gap: 4,
-                            background: 'rgba(15, 23, 42, 0.85)',
-                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                            background: !isAdmin && ag.status === 'Aguardando Liberação' ? 'rgba(15, 23, 42, 0.45)' : 'rgba(15, 23, 42, 0.85)',
+                            border: !isAdmin && ag.status === 'Aguardando Liberação' ? '1px solid rgba(245, 158, 11, 0.25)' : '1px solid rgba(255, 255, 255, 0.12)',
                             borderRadius: 8,
-                            padding: '2px 6px'
+                            padding: '2px 6px',
+                            opacity: !isAdmin && ag.status === 'Aguardando Liberação' ? 0.75 : 1
                           }}>
                             <span style={{ fontSize: '0.68rem', color: 'var(--slate-400)', fontWeight: 600, textTransform: 'uppercase' }}>
                               Mudar:
@@ -1686,6 +1692,8 @@ export function PainelGestao({
                             <select
                               value={ag.status === 'Carregado' ? 'Finalizado' : ag.status}
                               onChange={(e) => solicitarMudancaStatus(ag, e.target.value)}
+                              disabled={!isAdmin && ag.status === 'Aguardando Liberação'}
+                              title={!isAdmin && ag.status === 'Aguardando Liberação' ? 'Apenas o Administrador Geral pode liberar ou alterar agendamentos em Aguardando Liberação' : 'Alterar status operacional'}
                               style={{
                                 flex: 1,
                                 padding: '4px 6px',
@@ -1695,13 +1703,18 @@ export function PainelGestao({
                                 background: '#111915',
                                 border: '1px solid rgba(255, 255, 255, 0.08)',
                                 color: '#f1f5f9',
-                                cursor: 'pointer',
+                                cursor: !isAdmin && ag.status === 'Aguardando Liberação' ? 'not-allowed' : 'pointer',
                                 outline: 'none'
                               }}
                             >
                               {isAdmin && (
                                 <option value="Aguardando Liberação" style={{ background: '#111915', color: '#fbbf24' }}>
                                   🟡 Aguardando Liberação
+                                </option>
+                              )}
+                              {!isAdmin && ag.status === 'Aguardando Liberação' && (
+                                <option value="Aguardando Liberação" style={{ background: '#111915', color: '#fbbf24' }}>
+                                  🟡 Aguardando Liberação (Bloqueado)
                                 </option>
                               )}
                               <option value="Liberado para Carregar" style={{ background: '#111915', color: '#c084fc' }}>
@@ -1718,6 +1731,11 @@ export function PainelGestao({
                               </option>
                             </select>
                           </div>
+                          {!isAdmin && ag.status === 'Aguardando Liberação' && (
+                            <span style={{ fontSize: '0.67rem', color: '#fde68a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 3 }}>
+                              🔒 Liberação exclusiva do Admin
+                            </span>
+                          )}
                         </div>
 
                         {/* Link / Botão para Histórico de Alterações de Status */}

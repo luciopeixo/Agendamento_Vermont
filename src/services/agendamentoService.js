@@ -1637,6 +1637,15 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
       itemAtual = { ...agendamentoAtualizado };
     }
 
+    // Verificação de permissão para 'Aguardando Liberação'
+    const statusOriginal = (itemAtual.status || 'Aguardando Liberação').trim();
+    if (!usuarioInfo?.isAdmin && statusOriginal === 'Aguardando Liberação' && agendamentoAtualizado.status !== 'Aguardando Liberação') {
+      return {
+        success: false,
+        error: 'Acesso restrito: Agendamentos com status "Aguardando Liberação" só podem ser liberados ou alterados pelo Administrador Geral.'
+      };
+    }
+
     // 2. Registra o histórico comparando o item anterior com os novos valores
     const historicoAtualizado = registrarHistoricoEdicao(itemAtual, agendamentoAtualizado, usuarioInfo);
     agendamentoAtualizado.historico_status = historicoAtualizado;
@@ -2333,6 +2342,15 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
     }
 
     itemAtual.historico_status = normalizarHistoricoStatus(itemAtual.historico_status);
+
+    // Verificação de permissão: apenas Admin pode alterar se o status atual for 'Aguardando Liberação'
+    const statusAtualNormal = (itemAtual.status || 'Aguardando Liberação').trim();
+    if (!usuarioInfo?.isAdmin && statusAtualNormal === 'Aguardando Liberação' && novoStatus !== 'Aguardando Liberação') {
+      return {
+        success: false,
+        error: 'Acesso restrito: Agendamentos com status "Aguardando Liberação" só podem ser liberados ou alterados pelo Administrador Geral.'
+      };
+    }
 
     // 2. Gera o novo histórico com status_anterior correto
     const historicoAtualizado = registrarHistoricoStatus(itemAtual, novoStatus, usuarioInfo);
