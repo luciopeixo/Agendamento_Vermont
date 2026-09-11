@@ -1928,6 +1928,92 @@ export function isDataSabado(dataStr) {
 }
 
 /**
+ * Retorna a data (YYYY-MM-DD) da sexta-feira imediatamente anterior a um sábado
+ */
+export function obterSextaFeiraAnterior(dataSabadoStr) {
+  if (!dataSabadoStr) return null;
+  const [ano, mes, dia] = String(dataSabadoStr).split('-').map(Number);
+  if (!ano || !mes || !dia) return null;
+  const d = new Date(ano, mes - 1, dia, 12, 0, 0);
+  if (d.getDay() === 6) {
+    d.setDate(d.getDate() - 1);
+  } else {
+    const diff = (d.getDay() + 2) % 7;
+    d.setDate(d.getDate() - (diff === 0 ? 7 : diff));
+  }
+  const a = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const diaFmt = String(d.getDate()).padStart(2, '0');
+  return `${a}-${m}-${diaFmt}`;
+}
+
+/**
+ * Verifica se o agendamento para um determinado sábado está bloqueado por horário limite.
+ * REGRA OFICIAL VERMONT: A agenda para carregamento aos sábados é travada/encerrada toda sexta-feira às 14:00 (Brasília/Fortaleza).
+ */
+export function isAgendamentoSabadoBloqueado(dataSabadoStr) {
+  if (!dataSabadoStr || !isDataSabado(dataSabadoStr)) return false;
+
+  const { dataHoje, minutosTotais } = obterDataHoraAtualBrasil();
+  const sextaAnteriorStr = obterSextaFeiraAnterior(dataSabadoStr);
+  const limiteMinutosSexta = 14 * 60; // 14:00 = 840 minutos
+
+  // Se a data de hoje já for posterior à sexta-feira anterior (ex: é o próprio sábado ou data posterior)
+  if (dataHoje > sextaAnteriorStr) {
+    return true;
+  }
+
+  // Se a data de hoje for a sexta-feira anterior e o horário atual for igual ou posterior a 14:00
+  if (dataHoje === sextaAnteriorStr) {
+    return minutosTotais >= limiteMinutosSexta;
+  }
+
+  // Se a data de hoje for anterior à sexta-feira (ex: quinta, quarta, etc.), ainda está dentro do prazo
+  return false;
+}
+
+/**
+ * Retorna o status detalhado da trava de horário para agendamentos de sábado
+ */
+export function obterStatusTravaSabado(dataSabadoStr) {
+  if (!dataSabadoStr || !isDataSabado(dataSabadoStr)) {
+    return { isSabado: false, bloqueado: false, motivo: '' };
+  }
+
+  const { dataHoje, minutosTotais } = obterDataHoraAtualBrasil();
+  const sextaAnteriorStr = obterSextaFeiraAnterior(dataSabadoStr);
+  const limiteMinutosSexta = 14 * 60; // 14:00 = 840 minutos
+
+  let bloqueado = false;
+  let motivo = '';
+
+  if (dataHoje > sextaAnteriorStr) {
+    bloqueado = true;
+    motivo = `A agenda para este sábado (${formatarDataBR(dataSabadoStr)}) foi encerrada às 14:00 da sexta-feira anterior (${formatarDataBR(sextaAnteriorStr)}).`;
+  } else if (dataHoje === sextaAnteriorStr) {
+    if (minutosTotais >= limiteMinutosSexta) {
+      bloqueado = true;
+      motivo = `A agenda para o sábado (${formatarDataBR(dataSabadoStr)}) foi encerrada hoje às 14:00. Não é mais possível incluir novos agendamentos para este sábado.`;
+    } else {
+      const minutosRestantes = limiteMinutosSexta - minutosTotais;
+      const horasRest = Math.floor(minutosRestantes / 60);
+      const minsRest = minutosRestantes % 60;
+      motivo = `Atenção: A agenda deste sábado se encerrará hoje às 14:00 (${horasRest > 0 ? `${horasRest}h ` : ''}${minsRest}min restantes para agendar).`;
+    }
+  } else {
+    motivo = `Agendamentos para este sábado são aceitos até as 14:00 da sexta-feira (${formatarDataBR(sextaAnteriorStr)}).`;
+  }
+
+  return {
+    isSabado: true,
+    bloqueado,
+    motivo,
+    dataSabado: dataSabadoStr,
+    sextaAnterior: sextaAnteriorStr
+  };
+}
+
+/**
  * Conta a quantidade de veículos únicos (carros/cavalos mecânicos) a partir de uma lista de agendamentos
  */
 export function contarVeiculosUnicos(lista) {
@@ -1963,12 +2049,14 @@ export function contarVeiculosUnicos(lista) {
 }
 
 /**
- * Consulta a quantidade de agendamentos no sábado para verificar limite de 12 veículos
+ * Consulta a quantidade de agendamentos no sábado para verificar limite de 12 veículos e status de trava de horário
  */
 export async function obterOcupacaoSabado(dataStr, pedreira = null) {
   try {
+    const statusTrava = obterStatusTravaSabado(dataStr);
+
     if (!dataStr) {
-      return { total: 0, limite: 12, disponivel: 12, lotado: false, totalBlocos: 0 };
+      return { total: 0, limite: 12, disponivel: 12, lotado: false, totalBlocos: 0, bloqueado: false, motivoTrava: '' };
     }
 
     const idsExcluidos = obterIdsExcluidos();
@@ -2037,12 +2125,14 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
       total: totalVeiculos, 
       limite, 
       disponivel, 
-      lotado,
-      totalBlocos: filtrados.length 
+      lotado, 
+      totalBlocos: filtrados.length,
+      bloqueado: statusTrava.bloqueado,
+      motivoTrava: statusTrava.motivo
     };
   } catch (err) {
     console.error('Erro ao verificar ocupação do sábado:', err);
-    return { total: 0, limite: 12, disponivel: 12, lotado: false, totalBlocos: 0 };
+    return { total: 0, limite: 12, disponivel: 12, lotado: false, totalBlocos: 0, bloqueado: false, motivoTrava: '' };
   }
 }
 
@@ -2785,14 +2875,18 @@ Portal de Agendamentos Polo Ceará`;
  */
 export async function salvarAgendamento(dados) {
   try {
-    if (dados.tipo_dia === 'sabado') {
+    if (dados.tipo_dia === 'sabado' || isDataSabado(dados.data_agendamento)) {
       if (!isPedreiraUruoca(dados.pedreira)) {
         throw new Error('Aos sábados, o carregamento está disponível exclusivamente para a pedreira de Uruoca - CE (Taj Mahal). Nas demais pedreiras, os carregamentos ocorrem de segunda a sexta-feira.');
       }
 
+      if (isAgendamentoSabadoBloqueado(dados.data_agendamento)) {
+        throw new Error(`A agenda para o sábado (${formatarDataBR(dados.data_agendamento)}) foi encerrada. Conforme regra operacional, as solicitações para carregamento no sábado devem ser realizadas impreterivelmente até as 14:00 da sexta-feira anterior.`);
+      }
+
       const { lotado } = await obterOcupacaoSabado(dados.data_agendamento, dados.pedreira);
       if (lotado) {
-        throw new Error(`Limite máximo de 12 veículos para o sábado (${dados.data_agendamento}) na pedreira de Uruoca já foi atingido. Escolha outra data.`);
+        throw new Error(`Limite máximo de 12 veículos para o sábado (${formatarDataBR(dados.data_agendamento)}) na pedreira de Uruoca já foi atingido. Escolha outra data.`);
       }
     } else if (dados.tipo_dia === 'dia_util' && dados.horario_agendamento !== 'outros') {
       if (isHorarioPassado(dados.data_agendamento, dados.horario_agendamento)) {
@@ -2946,13 +3040,16 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
     for (let i = 0; i < totalPontos; i++) {
       const p = listaPontos[i];
       const numPonto = i + 1;
-      if (p.tipo_dia === 'sabado') {
+      if (p.tipo_dia === 'sabado' || isDataSabado(p.data_agendamento)) {
         if (!isPedreiraUruoca(p.pedreira)) {
           throw new Error(`[${numPonto}º Carregamento] Aos sábados, o carregamento está disponível exclusivamente para a pedreira de Uruoca - CE (Taj Mahal).`);
         }
+        if (isAgendamentoSabadoBloqueado(p.data_agendamento)) {
+          throw new Error(`[${numPonto}º Carregamento] A agenda para o sábado (${formatarDataBR(p.data_agendamento)}) foi encerrada. As solicitações para carregamento no sábado devem ser realizadas até as 14:00 da sexta-feira anterior.`);
+        }
         const { lotado } = await obterOcupacaoSabado(p.data_agendamento, p.pedreira);
         if (lotado) {
-          throw new Error(`[${numPonto}º Carregamento] Limite máximo de 12 veículos para o sábado (${p.data_agendamento}) na pedreira de Uruoca já foi atingido.`);
+          throw new Error(`[${numPonto}º Carregamento] Limite máximo de 12 veículos para o sábado (${formatarDataBR(p.data_agendamento)}) na pedreira de Uruoca já foi atingido.`);
         }
       } else if (p.tipo_dia === 'dia_util' && p.horario_agendamento !== 'outros') {
         if (isHorarioPassado(p.data_agendamento, p.horario_agendamento)) {
