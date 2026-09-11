@@ -307,6 +307,20 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         const razao = resultado.empresa.razao_social;
         if (pontoNum === 1) {
           handleChange('cliente', razao);
+          if (tipoCarregamento === 'combinado') {
+            setPonto2(prev => ({
+              ...prev,
+              cliente: prev.cliente ? prev.cliente : razao,
+              cliente_cnpj: prev.cliente_cnpj ? prev.cliente_cnpj : formatado
+            }));
+            if (qtdBlocosCombinados === 3) {
+              setPonto3(prev => ({
+                ...prev,
+                cliente: prev.cliente ? prev.cliente : razao,
+                cliente_cnpj: prev.cliente_cnpj ? prev.cliente_cnpj : formatado
+              }));
+            }
+          }
         } else if (pontoNum === 2) {
           handlePonto2Change('cliente', razao);
         } else {
@@ -553,6 +567,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       ...prev,
       numero_bloco: (blocos[1] || '').toUpperCase(),
       cliente: prev.cliente || formData.cliente,
+      cliente_cnpj: prev.cliente_cnpj || formData.cliente_cnpj,
       pedreira: formData.pedreira,
       material: formData.material,
       data_agendamento: formData.data_agendamento,
@@ -563,6 +578,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         ...prev,
         numero_bloco: (blocos[2] || '').toUpperCase(),
         cliente: prev.cliente || formData.cliente,
+        cliente_cnpj: prev.cliente_cnpj || formData.cliente_cnpj,
         pedreira: formData.pedreira,
         material: formData.material,
         data_agendamento: formData.data_agendamento,
@@ -1235,11 +1251,80 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               </div>
             </div>
 
-            {/* BLOCO 2: Data & Horário (Simples) */}
+            {/* BLOCO 2: Dados do Cliente Destinatário (Simples) */}
+            <div className="glass-panel animate-fade" style={{ padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
+                <Building2 size={20} color="var(--vermont-green-light)" />
+                <h2 style={{ fontSize: '1.15rem', margin: 0 }}>2. Dados do Cliente Destinatário</h2>
+              </div>
+
+              <div className="form-grid-2">
+                {/* CNPJ do Destinatário com Consulta em Tempo Real na Receita Federal */}
+                <div className="form-group animate-fade">
+                  <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
+                    <span>CNPJ do Destinatário / Cliente</span>
+                    {statusCNPJCliente.buscando && (
+                      <span style={{ fontSize: '0.72rem', color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} /> Consultando Receita Federal...
+                      </span>
+                    )}
+                    {statusCNPJCliente.valido === false && (
+                      <span style={{ fontSize: '0.72rem', color: '#f87171', fontWeight: 600 }}>
+                        ❌ CNPJ Inválido
+                      </span>
+                    )}
+                    {statusCNPJCliente.encontrado && (
+                      <span style={{ fontSize: '0.72rem', color: '#4ade80', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <Building2 size={12} /> Receita Federal OK ({statusCNPJCliente.situacao})
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="00.000.000/0000-00"
+                    maxLength={18}
+                    value={formData.cliente_cnpj}
+                    onChange={(e) => handleCNPJClienteChange(e.target.value, 1)}
+                    required
+                    style={{
+                      borderColor: statusCNPJCliente.valido === false ? '#ef4444' : statusCNPJCliente.encontrado ? '#00a83e' : undefined
+                    }}
+                  />
+                  {statusCNPJCliente.valido === false && (
+                    <span className="animate-fade" style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 2, fontWeight: 600 }}>
+                      ⚠️ {statusCNPJCliente.erro}
+                    </span>
+                  )}
+                </div>
+
+                {/* Razão Social / Nome do Cliente */}
+                <div className="form-group">
+                  <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
+                    <span>Cliente / Destinatário</span>
+                    {statusCNPJCliente.encontrado && (
+                      <span style={{ fontSize: '0.7rem', color: '#86efac', fontWeight: 500 }}>
+                        Auto-preenchido via Receita
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Razão Social ou Nome Fantasia do Destinatário"
+                    value={formData.cliente}
+                    onChange={(e) => handleChange('cliente', e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* BLOCO 3: Data & Horário (Simples) */}
             <div className="glass-panel animate-fade" style={{ padding: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
                 <Calendar size={20} color="var(--vermont-green-light)" />
-                <h2 style={{ fontSize: '1.15rem', margin: 0 }}>2. Data & Horário de Carregamento</h2>
+                <h2 style={{ fontSize: '1.15rem', margin: 0 }}>3. Data & Horário de Carregamento</h2>
               </div>
 
               <div className="form-grid-2">
@@ -2109,74 +2194,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 10 }}>
             <Truck size={20} color="var(--vermont-green-light)" />
             <h2 style={{ fontSize: '1.15rem', margin: 0 }}>
-              {tipoCarregamento === 'combinado' ? '3. Dados do Transporte & Veículo (Compartilhado)' : '3. Dados do Transporte & Veículo'}
+              {tipoCarregamento === 'combinado' ? '3. Dados do Transporte & Veículo (Compartilhado)' : '4. Dados do Transporte & Veículo'}
             </h2>
           </div>
 
           <div className="form-grid-2">
-            {/* CNPJ do Destinatário com Consulta em Tempo Real na Receita Federal (Modo Simples) */}
-            {tipoCarregamento === 'simples' && (
-              <>
-                <div className="form-group animate-fade">
-                  <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
-                    <span>CNPJ do Destinatário / Cliente</span>
-                    {statusCNPJCliente.buscando && (
-                      <span style={{ fontSize: '0.72rem', color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} /> Consultando Receita Federal...
-                      </span>
-                    )}
-                    {statusCNPJCliente.valido === false && (
-                      <span style={{ fontSize: '0.72rem', color: '#f87171', fontWeight: 600 }}>
-                        ❌ CNPJ Inválido
-                      </span>
-                    )}
-                    {statusCNPJCliente.encontrado && (
-                      <span style={{ fontSize: '0.72rem', color: '#4ade80', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <Building2 size={12} /> Receita Federal OK ({statusCNPJCliente.situacao})
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="00.000.000/0000-00"
-                    maxLength={18}
-                    value={formData.cliente_cnpj}
-                    onChange={(e) => handleCNPJClienteChange(e.target.value, 1)}
-                    required
-                    style={{
-                      borderColor: statusCNPJCliente.valido === false ? '#ef4444' : statusCNPJCliente.encontrado ? '#00a83e' : undefined
-                    }}
-                  />
-                  {statusCNPJCliente.valido === false && (
-                    <span className="animate-fade" style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 2, fontWeight: 600 }}>
-                      ⚠️ {statusCNPJCliente.erro}
-                    </span>
-                  )}
-                </div>
-
-                {/* Razão Social / Nome do Cliente */}
-                <div className="form-group">
-                  <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
-                    <span>Cliente / Destinatário</span>
-                    {statusCNPJCliente.encontrado && (
-                      <span style={{ fontSize: '0.7rem', color: '#86efac', fontWeight: 500 }}>
-                        Auto-preenchido via Receita
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Razão Social ou Nome Fantasia do Destinatário"
-                    value={formData.cliente}
-                    onChange={(e) => handleChange('cliente', e.target.value)}
-                    required
-                  />
-                </div>
-              </>
-            )}
-
             {/* CNPJ da Transportadora com Consulta em Tempo Real na Receita Federal */}
             <div className="form-group animate-fade">
               <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>

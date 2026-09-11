@@ -290,7 +290,52 @@ export function ModalEditarAgendamento({
             </div>
           </div>
 
-          {/* Seção 2: Data e Horário */}
+          {/* Seção 2: Cliente Destinatário */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid rgba(255, 255, 255, 0.06)',
+            borderRadius: 10,
+            padding: '16px 18px'
+          }}>
+            <strong style={{ color: '#4ade80', fontSize: '0.88rem', display: 'block', marginBottom: 12 }}>
+              🏢 Cliente Destinatário
+            </strong>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">CNPJ Destinatário</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="00.000.000/0000-00"
+                  maxLength={18}
+                  value={formData.cliente_cnpj}
+                  onChange={(e) => {
+                    const nums = e.target.value.replace(/\D/g, '').slice(0, 14);
+                    let fmt = nums;
+                    if (nums.length > 2) fmt = `${nums.slice(0, 2)}.${nums.slice(2)}`;
+                    if (nums.length > 5) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5)}`;
+                    if (nums.length > 8) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8)}`;
+                    if (nums.length > 12) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8, 12)}-${nums.slice(12)}`;
+                    handleChange('cliente_cnpj', fmt);
+                  }}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Cliente Destinatário</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Razão Social ou Nome Fantasia"
+                  value={formData.cliente}
+                  onChange={(e) => handleChange('cliente', e.target.value.toUpperCase())}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção 3: Data e Horário */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.02)',
             border: '1px solid rgba(255, 255, 255, 0.06)',
@@ -322,36 +367,6 @@ export function ModalEditarAgendamento({
                   value={formData.horario_agendamento}
                   onChange={(e) => handleChange('horario_agendamento', e.target.value)}
                   required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">CNPJ Destinatário</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="00.000.000/0000-00"
-                  maxLength={18}
-                  value={formData.cliente_cnpj}
-                  onChange={(e) => {
-                    const nums = e.target.value.replace(/\D/g, '').slice(0, 14);
-                    let fmt = nums;
-                    if (nums.length > 2) fmt = `${nums.slice(0, 2)}.${nums.slice(2)}`;
-                    if (nums.length > 5) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5)}`;
-                    if (nums.length > 8) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8)}`;
-                    if (nums.length > 12) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8, 12)}-${nums.slice(12)}`;
-                    handleChange('cliente_cnpj', fmt);
-                  }}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Cliente Destinatário</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={formData.cliente}
-                  onChange={(e) => handleChange('cliente', e.target.value.toUpperCase())}
                 />
               </div>
             </div>

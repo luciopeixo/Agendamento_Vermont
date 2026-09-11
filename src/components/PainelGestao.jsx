@@ -1006,10 +1006,7 @@ export function PainelGestao({
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, maxWidth: 800 }}>
           <Mail size={22} color="#4ade80" style={{ flexShrink: 0, marginTop: 2 }} />
           <div style={{ fontSize: '0.86rem' }}>
-            <strong style={{ color: '#fff' }}>Notificações por E-mail para: </strong>
-            <span style={{ color: '#4ade80', fontWeight: 600 }}>
-              {EMAIL_NOTIFICACAO_DESTINO || 'E-mail Institucional da Logística (Configurado via .env)'}
-            </span>
+            <strong style={{ color: '#fff' }}>Notificações por E-mail</strong>
             <p style={{ margin: '3px 0 0 0', color: 'var(--slate-300)', fontSize: '0.8rem' }}>
               Cada agendamento e atualização é registrado com cópia imediata para a coordenação de logística.
             </p>
@@ -1556,7 +1553,7 @@ export function PainelGestao({
                           Bloco: {ag.numero_bloco}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
-                          Cliente: <strong style={{ color: 'var(--slate-200)' }}>{limparNomeEmpresa(ag.cliente)}</strong> {(ag.cliente_cnpj || resolverCnpjCliente(ag)) && <span style={{ fontSize: '0.72rem', color: '#60a5fa', fontFamily: 'monospace' }}>({ag.cliente_cnpj || resolverCnpjCliente(ag)})</span>}
+                          Cliente: <strong style={{ color: 'var(--slate-200)' }}>{limparNomeEmpresa(ag.cliente)}</strong>
                         </div>
                         <div style={{ fontSize: '0.74rem', color: 'var(--slate-500)' }}>
                           Transp: {limparNomeEmpresa(ag.transportadora)} {(ag.transportadora_cnpj || resolverCnpjTransportadora(ag)) && <span style={{ fontSize: '0.70rem', color: '#60a5fa', fontFamily: 'monospace' }}>({ag.transportadora_cnpj || resolverCnpjTransportadora(ag)})</span>}
@@ -1802,17 +1799,6 @@ export function PainelGestao({
                           >
                             <FileText size={14} />
                             Ver
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleReenviarEmail(ag)}
-                            className="btn btn-secondary"
-                            style={{ padding: '6px 8px', fontSize: '0.78rem' }}
-                            disabled={notificandoEmailId === ag.id}
-                            title="Reenviar e-mail de notificação para a logística"
-                          >
-                            <Mail size={14} color="var(--info)" />
                           </button>
 
                           {/* BOTÃO EXCLUIR AGENDAMENTO (Exclusivo para ADMIN GERAL) */}

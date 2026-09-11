@@ -501,7 +501,17 @@ const CNPJ_CONHECIDOS_PADRAO = {
   'FBSLOGISTICAETRANSPORTELTDA': '49.131.491/0001-07',
   'FBSLOGISTICA': '49.131.491/0001-07',
   'FBSLOGISTICALTDA': '49.131.491/0001-07',
-  'FBSTRANSPORTES': '49.131.491/0001-07'
+  'FBSTRANSPORTES': '49.131.491/0001-07',
+  // Bruno Lucchetti do Brasil Comércio, Importação e Exportação de Rochas Ornamentais Ltda
+  'BRUNOLUCCHETTI': '07.825.404/0001-63',
+  'BRUNOLUCCHETTIDOBRASIL': '07.825.404/0001-63',
+  'BRUNOLUCCHETTIDOBRASILCOMERCIO': '07.825.404/0001-63',
+  'BRUNOLUCCHETTIDOBRASILCOMERCIOIMPORTACAO': '07.825.404/0001-63',
+  'BRUNOLUCCHETTIDOBRASILCOMERCIOIMPORTACAOEXPORTACAODEROCHASORNAMENTAISLTDA': '07.825.404/0001-63',
+  // GMA Transportes Ltda
+  'GMATRANSPORTES': '09.201.403/0002-54',
+  'GMATRANSPORTESLTDA': '09.201.403/0002-54',
+  'GMATRANSPORTE': '09.201.403/0002-54'
 };
 
 /**
@@ -1134,6 +1144,58 @@ export function normalizarHistoricoStatus(hist) {
   return [];
 }
 
+/**
+ * Mescla e unifica duas listas de histórico (ex: Supabase e LocalStorage),
+ * eliminando duplicatas por ID/Timestamp e ordenando cronologicamente (mais recente primeiro).
+ * Isso garante que NUNCA haja perda ou desaparecimento de histórico de alterações.
+ */
+export function fundirHistoricosStatus(histA = [], histB = []) {
+  const normA = normalizarHistoricoStatus(histA);
+  const normB = normalizarHistoricoStatus(histB);
+  if (normA.length === 0) return normB;
+  if (normB.length === 0) return normA;
+
+  const mapa = new Map();
+
+  const extrairTimestamp = (item) => {
+    if (!item?.data_hora) return 0;
+    const t = new Date(item.data_hora).getTime();
+    return isNaN(t) ? 0 : t;
+  };
+
+  const gerarChave = (item) => {
+    if (item.id && typeof item.id === 'string' && !item.id.startsWith('temp_')) {
+      return item.id;
+    }
+    const dh = item.data_hora ? new Date(item.data_hora).toISOString() : '';
+    const st = item.status_novo || item.status || '';
+    const tp = item.tipo || '';
+    const desc = item.descricao || '';
+    const usr = item.usuario_nome || item.usuario_email || '';
+    return `${dh}_${st}_${tp}_${desc}_${usr}`;
+  };
+
+  // Processa B primeiro, depois A (para que A possa enriquecer ou sobrescrever B se tiver mais dados)
+  for (const item of [...normB, ...normA]) {
+    if (!item || typeof item !== 'object') continue;
+    const chave = gerarChave(item);
+    if (!mapa.has(chave)) {
+      mapa.set(chave, item);
+    } else {
+      const existente = mapa.get(chave);
+      mapa.set(chave, {
+        ...existente,
+        ...item,
+        alteracoes: (item.alteracoes && item.alteracoes.length > 0) ? item.alteracoes : existente.alteracoes
+      });
+    }
+  }
+
+  const resultado = Array.from(mapa.values());
+  resultado.sort((a, b) => extrairTimestamp(b) - extrairTimestamp(a));
+  return resultado;
+}
+
 export function obterAgendamentosLocais() {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -1160,6 +1222,9 @@ export function salvarAgendamentoLocal(registro) {
     const clienteCnpj = registro.cliente_cnpj || (idxExistente !== -1 ? lista[idxExistente].cliente_cnpj : null) || resolverCnpjCliente(registro);
     const transportadoraCnpj = registro.transportadora_cnpj || (idxExistente !== -1 ? lista[idxExistente].transportadora_cnpj : null) || resolverCnpjTransportadora(registro);
 
+    const histExistente = idxExistente !== -1 ? lista[idxExistente].historico_status : [];
+    const histFinal = fundirHistoricosStatus(registro.historico_status, histExistente);
+
     const itemMesclado = {
       ...(idxExistente !== -1 ? lista[idxExistente] : {}),
       ...registro,
@@ -1168,7 +1233,7 @@ export function salvarAgendamentoLocal(registro) {
       cliente_cnpj: clienteCnpj || null,
       transportadora: limparNomeEmpresa(registro.transportadora || (idxExistente !== -1 ? lista[idxExistente].transportadora : '')),
       transportadora_cnpj: transportadoraCnpj || null,
-      historico_status: normalizarHistoricoStatus(registro.historico_status),
+      historico_status: histFinal,
       created_at: (idxExistente !== -1 ? lista[idxExistente].created_at : null) || registro.created_at || new Date().toISOString()
     };
 
@@ -1264,9 +1329,7 @@ export function registrarHistoricoEdicao(itemAtual = {}, itemAtualizado = {}, us
   const histItemAtualizado = normalizarHistoricoStatus(itemAtualizado.historico_status);
   const histItemAtual = normalizarHistoricoStatus(itemAtual.historico_status);
 
-  let historicoBase = histItemAtualizado.length > 0
-    ? [...histItemAtualizado]
-    : (histItemAtual.length > 0 ? [...histItemAtual] : []);
+  let historicoBase = fundirHistoricosStatus(histItemAtualizado, histItemAtual);
 
   const dataHora = new Date().toISOString();
   const usuarioNome = usuarioInfo.nome || usuarioInfo.email?.split('@')[0]?.toUpperCase() || 'SISTEMA';
@@ -1357,13 +1420,14 @@ export function atualizarAgendamentoLocalCompleto(agendamentoAtualizado, usuario
     const index = lista.findIndex(item => item.id === agendamentoAtualizado.id);
     if (index !== -1) {
       const itemAtual = lista[index];
-      const historico = normalizarHistoricoStatus(agendamentoAtualizado.historico_status).length > 0 
-        ? normalizarHistoricoStatus(agendamentoAtualizado.historico_status) 
-        : registrarHistoricoEdicao(itemAtual, agendamentoAtualizado, usuarioInfo);
+      const historicoNovo = normalizarHistoricoStatus(agendamentoAtualizado.historico_status);
+      const historicoExistente = normalizarHistoricoStatus(itemAtual.historico_status);
+      const historicoFinal = fundirHistoricosStatus(historicoNovo, historicoExistente);
+
       lista[index] = { 
         ...lista[index], 
         ...agendamentoAtualizado, 
-        historico_status: historico,
+        historico_status: historicoFinal,
         ultimo_editor: usuarioInfo.nome || usuarioInfo.email || itemAtual.ultimo_editor || 'Sistema',
         updated_at: new Date().toISOString() 
       };
@@ -1446,7 +1510,7 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
     if (isSupabaseConfigurado()) {
       try {
         // 1. Tenta atualizar incluindo colunas de auditoria
-        const { data, error } = await supabase
+        let resSup = await supabase
           .from('agendamentos_pedreira')
           .update({
             ...payloadBase,
@@ -1457,10 +1521,26 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
           .select()
           .single();
 
-        if (!error && data) {
-          resultado = data;
-        } else if (error) {
-          console.warn('Erro ao atualizar com campos de auditoria no Supabase. Tentando campos padrão:', error.message);
+        // 1.1 Se falhar, tenta com JSON string caso a coluna seja tipo text
+        if (resSup.error) {
+          try {
+            resSup = await supabase
+              .from('agendamentos_pedreira')
+              .update({
+                ...payloadBase,
+                historico_status: JSON.stringify(historicoAtualizado),
+                ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema'
+              })
+              .eq('id', agendamentoAtualizado.id)
+              .select()
+              .single();
+          } catch (eStr) {}
+        }
+
+        if (!resSup.error && resSup.data) {
+          resultado = resSup.data;
+        } else if (resSup.error) {
+          console.warn('Erro ao atualizar com campos de auditoria no Supabase. Tentando campos padrão:', resSup.error.message);
           // 2. Se falhar (ex: colunas extras não criadas no Supabase), atualiza os campos padrão da tabela
           const { data: dataPadrao, error: errorPadrao } = await supabase
             .from('agendamentos_pedreira')
@@ -1508,6 +1588,11 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
     const clienteCnpj = agendamentoAtualizado.cliente_cnpj || (resultado && resultado.cliente_cnpj) || (itemAtual && itemAtual.cliente_cnpj) || resolverCnpjCliente(agendamentoAtualizado);
     const transpCnpj = agendamentoAtualizado.transportadora_cnpj || (resultado && resultado.transportadora_cnpj) || (itemAtual && itemAtual.transportadora_cnpj) || resolverCnpjTransportadora(agendamentoAtualizado);
 
+    const histConsolidado = fundirHistoricosStatus(
+      historicoAtualizado,
+      resultado?.historico_status || itemAtual?.historico_status
+    );
+
     const dadosConsolidados = {
       ...itemAtual,
       ...agendamentoAtualizado,
@@ -1516,7 +1601,7 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
       cliente_cnpj: clienteCnpj || null,
       transportadora: transpLimpa,
       transportadora_cnpj: transpCnpj || null,
-      historico_status: historicoAtualizado
+      historico_status: histConsolidado
     };
 
     const localAtualizado = atualizarAgendamentoLocalCompleto(dadosConsolidados, usuarioInfo);
@@ -1794,7 +1879,7 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
             const loc = locaisMap.get(item.id);
             const histSup = normalizarHistoricoStatus(item.historico_status);
             const histLoc = normalizarHistoricoStatus(loc?.historico_status);
-            const historicoFinal = histSup.length > 0 ? histSup : histLoc;
+            const historicoFinal = fundirHistoricosStatus(histSup, histLoc);
 
             const clienteCnpj = resolverCnpjCliente(item, loc);
             const transpCnpj = resolverCnpjTransportadora(item, loc);
@@ -1881,7 +1966,7 @@ export async function listarAgendamentos(filtros = {}) {
             const loc = locaisMap.get(String(item.id));
             const histSup = normalizarHistoricoStatus(item.historico_status);
             const histLoc = normalizarHistoricoStatus(loc?.historico_status);
-            const historicoFinal = histSup.length > 0 ? histSup : histLoc;
+            const historicoFinal = fundirHistoricosStatus(histSup, histLoc);
 
             const clienteCnpj = resolverCnpjCliente(item, loc);
             const transpCnpj = resolverCnpjTransportadora(item, loc);
@@ -1928,18 +2013,20 @@ export async function listarAgendamentos(filtros = {}) {
             listaUnificada = listaUnificada.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
           }
 
-          // Mantém localStorage sempre sincronizado sem perder dados enriquecidos
+          // Mantém localStorage sempre sincronizado sem perder dados enriquecidos ou histórico
           try {
             const mapaAtualizado = new Map(locais.map(l => [String(l.id), l]));
             listaSup.forEach(item => {
               const anterior = mapaAtualizado.get(String(item.id)) || {};
+              const histMesclado = fundirHistoricosStatus(item.historico_status, anterior.historico_status);
               mapaAtualizado.set(String(item.id), {
                 ...anterior,
                 ...item,
                 cliente: item.cliente || anterior.cliente,
                 cliente_cnpj: item.cliente_cnpj || anterior.cliente_cnpj || null,
                 transportadora: item.transportadora || anterior.transportadora,
-                transportadora_cnpj: item.transportadora_cnpj || anterior.transportadora_cnpj || null
+                transportadora_cnpj: item.transportadora_cnpj || anterior.transportadora_cnpj || null,
+                historico_status: histMesclado
               });
             });
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(Array.from(mapaAtualizado.values())));
@@ -2037,7 +2124,7 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
     if (isSupabaseConfigurado()) {
       try {
         // 1. Tenta atualizar com colunas de auditoria
-        const { data, error } = await supabase
+        let resSup = await supabase
           .from('agendamentos_pedreira')
           .update({ 
             status: novoStatus,
@@ -2048,13 +2135,29 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
           .select()
           .single();
 
-        if (!error && data) {
+        // 1.1 Se falhar, tenta com JSON string caso a coluna seja tipo text
+        if (resSup.error) {
+          try {
+            resSup = await supabase
+              .from('agendamentos_pedreira')
+              .update({ 
+                status: novoStatus,
+                historico_status: JSON.stringify(historicoAtualizado),
+                ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema'
+              })
+              .eq('id', id)
+              .select()
+              .single();
+          } catch (eStr) {}
+        }
+
+        if (!resSup.error && resSup.data) {
           atualizado = {
-            ...data,
-            historico_status: normalizarHistoricoStatus(data.historico_status || historicoAtualizado)
+            ...resSup.data,
+            historico_status: normalizarHistoricoStatus(resSup.data.historico_status || historicoAtualizado)
           };
-        } else if (error) {
-          console.warn('Tentando atualizar apenas status básico no Supabase:', error.message);
+        } else if (resSup.error) {
+          console.warn('Tentando atualizar apenas status básico no Supabase:', resSup.error.message);
           // 2. Se falhar (ex: colunas extras inexistentes no Supabase), atualiza apenas o status
           const { data: dataSimples, error: errorSimples } = await supabase
             .from('agendamentos_pedreira')
@@ -2076,12 +2179,14 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
     const clienteCnpj = (itemAtual && itemAtual.cliente_cnpj) || (local && local.cliente_cnpj) || (atualizado && atualizado.cliente_cnpj) || resolverCnpjCliente(itemAtual);
     const transpCnpj = (itemAtual && itemAtual.transportadora_cnpj) || (local && local.transportadora_cnpj) || (atualizado && atualizado.transportadora_cnpj) || resolverCnpjTransportadora(itemAtual);
 
+    const histRetorno = fundirHistoricosStatus(historicoAtualizado, local?.historico_status || atualizado?.historico_status);
+
     const objetoRetorno = {
       ...(itemAtual || {}),
       ...(atualizado || local || {}),
       id,
       status: novoStatus,
-      historico_status: historicoAtualizado,
+      historico_status: histRetorno,
       cliente: limparNomeEmpresa(itemAtual?.cliente || local?.cliente || atualizado?.cliente),
       cliente_cnpj: clienteCnpj || null,
       transportadora: limparNomeEmpresa(itemAtual?.transportadora || local?.transportadora || atualizado?.transportadora),
