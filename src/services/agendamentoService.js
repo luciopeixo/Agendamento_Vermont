@@ -341,6 +341,20 @@ export async function salvarMotoristaNaBase(dadosMotorista = {}) {
 }
 
 /**
+ * Formata sequência numérica como CPF padrão XXX.XXX.XXX-XX
+ */
+export function formatarCPF(valor = '') {
+  if (!valor) return '';
+  const nums = String(valor).replace(/\D/g, '').slice(0, 11);
+  if (!nums) return '';
+  let fmt = nums;
+  if (nums.length > 3) fmt = `${nums.slice(0, 3)}.${nums.slice(3)}`;
+  if (nums.length > 6) fmt = `${nums.slice(0, 3)}.${nums.slice(3, 6)}.${nums.slice(6)}`;
+  if (nums.length > 9) fmt = `${nums.slice(0, 3)}.${nums.slice(3, 6)}.${nums.slice(6, 9)}-${nums.slice(9)}`;
+  return fmt;
+}
+
+/**
  * Consulta um motorista pelo CPF na base interna e no histórico (com suporte a criptografia Supabase)
  */
 export async function consultarMotoristaPorCPF(cpf = '') {
@@ -362,9 +376,14 @@ export async function consultarMotoristaPorCPF(cpf = '') {
     };
   }
 
+  const cpfFormatado = formatarCPF(cpfLimpo);
+
   // 2. Busca na base local (cadastros e sementes protegidos)
   const baseLocal = obterBaseMotoristas();
-  const encontradoLocal = baseLocal.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
+  const encontradoLocal = baseLocal.find(m => {
+    const mCpf = String(m.cpf || '').replace(/\D/g, '');
+    return mCpf === cpfLimpo;
+  });
 
   if (encontradoLocal && encontradoLocal.nome) {
     const transpNome = limparNomeEmpresa(encontradoLocal.transportadora || '');
@@ -411,7 +430,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
       const { data: dataBase, error: errorBase } = await supabase
         .from('base_motoristas')
         .select('nome, telefone, transportadora')
-        .eq('cpf', cpfLimpo)
+        .or(`cpf.eq.${cpfLimpo},cpf.eq.${cpfFormatado}`)
         .limit(1);
 
       if (!errorBase && dataBase && dataBase.length > 0 && dataBase[0].nome) {
@@ -432,7 +451,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
       const { data, error } = await supabase
         .from('agendamentos_pedreira')
         .select('motorista_nome, motorista_telefone, transportadora, tipo_veiculo, placa_cavalo, placa_carreta, placa_carreta_2')
-        .eq('motorista_cpf', cpfLimpo)
+        .or(`motorista_cpf.eq.${cpfLimpo},motorista_cpf.eq.${cpfFormatado}`)
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -456,7 +475,10 @@ export async function consultarMotoristaPorCPF(cpf = '') {
 
   // 4. Busca no histórico de agendamentos locais
   const agendamentosLocais = obterAgendamentosLocais();
-  const agLocal = agendamentosLocais.find(a => a.motorista_cpf && a.motorista_cpf.replace(/\D/g, '') === cpfLimpo && a.motorista_nome);
+  const agLocal = agendamentosLocais.find(a => {
+    const rawC = String(a.motorista_cpf || '').replace(/\D/g, '');
+    return rawC === cpfLimpo && a.motorista_nome;
+  });
   if (agLocal) {
     const transpNome = limparNomeEmpresa(agLocal.transportadora || '');
     const transpCnpj = agLocal.transportadora_cnpj || resolverCnpjTransportadora(agLocal) || null;
