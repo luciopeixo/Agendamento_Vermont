@@ -12,7 +12,8 @@ import {
   gerarLinkMailtoComprovante,
   resolverCnpjCliente,
   resolverCnpjTransportadora,
-  limparNomeEmpresa
+  limparNomeEmpresa,
+  limparObservacoesDuplicadas
 } from '../services/agendamentoService';
 
 export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
@@ -136,8 +137,8 @@ ${roteiroTextoWhats}
 🛣️ *Tipo de Veículo:* *${agendamento.tipo_veiculo}*
 ⚖️ *Placas:*
 ${placasFormatadasWhats}
-💼 *Cliente Destinatário:* *${clienteNome}* ${clienteCnpj ? `(CNPJ: ${clienteCnpj})` : ''}
-${agendamento.observacoes ? `\n📌 *Observações:* _${agendamento.observacoes}_\n` : ''}
+💼 *Cliente Destinatário:* *${clienteNome}*
+${agendamento.observacoes ? `\n📌 *Observações:* _${limparObservacoesDuplicadas(agendamento.observacoes)}_\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📄 *DOCUMENTOS OBRIGATÓRIOS NA PEDREIRA:*
 • Obrigatório apresentação de CRLVs do cavalo e carreta atualizados;
@@ -177,8 +178,8 @@ ${placasFormatadasWhats}
 📦 *DADOS DA CARGA:*
 🪨 *Material:* *${agendamento.material}*
 🏷️ *Nº do Bloco:* *${agendamento.numero_bloco}*
-💼 *Cliente Destinatário:* *${clienteNome}* ${clienteCnpj ? `(CNPJ: ${clienteCnpj})` : ''}
-${agendamento.observacoes ? `\n📌 *Observações:* _${agendamento.observacoes}_\n` : ''}
+💼 *Cliente Destinatário:* *${clienteNome}*
+${agendamento.observacoes ? `\n📌 *Observações:* _${limparObservacoesDuplicadas(agendamento.observacoes)}_\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 📄 *DOCUMENTOS OBRIGATÓRIOS NA PEDREIRA:*
 • Obrigatório apresentação de CRLVs do cavalo e carreta atualizados;
@@ -415,9 +416,6 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
               <div>
                 <span style={{ color: 'var(--slate-400)' }}>Cliente Destinatário:</span> <strong className="print-text-dark">{clienteNome}</strong>
               </div>
-              <div>
-                <span style={{ color: 'var(--slate-400)' }}>CNPJ Destinatário:</span> <strong className="print-text-dark" style={{ fontFamily: 'monospace' }}>{clienteCnpj || 'Não informado'}</strong>
-              </div>
 
               <div>
                 <span style={{ color: 'var(--slate-400)' }}>Transportadora:</span> <strong className="print-text-dark">{transportadoraNome}</strong>
@@ -446,7 +444,7 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
               {agendamento.observacoes && (
                 <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>
                   <span style={{ color: 'var(--slate-400)' }}>Observações:</span>{' '}
-                  <span style={{ color: 'var(--slate-300)' }} className="print-text-dark">{agendamento.observacoes}</span>
+                  <span style={{ color: 'var(--slate-300)' }} className="print-text-dark">{limparObservacoesDuplicadas(agendamento.observacoes)}</span>
                 </div>
               )}
             </div>

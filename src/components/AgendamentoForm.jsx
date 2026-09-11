@@ -876,22 +876,25 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return;
     }
 
-    // Validações de Justificativa para "Outros" (aceita justificativa específica ou observações gerais)
-    const justificativaPonto1 = (formData.justificativa_outros || formData.observacoes || '').trim();
-    if (tipoDia === 'dia_util' && formData.horario_agendamento === 'outros' && !justificativaPonto1) {
-      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 1º carregamento (ou no campo de Observações).');
+    // Validações de Justificativa para "Outros"
+    const isOutrosPonto1 = tipoDia === 'dia_util' && formData.horario_agendamento === 'outros';
+    const justificativaPonto1 = (formData.justificativa_outros || '').trim();
+    if (isOutrosPonto1 && !justificativaPonto1) {
+      setMensagemErro('Por favor, informe a justificativa ou horário pretendido na opção "Outros" do 1º carregamento.');
       return;
     }
 
-    const justificativaPonto2 = (ponto2.justificativa_outros || formData.observacoes || '').trim();
-    if (tipoCarregamento === 'combinado' && tipoDia2 === 'dia_util' && ponto2.horario_agendamento === 'outros' && !justificativaPonto2) {
-      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 2º carregamento (ou no campo de Observações).');
+    const isOutrosPonto2 = tipoCarregamento === 'combinado' && tipoDia2 === 'dia_util' && ponto2.horario_agendamento === 'outros';
+    const justificativaPonto2 = (ponto2.justificativa_outros || '').trim();
+    if (isOutrosPonto2 && !justificativaPonto2) {
+      setMensagemErro('Por favor, informe a justificativa ou horário pretendido na opção "Outros" do 2º carregamento.');
       return;
     }
 
-    const justificativaPonto3 = (ponto3.justificativa_outros || formData.observacoes || '').trim();
-    if (tipoCarregamento === 'combinado' && qtdBlocosCombinados === 3 && tipoDia3 === 'dia_util' && ponto3.horario_agendamento === 'outros' && !justificativaPonto3) {
-      setMensagemErro('Por favor, especifique o horário solicitado ou a justificativa na opção "Outros" do 3º carregamento (ou no campo de Observações).');
+    const isOutrosPonto3 = tipoCarregamento === 'combinado' && qtdBlocosCombinados === 3 && tipoDia3 === 'dia_util' && ponto3.horario_agendamento === 'outros';
+    const justificativaPonto3 = (ponto3.justificativa_outros || '').trim();
+    if (isOutrosPonto3 && !justificativaPonto3) {
+      setMensagemErro('Por favor, informe a justificativa ou horário pretendido na opção "Outros" do 3º carregamento.');
       return;
     }
 
@@ -910,7 +913,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           data_agendamento: formData.data_agendamento,
           tipo_dia: tipoDia,
           horario_agendamento: tipoDia === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : formData.horario_agendamento,
-          justificativa_outros: formData.justificativa_outros || formData.observacoes || null
+          justificativa_outros: isOutrosPonto1 ? justificativaPonto1 : null
         },
         ponto2: {
           pedreira: ponto2.pedreira,
@@ -921,7 +924,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           data_agendamento: ponto2.data_agendamento,
           tipo_dia: tipoDia2,
           horario_agendamento: tipoDia2 === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : ponto2.horario_agendamento,
-          justificativa_outros: ponto2.justificativa_outros || formData.observacoes || null
+          justificativa_outros: isOutrosPonto2 ? justificativaPonto2 : null
         },
         ponto3: qtdBlocosCombinados === 3 ? {
           pedreira: ponto3.pedreira,
@@ -932,7 +935,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           data_agendamento: ponto3.data_agendamento,
           tipo_dia: tipoDia3,
           horario_agendamento: tipoDia3 === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : ponto3.horario_agendamento,
-          justificativa_outros: ponto3.justificativa_outros || formData.observacoes || null
+          justificativa_outros: isOutrosPonto3 ? justificativaPonto3 : null
         } : null,
         veiculo: {
           cliente: formData.cliente,
@@ -946,7 +949,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           placa_carreta: formData.placa_carreta,
           placa_carreta_2: formData.placa_carreta_2,
           tipo_veiculo: formData.tipo_veiculo,
-          observacoes: formData.observacoes
+          observacoes: formData.observacoes ? formData.observacoes.trim() : null
         }
       });
     } else {
@@ -954,7 +957,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         ...formData,
         tipo_dia: tipoDia,
         horario_agendamento: tipoDia === 'sabado' ? 'Sábado - Cota do Dia (Até 12 Veículos)' : formData.horario_agendamento,
-        justificativa_outros: formData.justificativa_outros || formData.observacoes || null
+        justificativa_outros: isOutrosPonto1 ? justificativaPonto1 : null,
+        observacoes: formData.observacoes ? formData.observacoes.trim() : null
       };
       resultado = await salvarAgendamento(dadosParaSalvar);
     }

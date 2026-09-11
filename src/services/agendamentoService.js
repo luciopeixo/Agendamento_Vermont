@@ -927,6 +927,27 @@ export function sanitizarNumeroBloco(texto = '') {
 }
 
 /**
+ * Remove duplicações acidentais de justificativas embutidas no campo observações
+ */
+export function limparObservacoesDuplicadas(obs = '') {
+  if (!obs || typeof obs !== 'string') return '';
+  let str = obs.trim();
+  // Padrão: "TEXTO | [Horário: TEXTO]"
+  const regexDuplicado = /^(.*?)\s*\|\s*\[Horário:\s*\1\s*\]$/i;
+  const match = str.match(regexDuplicado);
+  if (match) {
+    return match[1].trim();
+  }
+  // Padrão: "[Horário: TEXTO]"
+  const regexHorario = /^\[Horário:\s*(.*?)\]$/i;
+  const matchH = str.match(regexHorario);
+  if (matchH) {
+    return matchH[1].trim();
+  }
+  return str;
+}
+
+/**
  * Extrai números de blocos individuais se o usuário digitou múltiplos blocos no mesmo campo
  * Exemplos aceitos: "1256926 - 1256972", "1256926 e 1256972", "1256926 / 1256972", "1256926, 1256972"
  */
@@ -2814,8 +2835,7 @@ export async function salvarAgendamento(dados) {
             placa_carreta: payload.placa_carreta,
             tipo_veiculo: payload.tipo_veiculo,
             data_agendamento: payload.data_agendamento,
-            horario_agendamento: payload.horario_agendamento,
-            observacoes: payload.justificativa_outros ? `${payload.observacoes ? payload.observacoes + ' | ' : ''}[Horário: ${payload.justificativa_outros}]` : payload.observacoes,
+            observacoes: payload.observacoes ? limparObservacoesDuplicadas(payload.observacoes) : null,
             status: payload.status
           };
 
