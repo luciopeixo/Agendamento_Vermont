@@ -443,14 +443,20 @@ export const CNPJ_EMPRESAS_KEY = 'vermont_cnpj_empresas_cache';
  * Formata qualquer número ou sequência como CNPJ padrão brasileiro XX.XXX.XXX/XXXX-XX
  */
 export function formatarCNPJ(valor = '') {
-  if (!valor) return '';
-  const nums = String(valor).replace(/\D/g, '').slice(0, 14);
-  if (!nums) return '';
-  let fmt = nums;
-  if (nums.length > 2) fmt = `${nums.slice(0, 2)}.${nums.slice(2)}`;
-  if (nums.length > 5) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5)}`;
-  if (nums.length > 8) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8)}`;
-  if (nums.length > 12) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8, 12)}-${nums.slice(12)}`;
+  if (!valor && valor !== 0) return '';
+  const str = String(valor).trim();
+  const nums = str.replace(/\D/g, '');
+  if (!nums) return str;
+  // Se for 14 dígitos ou 13 dígitos (quando perde o zero à esquerda)
+  const limpo = (nums.length === 13 || (nums.length < 14 && nums.length >= 11 && str.includes('/'))) ? nums.padStart(14, '0') : nums.slice(0, 14);
+  if (limpo.length === 14) {
+    return limpo.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  }
+  let fmt = limpo;
+  if (limpo.length > 2) fmt = `${limpo.slice(0, 2)}.${limpo.slice(2)}`;
+  if (limpo.length > 5) fmt = `${limpo.slice(0, 2)}.${limpo.slice(2, 5)}.${limpo.slice(5)}`;
+  if (limpo.length > 8) fmt = `${limpo.slice(0, 2)}.${limpo.slice(2, 5)}.${limpo.slice(5, 8)}/${limpo.slice(8)}`;
+  if (limpo.length > 12) fmt = `${limpo.slice(0, 2)}.${limpo.slice(2, 5)}.${limpo.slice(5, 8)}/${limpo.slice(8, 12)}-${limpo.slice(12)}`;
   return fmt;
 }
 
@@ -603,18 +609,14 @@ export function extrairCnpj(texto = '') {
 export function resolverCnpjCliente(agendamento = {}, localItem = null) {
   if (!agendamento) return null;
 
-  const direto = agendamento.cliente_cnpj ? String(agendamento.cliente_cnpj).trim() : null;
-  if (direto && direto.replace(/\D/g, '').length === 14) {
-    const fmt = formatarCNPJ(direto);
-    salvarEmpresaCnpjCache(agendamento.cliente, fmt);
-    return fmt;
-  }
-
-  const localCnpj = localItem?.cliente_cnpj ? String(localItem.cliente_cnpj).trim() : null;
-  if (localCnpj && localCnpj.replace(/\D/g, '').length === 14) {
-    const fmt = formatarCNPJ(localCnpj);
-    salvarEmpresaCnpjCache(agendamento.cliente || localItem.cliente, fmt);
-    return fmt;
+  const campoDireto = agendamento.cliente_cnpj || agendamento.cnpj_cliente || agendamento.destinatario_cnpj || localItem?.cliente_cnpj || localItem?.cnpj_cliente || localItem?.destinatario_cnpj;
+  if (campoDireto) {
+    const strDireto = String(campoDireto).trim();
+    if (strDireto) {
+      const fmt = formatarCNPJ(strDireto);
+      salvarEmpresaCnpjCache(agendamento.cliente || localItem?.cliente, fmt);
+      return fmt;
+    }
   }
 
   const extraidoNome = extrairCnpj(agendamento.cliente || localItem?.cliente);
@@ -642,18 +644,14 @@ export function resolverCnpjCliente(agendamento = {}, localItem = null) {
 export function resolverCnpjTransportadora(agendamento = {}, localItem = null) {
   if (!agendamento) return null;
 
-  const direto = agendamento.transportadora_cnpj ? String(agendamento.transportadora_cnpj).trim() : null;
-  if (direto && direto.replace(/\D/g, '').length === 14) {
-    const fmt = formatarCNPJ(direto);
-    salvarEmpresaCnpjCache(agendamento.transportadora, fmt);
-    return fmt;
-  }
-
-  const localCnpj = localItem?.transportadora_cnpj ? String(localItem.transportadora_cnpj).trim() : null;
-  if (localCnpj && localCnpj.replace(/\D/g, '').length === 14) {
-    const fmt = formatarCNPJ(localCnpj);
-    salvarEmpresaCnpjCache(agendamento.transportadora || localItem.transportadora, fmt);
-    return fmt;
+  const campoDireto = agendamento.transportadora_cnpj || agendamento.cnpj_transportadora || localItem?.transportadora_cnpj || localItem?.cnpj_transportadora;
+  if (campoDireto) {
+    const strDireto = String(campoDireto).trim();
+    if (strDireto) {
+      const fmt = formatarCNPJ(strDireto);
+      salvarEmpresaCnpjCache(agendamento.transportadora || localItem?.transportadora, fmt);
+      return fmt;
+    }
   }
 
   const extraidoNome = extrairCnpj(agendamento.transportadora || localItem?.transportadora);
@@ -830,6 +828,38 @@ export function obterPrimeiroHorarioDisponivel(horariosOcupados = [], dataStr = 
 }
 
 /**
+ * Sanitiza a numeração do bloco para remover textos extras (ex: 'BLOCO:', 'Bloco', 'Nº', 'Quartzito', 'Taj Mahal')
+ * deixando apenas a numeração/código oficial do bloco a ser imputado no campo.
+ */
+export function sanitizarNumeroBloco(texto = '') {
+  if (!texto || typeof texto !== 'string') return '';
+  let str = String(texto).trim().toUpperCase();
+  
+  // 1. Remove prefixos comuns de bloco como "BLOCO:", "BLOCO", "BL.", "BL", "Nº", "N°", "NUMERO:", "NUMERO", "NUM:", "NUM"
+  str = str.replace(/^(?:BLOCO\s*[:.-]?|BL\s*[:.-]?|N[º°]\s*[:.-]?|N[O0]\s*[:.-]?|NUMERO\s*[:.-]?|NUM\s*[:.-]?)\s*/i, '');
+  
+  // 2. Remove conteúdos explicativos entre parênteses (ex: "1256926 (QUARTZITO)" -> "1256926")
+  str = str.replace(/\s*\([^)]*\)/g, '');
+  
+  // 3. Se contiver traço ou barra com texto explicativo e não outro número de bloco
+  // Ex: "1256926 - TAJ MAHAL" -> "1256926"
+  const partesTraco = str.split(/\s*[-–]\s*/);
+  if (partesTraco.length > 1) {
+    if (!/^\d+$/.test(partesTraco[1]) && !/^VT-/i.test(partesTraco[1]) && !/^\d{2,}\/\d{2,}$/.test(partesTraco[1])) {
+      str = partesTraco[0];
+    }
+  }
+
+  // 4. Remove palavras descritivas comuns caso fiquem soltas no texto (ex: "1256926 TAJ MAHAL" -> "1256926")
+  str = str.replace(/\s+(?:TAJ\s+MAHAL|QUARTZITO|GRANITO|MARMORE|CARGA\s*\d*|MATERIAL).*$/i, '');
+
+  // 5. Remove pontuações desnecessárias no início ou fim
+  str = str.replace(/^[^\w]+|[^\w]+$/g, '');
+  
+  return str.trim();
+}
+
+/**
  * Extrai números de blocos individuais se o usuário digitou múltiplos blocos no mesmo campo
  * Exemplos aceitos: "1256926 - 1256972", "1256926 e 1256972", "1256926 / 1256972", "1256926, 1256972"
  */
@@ -861,7 +891,7 @@ export function extrairBlocosDigitados(texto = '') {
   }
 
   const blocos = (partes.length > 1 ? partes : [limpo])
-    .map(b => b.trim().replace(/^BLOCO\s+/i, ''))
+    .map(b => sanitizarNumeroBloco(b))
     .filter(b => b.length > 0);
 
   return blocos;
@@ -2067,9 +2097,9 @@ export async function listarAgendamentos(filtros = {}) {
               ...(loc || {}),
               ...item,
               cliente: clienteLimpo || item.cliente,
-              cliente_cnpj: clienteCnpj || null,
+              cliente_cnpj: clienteCnpj || item.cliente_cnpj || loc?.cliente_cnpj || null,
               transportadora: transpLimpa || item.transportadora,
-              transportadora_cnpj: transpCnpj || null,
+              transportadora_cnpj: transpCnpj || item.transportadora_cnpj || loc?.transportadora_cnpj || null,
               historico_status: historicoFinal,
               ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || (historicoFinal.length > 0 ? historicoFinal[0].usuario_nome : null)
             };
@@ -2114,13 +2144,15 @@ export async function listarAgendamentos(filtros = {}) {
               if (idsExcluidos.has(idItemStr)) return;
               const anterior = mapaAtualizado.get(idItemStr) || {};
               const histMesclado = fundirHistoricosStatus(item.historico_status, anterior.historico_status);
+              const cCnpj = item.cliente_cnpj || anterior.cliente_cnpj || resolverCnpjCliente(item, anterior) || null;
+              const tCnpj = item.transportadora_cnpj || anterior.transportadora_cnpj || resolverCnpjTransportadora(item, anterior) || null;
               mapaAtualizado.set(idItemStr, {
                 ...anterior,
                 ...item,
                 cliente: item.cliente || anterior.cliente,
-                cliente_cnpj: item.cliente_cnpj || anterior.cliente_cnpj || null,
+                cliente_cnpj: cCnpj,
                 transportadora: item.transportadora || anterior.transportadora,
-                transportadora_cnpj: item.transportadora_cnpj || anterior.transportadora_cnpj || null,
+                transportadora_cnpj: tCnpj,
                 historico_status: histMesclado
               });
             });

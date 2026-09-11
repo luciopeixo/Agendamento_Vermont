@@ -13,6 +13,7 @@ import {
   dispararEmailConfirmacao,
   formatarPlacasExibicao,
   formatarDataBR,
+  formatarCNPJ,
   normalizarHistoricoStatus,
   obterDataHoraAtualBrasil,
   isDataSabado,
@@ -333,7 +334,7 @@ export function PainelGestao({
         'Cliente Destinatário': limparNomeEmpresa(ag.cliente) || '',
         'CNPJ Destinatário': ag.cliente_cnpj || resolverCnpjCliente(ag) || '',
         'Transportadora': limparNomeEmpresa(ag.transportadora) || '',
-        'CNPJ Transportadora': ag.transportadora_cnpj || resolverCnpjTransportadora(ag) || '',
+        'CNPJ Transportadora': formatarCNPJ(ag.transportadora_cnpj || resolverCnpjTransportadora(ag)) || '',
         'Motorista': ag.motorista_nome || '',
         'CPF Motorista': ag.motorista_cpf || '',
         'Telefone Motorista': ag.motorista_telefone || '',
@@ -1566,8 +1567,13 @@ export function PainelGestao({
                         <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
                           Cliente: <strong style={{ color: 'var(--slate-200)' }}>{limparNomeEmpresa(ag.cliente)}</strong>
                         </div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--slate-500)' }}>
-                          Transp: {limparNomeEmpresa(ag.transportadora)} {(ag.transportadora_cnpj || resolverCnpjTransportadora(ag)) && <span style={{ fontSize: '0.70rem', color: '#60a5fa', fontFamily: 'monospace' }}>({ag.transportadora_cnpj || resolverCnpjTransportadora(ag)})</span>}
+                        <div style={{ fontSize: '0.74rem', color: 'var(--slate-400)', marginTop: '2px' }}>
+                          Transp: <strong style={{ color: 'var(--slate-200)' }}>{limparNomeEmpresa(ag.transportadora)}</strong>
+                          {(ag.transportadora_cnpj || resolverCnpjTransportadora(ag)) ? (
+                            <span style={{ fontSize: '0.70rem', color: '#60a5fa', fontFamily: 'monospace', fontWeight: 600, marginLeft: '4px' }}>
+                              (CNPJ: {formatarCNPJ(ag.transportadora_cnpj || resolverCnpjTransportadora(ag))})
+                            </span>
+                          ) : null}
                         </div>
                       </td>
 

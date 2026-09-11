@@ -25,6 +25,7 @@ import {
   formatarDataBR,
   detectarMultiplosBlocos,
   extrairBlocosDigitados,
+  sanitizarNumeroBloco,
   validarCPF,
   consultarMotoristaPorCPF,
   validarCNPJ,
@@ -509,7 +510,15 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   }, [tipoCarregamento, qtdBlocosCombinados, ponto3.data_agendamento, ponto3.pedreira]);
 
   const handleChange = (campo, valor) => {
-    setFormData(prev => ({ ...prev, [campo]: valor }));
+    let valorFinal = valor;
+    if (campo === 'numero_bloco' && valor) {
+      // Se contiver prefixos como "BLOCO", "Nº", ou texto explicativo extra, sanitiza automaticamente
+      const limpo = sanitizarNumeroBloco(valor);
+      if (limpo && limpo !== valor.trim().toUpperCase()) {
+        valorFinal = limpo;
+      }
+    }
+    setFormData(prev => ({ ...prev, [campo]: valorFinal }));
     if (mensagemErro) setMensagemErro('');
   };
 
@@ -525,7 +534,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   };
 
   const handlePonto2Change = (campo, valor) => {
-    setPonto2(prev => ({ ...prev, [campo]: valor }));
+    let valorFinal = valor;
+    if (campo === 'numero_bloco' && valor) {
+      const limpo = sanitizarNumeroBloco(valor);
+      if (limpo && limpo !== valor.trim().toUpperCase()) {
+        valorFinal = limpo;
+      }
+    }
+    setPonto2(prev => ({ ...prev, [campo]: valorFinal }));
     if (mensagemErro) setMensagemErro('');
   };
 
@@ -541,7 +557,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   };
 
   const handlePonto3Change = (campo, valor) => {
-    setPonto3(prev => ({ ...prev, [campo]: valor }));
+    let valorFinal = valor;
+    if (campo === 'numero_bloco' && valor) {
+      const limpo = sanitizarNumeroBloco(valor);
+      if (limpo && limpo !== valor.trim().toUpperCase()) {
+        valorFinal = limpo;
+      }
+    }
+    setPonto3(prev => ({ ...prev, [campo]: valorFinal }));
     if (mensagemErro) setMensagemErro('');
   };
 
@@ -1199,6 +1222,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     placeholder="Ex: 1256926 ou VT-2026/089"
                     value={formData.numero_bloco}
                     onChange={(e) => handleChange('numero_bloco', e.target.value)}
+                    onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value))}
                     required
                     style={{ textTransform: 'uppercase' }}
                   />
@@ -1302,9 +1326,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <div className="form-group">
                   <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
                     <span>Cliente / Destinatário</span>
-                    {statusCNPJCliente.encontrado && (
-                      <span style={{ fontSize: '0.7rem', color: '#86efac', fontWeight: 500 }}>
-                        Auto-preenchido via Receita
+                    {statusCNPJCliente.encontrado && formData.cliente && (
+                      <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        🔒 Razão Social travada (Validada na Receita)
                       </span>
                     )}
                   </label>
@@ -1315,6 +1339,13 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     value={formData.cliente}
                     onChange={(e) => handleChange('cliente', e.target.value)}
                     required
+                    readOnly={Boolean(statusCNPJCliente.encontrado && formData.cliente)}
+                    style={{
+                      backgroundColor: statusCNPJCliente.encontrado && formData.cliente ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                      borderColor: statusCNPJCliente.encontrado && formData.cliente ? '#10b981' : undefined,
+                      cursor: statusCNPJCliente.encontrado && formData.cliente ? 'not-allowed' : undefined,
+                      color: statusCNPJCliente.encontrado && formData.cliente ? '#e2e8f0' : undefined
+                    }}
                   />
                 </div>
               </div>
@@ -1520,6 +1551,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     placeholder="Ex: 1256926"
                     value={formData.numero_bloco}
                     onChange={(e) => handleChange('numero_bloco', e.target.value)}
+                    onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value))}
                     required
                     style={{ textTransform: 'uppercase' }}
                   />
@@ -1573,9 +1605,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <div className="form-group">
                   <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
                     <span>Cliente / Destinatário (1º Bloco)</span>
-                    {statusCNPJCliente.encontrado && (
-                      <span style={{ fontSize: '0.7rem', color: '#86efac', fontWeight: 500 }}>
-                        Auto-preenchido
+                    {statusCNPJCliente.encontrado && formData.cliente && (
+                      <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        🔒 Razão Social travada (Validada na Receita)
                       </span>
                     )}
                   </label>
@@ -1586,6 +1618,13 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     value={formData.cliente}
                     onChange={(e) => handleChange('cliente', e.target.value)}
                     required
+                    readOnly={Boolean(statusCNPJCliente.encontrado && formData.cliente)}
+                    style={{
+                      backgroundColor: statusCNPJCliente.encontrado && formData.cliente ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                      borderColor: statusCNPJCliente.encontrado && formData.cliente ? '#10b981' : undefined,
+                      cursor: statusCNPJCliente.encontrado && formData.cliente ? 'not-allowed' : undefined,
+                      color: statusCNPJCliente.encontrado && formData.cliente ? '#e2e8f0' : undefined
+                    }}
                   />
                 </div>
 
@@ -1713,6 +1752,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     placeholder="Ex: 1256972"
                     value={ponto2.numero_bloco}
                     onChange={(e) => handlePonto2Change('numero_bloco', e.target.value)}
+                    onBlur={(e) => handlePonto2Change('numero_bloco', sanitizarNumeroBloco(e.target.value))}
                     required
                     style={{ textTransform: 'uppercase' }}
                   />
@@ -1766,9 +1806,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <div className="form-group">
                   <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
                     <span>Cliente / Destinatário (2º Bloco)</span>
-                    {statusCNPJCliente2.encontrado && (
-                      <span style={{ fontSize: '0.7rem', color: '#86efac', fontWeight: 500 }}>
-                        Auto-preenchido
+                    {statusCNPJCliente2.encontrado && ponto2.cliente && (
+                      <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        🔒 Razão Social travada (Validada na Receita)
                       </span>
                     )}
                   </label>
@@ -1779,6 +1819,13 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     value={ponto2.cliente}
                     onChange={(e) => handlePonto2Change('cliente', e.target.value)}
                     required
+                    readOnly={Boolean(statusCNPJCliente2.encontrado && ponto2.cliente)}
+                    style={{
+                      backgroundColor: statusCNPJCliente2.encontrado && ponto2.cliente ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                      borderColor: statusCNPJCliente2.encontrado && ponto2.cliente ? '#10b981' : undefined,
+                      cursor: statusCNPJCliente2.encontrado && ponto2.cliente ? 'not-allowed' : undefined,
+                      color: statusCNPJCliente2.encontrado && ponto2.cliente ? '#e2e8f0' : undefined
+                    }}
                   />
                 </div>
 
@@ -1994,6 +2041,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       placeholder="Ex: 1256980"
                       value={ponto3.numero_bloco}
                       onChange={(e) => handlePonto3Change('numero_bloco', e.target.value)}
+                      onBlur={(e) => handlePonto3Change('numero_bloco', sanitizarNumeroBloco(e.target.value))}
                       required
                       style={{ textTransform: 'uppercase' }}
                     />
@@ -2047,9 +2095,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   <div className="form-group">
                     <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
                       <span>Cliente / Destinatário (3º Bloco)</span>
-                      {statusCNPJCliente3.encontrado && (
-                        <span style={{ fontSize: '0.7rem', color: '#86efac', fontWeight: 500 }}>
-                          Auto-preenchido
+                      {statusCNPJCliente3.encontrado && ponto3.cliente && (
+                        <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          🔒 Razão Social travada (Validada na Receita)
                         </span>
                       )}
                     </label>
@@ -2060,6 +2108,13 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       value={ponto3.cliente}
                       onChange={(e) => handlePonto3Change('cliente', e.target.value)}
                       required
+                      readOnly={Boolean(statusCNPJCliente3.encontrado && ponto3.cliente)}
+                      style={{
+                        backgroundColor: statusCNPJCliente3.encontrado && ponto3.cliente ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                        borderColor: statusCNPJCliente3.encontrado && ponto3.cliente ? '#10b981' : undefined,
+                        cursor: statusCNPJCliente3.encontrado && ponto3.cliente ? 'not-allowed' : undefined,
+                        color: statusCNPJCliente3.encontrado && ponto3.cliente ? '#e2e8f0' : undefined
+                      }}
                     />
                   </div>
 
@@ -2244,9 +2299,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             <div className="form-group">
               <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
                 <span>Nome da Transportadora</span>
-                {statusCNPJ.encontrado && (
-                  <span style={{ fontSize: '0.7rem', color: '#86efac', fontWeight: 500 }}>
-                    Auto-preenchido via Receita
+                {statusCNPJ.encontrado && formData.transportadora && (
+                  <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    🔒 Razão Social travada (Validada na Receita)
                   </span>
                 )}
               </label>
@@ -2257,6 +2312,13 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 value={formData.transportadora}
                 onChange={(e) => handleChange('transportadora', e.target.value)}
                 required
+                readOnly={Boolean(statusCNPJ.encontrado && formData.transportadora)}
+                style={{
+                  backgroundColor: statusCNPJ.encontrado && formData.transportadora ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                  borderColor: statusCNPJ.encontrado && formData.transportadora ? '#10b981' : undefined,
+                  cursor: statusCNPJ.encontrado && formData.transportadora ? 'not-allowed' : undefined,
+                  color: statusCNPJ.encontrado && formData.transportadora ? '#e2e8f0' : undefined
+                }}
               />
             </div>
 

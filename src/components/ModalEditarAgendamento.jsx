@@ -11,7 +11,8 @@ import {
   normalizarHistoricoStatus,
   resolverCnpjCliente,
   resolverCnpjTransportadora,
-  limparNomeEmpresa
+  limparNomeEmpresa,
+  sanitizarNumeroBloco
 } from '../services/agendamentoService';
 
 export function ModalEditarAgendamento({ 
@@ -75,11 +76,13 @@ export function ModalEditarAgendamento({
     setErro('');
     setSalvando(true);
 
-    if (!formData.numero_bloco.trim()) {
+    const blocoLimpo = sanitizarNumeroBloco(formData.numero_bloco);
+    if (!blocoLimpo) {
       setErro('Informe a numeração do bloco.');
       setSalvando(false);
       return;
     }
+    const dadosParaSalvar = { ...formData, numero_bloco: blocoLimpo };
 
     if (!isAdmin && formData.status === 'Aguardando Liberação' && agendamento.status !== 'Aguardando Liberação') {
       setErro('Acesso restrito: Apenas o Administrador Geral pode reverter o status para "Aguardando Liberação".');
@@ -87,7 +90,7 @@ export function ModalEditarAgendamento({
       return;
     }
 
-    const res = await salvarEdicaoAgendamento(formData, usuarioInfo || { isAdmin }, agendamento);
+    const res = await salvarEdicaoAgendamento(dadosParaSalvar, usuarioInfo || { isAdmin }, agendamento);
     setSalvando(false);
 
     if (res.success) {
@@ -217,6 +220,7 @@ export function ModalEditarAgendamento({
                   style={{ textTransform: 'uppercase', fontWeight: 700 }}
                   value={formData.numero_bloco}
                   onChange={(e) => handleChange('numero_bloco', e.target.value.toUpperCase())}
+                  onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value))}
                   required
                 />
               </div>
