@@ -334,9 +334,17 @@ export function PainelGestao({
 
   const handleImprimirRelatorio = () => {
     document.body.classList.add('imprimindo-relatorio');
+    const styleEl = document.createElement('style');
+    styleEl.id = 'relatorio-landscape-print-style';
+    styleEl.innerHTML = '@page { size: A4 landscape !important; margin: 6mm 8mm !important; }';
+    document.head.appendChild(styleEl);
+
     window.print();
+
     setTimeout(() => {
       document.body.classList.remove('imprimindo-relatorio');
+      const el = document.getElementById('relatorio-landscape-print-style');
+      if (el) el.remove();
     }, 1500);
   };
 
@@ -1636,6 +1644,7 @@ export function PainelGestao({
               Unidade: <strong>{filtroPedreira === 'todas' ? 'Todas as Pedreiras (Polo Ceará)' : filtroPedreira}</strong> | 
               Data de Emissão: <strong>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date())}</strong>
               {filtroData && <> | Filtrado para a data: <strong>{formatarDataBR(filtroData)}</strong></>}
+              {!isTodosStatus && <> | Status: <strong>{filtroStatus.join(', ')}</strong></>}
             </div>
           </div>
 

@@ -54,9 +54,17 @@ export function ComprovanteModal({ agendamento, onFechar, onNovoAgendamento }) {
 
   const handlePrint = () => {
     document.body.classList.add('imprimindo-comprovante');
+    const styleEl = document.createElement('style');
+    styleEl.id = 'comprovante-portrait-print-style';
+    styleEl.innerHTML = '@page { size: A4 portrait !important; margin: 6mm 8mm !important; }';
+    document.head.appendChild(styleEl);
+
     window.print();
+
     setTimeout(() => {
       document.body.classList.remove('imprimindo-comprovante');
+      const el = document.getElementById('comprovante-portrait-print-style');
+      if (el) el.remove();
     }, 1500);
   };
 
