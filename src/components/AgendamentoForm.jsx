@@ -13,6 +13,8 @@ import {
   salvarAgendamento,
   salvarAgendamentoCombinado,
   isPedreiraUruoca,
+  isDataSabado,
+  contarVeiculosUnicos,
   DOCUMENTOS_OBRIGATORIOS_PEDREIRA,
   AVISO_CONFIRMACAO_CLIENTE,
   EMAIL_NOTIFICACAO_DESTINO,
@@ -397,7 +399,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     if (!formData.data_agendamento) return;
 
     const [ano, mes, dia] = formData.data_agendamento.split('-').map(Number);
-    const dataObj = new Date(ano, mes - 1, dia);
+    const dataObj = new Date(ano, mes - 1, dia, 12, 0, 0);
     const diaSemana = dataObj.getDay();
 
     if (diaSemana === 0) {
@@ -415,7 +417,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
   const verificarVagasSabado = async (dataStr, pedreiraNome) => {
     setCarregandoOcupacao(true);
-    const dadosOcupacao = await obterOcupacaoSabado(dataStr, pedreiraNome);
+    const dadosOcupacao = await obterOcupacaoSabado(dataStr, pedreiraNome || 'Uruoca - CE (Taj Mahal)');
     setOcupacaoSabado(dadosOcupacao);
     setCarregandoOcupacao(false);
   };
@@ -1314,9 +1316,24 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     borderRadius: 12,
                     padding: 16
                   }}>
-                    <strong style={{ color: ocupacaoSabado.lotado ? '#fca5a5' : '#4ade80' }}>
-                      {ocupacaoSabado.lotado ? '🚨 Limite de 12 Veículos Atingido para este Sábado' : `✅ Vagas Disponíveis para Sábado (${ocupacaoSabado.disponivel} de 12 vagas)`}
-                    </strong>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Truck size={20} color={ocupacaoSabado.lotado ? '#f87171' : '#4ade80'} />
+                        <strong style={{ color: ocupacaoSabado.lotado ? '#fca5a5' : '#4ade80', fontSize: '0.92rem' }}>
+                          {ocupacaoSabado.lotado 
+                            ? `🚨 Limite de 12 Veículos Atingido para este Sábado (${ocupacaoSabado.total} de 12 veículos ocupados)` 
+                            : `✅ Cota do Sábado (Uruoca): ${ocupacaoSabado.total} de 12 veículos ocupados (${ocupacaoSabado.disponivel} vaga${ocupacaoSabado.disponivel === 1 ? '' : 's'} restante${ocupacaoSabado.disponivel === 1 ? '' : 's'})`}
+                        </strong>
+                      </div>
+                      <span className={`badge ${ocupacaoSabado.lotado ? 'badge-danger' : 'badge-vermont'}`} style={{ fontSize: '0.74rem' }}>
+                        {ocupacaoSabado.lotado ? 'Esgotado (12/12)' : `${ocupacaoSabado.disponivel} vagas livres`}
+                      </span>
+                    </div>
+                    {ocupacaoSabado.totalBlocos > ocupacaoSabado.total && (
+                      <div style={{ fontSize: '0.76rem', color: 'var(--slate-300)', marginTop: 4 }}>
+                        * Contabilizando {ocupacaoSabado.totalBlocos} blocos distribuídos em {ocupacaoSabado.total} caminhão(ões) agendados.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1330,7 +1347,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     padding: 14,
                     color: '#fef3c7'
                   }}>
-                    A operação aos sábados é <strong>exclusiva para a pedreira de Uruoca - CE (Taj Mahal)</strong>. Demais pedreiras operam de segunda a sexta-feira.
+                    A operação aos sábados é <strong>exclusiva para a pedreira de Uruoca - CE (Taj Mahal)</strong> com limite de até 12 veículos. Demais pedreiras operam de segunda a sexta-feira.
                   </div>
                 )}
               </div>
@@ -1700,34 +1717,73 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 </div>
 
                 {/* Horário 2 */}
-                <div className="form-group">
-                  <label className="form-label form-label-required">
-                    Horário (2º Ponto)
-                    {horariosOcupados2.length > 0 && (
-                      <span style={{ fontSize: '0.74rem', color: '#fca5a5', fontWeight: 500, marginLeft: 6, textTransform: 'none' }}>
-                        ({horariosOcupados2.length} horário{horariosOcupados2.length > 1 ? 's' : ''} já reservado{horariosOcupados2.length > 1 ? 's' : ''})
-                      </span>
-                    )}
-                  </label>
-                  <select
-                    className="form-select"
-                    value={ponto2.horario_agendamento}
-                    onChange={(e) => handlePonto2Change('horario_agendamento', e.target.value)}
-                    required
-                  >
-                    {HORARIOS_SEMANA.map(h => {
-                      const ocupado = horariosOcupados2.includes(h.id);
-                      const expirado = isHorarioPassado(ponto2.data_agendamento, h.id);
-                      const indisponivel = (ocupado || expirado) && h.id !== 'outros';
+                {tipoDia2 === 'dia_util' && (
+                  <div className="form-group">
+                    <label className="form-label form-label-required">
+                      Horário (2º Ponto)
+                      {horariosOcupados2.length > 0 && (
+                        <span style={{ fontSize: '0.74rem', color: '#fca5a5', fontWeight: 500, marginLeft: 6, textTransform: 'none' }}>
+                          ({horariosOcupados2.length} horário{horariosOcupados2.length > 1 ? 's' : ''} já reservado{horariosOcupados2.length > 1 ? 's' : ''})
+                        </span>
+                      )}
+                    </label>
+                    <select
+                      className="form-select"
+                      value={ponto2.horario_agendamento}
+                      onChange={(e) => handlePonto2Change('horario_agendamento', e.target.value)}
+                      required
+                    >
+                      {HORARIOS_SEMANA.map(h => {
+                        const ocupado = horariosOcupados2.includes(h.id);
+                        const expirado = isHorarioPassado(ponto2.data_agendamento, h.id);
+                        const indisponivel = (ocupado || expirado) && h.id !== 'outros';
 
-                      return (
-                        <option key={h.id} value={h.id} disabled={indisponivel}>
-                          {h.id} {h.id === 'outros' ? '' : (expirado ? '— [JÁ PASSOU]' : (ocupado ? '— [OCUPADO]' : '— Disponível'))}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
+                        return (
+                          <option key={h.id} value={h.id} disabled={indisponivel}>
+                            {h.id} {h.id === 'outros' ? '' : (expirado ? '— [JÁ PASSOU]' : (ocupado ? '— [OCUPADO]' : '— Disponível'))}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                )}
+
+                {/* Sábado Uruoca Ponto 2 */}
+                {tipoDia2 === 'sabado' && isPedreiraUruoca(ponto2.pedreira) && (
+                  <div className="animate-fade" style={{
+                    gridColumn: '1 / -1',
+                    background: ocupacaoSabado2.lotado ? 'var(--danger-bg)' : 'var(--vermont-green-subtle)',
+                    border: `1px solid ${ocupacaoSabado2.lotado ? 'var(--danger-border)' : 'var(--vermont-green-border)'}`,
+                    borderRadius: 12,
+                    padding: 14
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Truck size={18} color={ocupacaoSabado2.lotado ? '#f87171' : '#4ade80'} />
+                        <strong style={{ color: ocupacaoSabado2.lotado ? '#fca5a5' : '#4ade80', fontSize: '0.88rem' }}>
+                          {ocupacaoSabado2.lotado 
+                            ? `🚨 Limite de 12 Veículos Atingido para este Sábado (${ocupacaoSabado2.total} de 12 ocupados)` 
+                            : `✅ Cota do Sábado (Uruoca): ${ocupacaoSabado2.total} de 12 veículos ocupados (${ocupacaoSabado2.disponivel} vagas disponíveis)`}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sábado Não Uruoca Ponto 2 */}
+                {tipoDia2 === 'sabado' && !isPedreiraUruoca(ponto2.pedreira) && (
+                  <div className="animate-fade" style={{
+                    gridColumn: '1 / -1',
+                    background: 'var(--warning-bg)',
+                    border: '1px solid var(--warning-border)',
+                    borderRadius: 12,
+                    padding: 12,
+                    color: '#fef3c7',
+                    fontSize: '0.82rem'
+                  }}>
+                    A operação aos sábados é <strong>exclusiva para a pedreira de Uruoca - CE (Taj Mahal)</strong>.
+                  </div>
+                )}
               </div>
 
               {/* Justificativa outros Ponto 2 */}
@@ -1942,34 +1998,73 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   </div>
 
                   {/* Horário 3 */}
-                  <div className="form-group">
-                    <label className="form-label form-label-required">
-                      Horário (3º Ponto)
-                      {horariosOcupados3.length > 0 && (
-                        <span style={{ fontSize: '0.74rem', color: '#fca5a5', fontWeight: 500, marginLeft: 6, textTransform: 'none' }}>
-                          ({horariosOcupados3.length} horário{horariosOcupados3.length > 1 ? 's' : ''} já reservado{horariosOcupados3.length > 1 ? 's' : ''})
-                        </span>
-                      )}
-                    </label>
-                    <select
-                      className="form-select"
-                      value={ponto3.horario_agendamento}
-                      onChange={(e) => handlePonto3Change('horario_agendamento', e.target.value)}
-                      required
-                    >
-                      {HORARIOS_SEMANA.map(h => {
-                        const ocupado = horariosOcupados3.includes(h.id);
-                        const expirado = isHorarioPassado(ponto3.data_agendamento, h.id);
-                        const indisponivel = (ocupado || expirado) && h.id !== 'outros';
+                  {tipoDia3 === 'dia_util' && (
+                    <div className="form-group">
+                      <label className="form-label form-label-required">
+                        Horário (3º Ponto)
+                        {horariosOcupados3.length > 0 && (
+                          <span style={{ fontSize: '0.74rem', color: '#fca5a5', fontWeight: 500, marginLeft: 6, textTransform: 'none' }}>
+                            ({horariosOcupados3.length} horário{horariosOcupados3.length > 1 ? 's' : ''} já reservado{horariosOcupados3.length > 1 ? 's' : ''})
+                          </span>
+                        )}
+                      </label>
+                      <select
+                        className="form-select"
+                        value={ponto3.horario_agendamento}
+                        onChange={(e) => handlePonto3Change('horario_agendamento', e.target.value)}
+                        required
+                      >
+                        {HORARIOS_SEMANA.map(h => {
+                          const ocupado = horariosOcupados3.includes(h.id);
+                          const expirado = isHorarioPassado(ponto3.data_agendamento, h.id);
+                          const indisponivel = (ocupado || expirado) && h.id !== 'outros';
 
-                        return (
-                          <option key={h.id} value={h.id} disabled={indisponivel}>
-                            {h.id} {h.id === 'outros' ? '' : (expirado ? '— [JÁ PASSOU]' : (ocupado ? '— [OCUPADO]' : '— Disponível'))}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
+                          return (
+                            <option key={h.id} value={h.id} disabled={indisponivel}>
+                              {h.id} {h.id === 'outros' ? '' : (expirado ? '— [JÁ PASSOU]' : (ocupado ? '— [OCUPADO]' : '— Disponível'))}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Sábado Uruoca Ponto 3 */}
+                  {tipoDia3 === 'sabado' && isPedreiraUruoca(ponto3.pedreira) && (
+                    <div className="animate-fade" style={{
+                      gridColumn: '1 / -1',
+                      background: ocupacaoSabado3.lotado ? 'var(--danger-bg)' : 'var(--vermont-green-subtle)',
+                      border: `1px solid ${ocupacaoSabado3.lotado ? 'var(--danger-border)' : 'var(--vermont-green-border)'}`,
+                      borderRadius: 12,
+                      padding: 14
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Truck size={18} color={ocupacaoSabado3.lotado ? '#f87171' : '#4ade80'} />
+                          <strong style={{ color: ocupacaoSabado3.lotado ? '#fca5a5' : '#4ade80', fontSize: '0.88rem' }}>
+                            {ocupacaoSabado3.lotado 
+                              ? `🚨 Limite de 12 Veículos Atingido para este Sábado (${ocupacaoSabado3.total} de 12 ocupados)` 
+                              : `✅ Cota do Sábado (Uruoca): ${ocupacaoSabado3.total} de 12 veículos ocupados (${ocupacaoSabado3.disponivel} vagas disponíveis)`}
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sábado Não Uruoca Ponto 3 */}
+                  {tipoDia3 === 'sabado' && !isPedreiraUruoca(ponto3.pedreira) && (
+                    <div className="animate-fade" style={{
+                      gridColumn: '1 / -1',
+                      background: 'var(--warning-bg)',
+                      border: '1px solid var(--warning-border)',
+                      borderRadius: 12,
+                      padding: 12,
+                      color: '#fef3c7',
+                      fontSize: '0.82rem'
+                    }}>
+                      A operação aos sábados é <strong>exclusiva para a pedreira de Uruoca - CE (Taj Mahal)</strong>.
+                    </div>
+                  )}
                 </div>
 
                 {/* Justificativa outros Ponto 3 */}

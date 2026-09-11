@@ -15,6 +15,9 @@ import {
   formatarDataBR,
   normalizarHistoricoStatus,
   obterDataHoraAtualBrasil,
+  isDataSabado,
+  contarVeiculosUnicos,
+  isPedreiraUruoca,
   PEDREIRAS_CEARA, 
   EMAIL_NOTIFICACAO_DESTINO,
   STATUS_AGENDAMENTO
@@ -561,6 +564,32 @@ export function PainelGestao({
 
   const agendamentosHoje = agendamentos.filter(ag => ag.data_agendamento === hojeStr);
 
+  const dataFiltroOuHoje = filtroData || hojeStr;
+  const isDataFiltroSabado = isDataSabado(dataFiltroOuHoje);
+
+  // Contagem precisa de veículos únicos no sábado para a data filtrada / selecionada
+  const estatisticasSabado = useMemo(() => {
+    if (!isDataFiltroSabado) return null;
+    const agsSabado = agendamentos.filter(a => {
+      const matchData = a.data_agendamento === dataFiltroOuHoje;
+      const matchPedreira = filtroPedreira === 'todas' || isPedreiraUruoca(a.pedreira);
+      const matchStatus = String(a.status || '').toLowerCase() !== 'cancelado';
+      return matchData && matchPedreira && matchStatus;
+    });
+    const veiculosUnicos = contarVeiculosUnicos(agsSabado);
+    const limite = 12;
+    const disponivel = Math.max(0, limite - veiculosUnicos);
+    const lotado = veiculosUnicos >= limite;
+    return {
+      totalVeiculos: veiculosUnicos,
+      totalBlocos: agsSabado.length,
+      limite,
+      disponivel,
+      lotado,
+      data: dataFiltroOuHoje
+    };
+  }, [isDataFiltroSabado, agendamentos, dataFiltroOuHoje, filtroPedreira]);
+
   return (
     <div style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 0' }}>
 
@@ -1084,6 +1113,27 @@ export function PainelGestao({
           <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Previstos para hoje</span>
         </div>
 
+        {/* Card Especial de Cota do Sábado (Uruoca - Limite 12 Veículos) */}
+        {estatisticasSabado && (
+          <div className="glass-panel animate-fade" style={{ 
+            padding: '14px 16px', 
+            borderLeft: `4px solid ${estatisticasSabado.lotado ? '#ef4444' : estatisticasSabado.disponivel <= 3 ? '#f59e0b' : '#38bdf8'}`,
+            background: 'rgba(56, 189, 248, 0.08)'
+          }}>
+            <span style={{ fontSize: '0.74rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Truck size={13} /> Cota do Sábado (Uruoca)
+            </span>
+            <div style={{ fontSize: '1.6rem', fontWeight: 800, color: estatisticasSabado.lotado ? '#f87171' : '#38bdf8', marginTop: 4 }}>
+              {estatisticasSabado.totalVeiculos} / 12
+            </div>
+            <span style={{ fontSize: '0.72rem', color: estatisticasSabado.lotado ? '#fca5a5' : 'var(--slate-300)', fontWeight: 600 }}>
+              {estatisticasSabado.lotado 
+                ? '🚨 Cota de 12 carros atingida' 
+                : `${estatisticasSabado.disponivel} vaga${estatisticasSabado.disponivel === 1 ? '' : 's'} livre${estatisticasSabado.disponivel === 1 ? '' : 's'} (${estatisticasSabado.totalBlocos} bloco${estatisticasSabado.totalBlocos === 1 ? '' : 's'})`}
+            </span>
+          </div>
+        )}
+
         {/* Card de Alerta de Pendências de Dias Anteriores */}
         <div 
           className="glass-panel" 
@@ -1395,7 +1445,7 @@ export function PainelGestao({
                 </tr>
               ) : (
                 agendamentosFiltrados.map((ag) => {
-                  const isSabado = ag.tipo_dia === 'sabado';
+                  const isSabado = ag.tipo_dia === 'sabado' || isDataSabado(ag.data_agendamento) || String(ag.horario_agendamento || '').includes('Sábado');
                   const isOutros = ag.horario_agendamento === 'outros' || String(ag.horario_agendamento).toLowerCase().startsWith('outro');
                   const listaPlacasTabela = formatarPlacasExibicao(ag);
                   const estaExcluindo = excluindoId === ag.id;

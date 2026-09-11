@@ -1351,54 +1351,123 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
 }
 
 /**
+ * Verifica se uma data em formato YYYY-MM-DD corresponde a um sábado
+ */
+export function isDataSabado(dataStr) {
+  if (!dataStr) return false;
+  const [ano, mes, dia] = String(dataStr).split('-').map(Number);
+  if (!ano || !mes || !dia) return false;
+  const d = new Date(ano, mes - 1, dia, 12, 0, 0);
+  return d.getDay() === 6;
+}
+
+/**
+ * Conta a quantidade de veículos únicos (carros/cavalos mecânicos) a partir de uma lista de agendamentos
+ */
+export function contarVeiculosUnicos(lista) {
+  if (!Array.isArray(lista)) return 0;
+  const setVeiculos = new Set();
+  lista.forEach(item => {
+    if (!item) return;
+    const statusLimpo = String(item.status || '').toLowerCase().trim();
+    if (statusLimpo === 'cancelado') return;
+
+    const placaCavalo = item.placa_cavalo ? item.placa_cavalo.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+    if (placaCavalo) {
+      setVeiculos.add(`placa:${placaCavalo}`);
+      return;
+    }
+
+    const placaCarreta = item.placa_carreta ? item.placa_carreta.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+    if (placaCarreta) {
+      setVeiculos.add(`carreta:${placaCarreta}`);
+      return;
+    }
+
+    const cpf = item.motorista_cpf ? String(item.motorista_cpf).replace(/\D/g, '') : '';
+    if (cpf) {
+      setVeiculos.add(`cpf:${cpf}`);
+      return;
+    }
+
+    const chaveId = item.id || item.codigo_agendamento || item.numero_bloco || Math.random();
+    setVeiculos.add(`id:${chaveId}`);
+  });
+  return setVeiculos.size;
+}
+
+/**
  * Consulta a quantidade de agendamentos no sábado para verificar limite de 12 veículos
  */
 export async function obterOcupacaoSabado(dataStr, pedreira = null) {
   try {
-    const extrairChaveVeiculo = (item) => {
-      const placa = item.placa_cavalo ? item.placa_cavalo.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
-      if (placa) return `placa:${placa}`;
-      return `id:${item.id || item.codigo_agendamento || Math.random()}`;
-    };
+    if (!dataStr) {
+      return { total: 0, limite: 12, disponivel: 12, lotado: false, totalBlocos: 0 };
+    }
 
+    let todosAgendamentosSabado = [];
+    const mapaUnificados = new Map();
+
+    // 1. Consulta agendamentos no Supabase para a data
     if (isSupabaseConfigurado()) {
       try {
-        let query = supabase
+        const { data, error } = await supabase
           .from('agendamentos_pedreira')
-          .select('id, pedreira, status, placa_cavalo, codigo_agendamento')
-          .eq('data_agendamento', dataStr)
-          .neq('status', 'Cancelado');
+          .select('*')
+          .eq('data_agendamento', dataStr);
 
-        const { data, error } = await query;
-        if (!error && data) {
-          const filtrados = pedreira ? data.filter(item => saoMesmaPedreira(item.pedreira, pedreira)) : data;
-          const totalVeiculos = new Set(filtrados.map(extrairChaveVeiculo)).size;
-          const limite = 12;
-          const disponivel = Math.max(0, limite - totalVeiculos);
-          const lotado = totalVeiculos >= limite;
-          return { total: totalVeiculos, limite, disponivel, lotado };
+        if (!error && Array.isArray(data)) {
+          data.forEach(item => {
+            const statusLimpo = String(item.status || '').toLowerCase().trim();
+            if (statusLimpo !== 'cancelado') {
+              mapaUnificados.set(String(item.id || item.codigo_agendamento || item.numero_bloco), item);
+            }
+          });
         }
       } catch (e) {
         console.warn('Erro ao verificar sábado no Supabase, buscando local:', e);
       }
     }
 
+    // 2. Mescla com o armazenamento local (offline/cache)
     const locais = obterAgendamentosLocais();
-    const filtrados = locais.filter(item => {
-      const matchData = item.data_agendamento === dataStr;
-      const matchPedreira = pedreira ? saoMesmaPedreira(item.pedreira, pedreira) : true;
-      const matchStatus = item.status !== 'Cancelado';
-      return matchData && matchPedreira && matchStatus;
+    locais.forEach(item => {
+      if (item.data_agendamento === dataStr) {
+        const statusLimpo = String(item.status || '').toLowerCase().trim();
+        if (statusLimpo !== 'cancelado') {
+          const key = String(item.id || item.codigo_agendamento || item.numero_bloco);
+          if (!mapaUnificados.has(key)) {
+            mapaUnificados.set(key, item);
+          }
+        }
+      }
     });
-    const total = new Set(filtrados.map(extrairChaveVeiculo)).size;
 
+    todosAgendamentosSabado = Array.from(mapaUnificados.values());
+
+    // 3. Filtro por pedreira: aos sábados a cota é exclusiva para Uruoca (Taj Mahal)
+    const filtrados = todosAgendamentosSabado.filter(item => {
+      if (!pedreira || pedreira === 'todas') {
+        return isPedreiraUruoca(item.pedreira) || saoMesmaPedreira(item.pedreira, 'Uruoca - CE (Taj Mahal)');
+      }
+      return saoMesmaPedreira(item.pedreira, pedreira) || (isPedreiraUruoca(pedreira) && isPedreiraUruoca(item.pedreira));
+    });
+
+    const totalVeiculos = contarVeiculosUnicos(filtrados);
     const limite = 12;
-    const disponivel = Math.max(0, limite - total);
-    const lotado = total >= limite;
-    return { total, limite, disponivel, lotado };
+    const disponivel = Math.max(0, limite - totalVeiculos);
+    const lotado = totalVeiculos >= limite;
+
+    return { 
+      total: totalVeiculos, 
+      limite, 
+      disponivel, 
+      lotado,
+      totalBlocos: filtrados.length 
+    };
   } catch (err) {
     console.error('Erro ao verificar ocupação do sábado:', err);
-    return { total: 0, limite: 12, disponivel: 12, lotado: false };
+    return { total: 0, limite: 12, disponivel: 12, lotado: false, totalBlocos: 0 };
   }
 }
 
