@@ -2345,11 +2345,81 @@ export async function listarAgendamentos(filtros = {}) {
               const idPendenteStr = String(pendente.id).trim();
               if (idsExcluidos.has(idPendenteStr) || pendente.status === 'Cancelado') return;
               try {
-                const { error: errInsert } = await supabase
+                const payloadSync = {
+                  pedreira: pendente.pedreira,
+                  material: pendente.material,
+                  numero_bloco: pendente.numero_bloco,
+                  cliente: pendente.cliente,
+                  cliente_cnpj: pendente.cliente_cnpj || null,
+                  transportadora: pendente.transportadora,
+                  transportadora_cnpj: pendente.transportadora_cnpj || null,
+                  motorista_nome: pendente.motorista_nome,
+                  motorista_cpf: pendente.motorista_cpf,
+                  motorista_telefone: pendente.motorista_telefone || null,
+                  placa_cavalo: pendente.placa_cavalo,
+                  placa_carreta: pendente.placa_carreta || null,
+                  placa_carreta_2: pendente.placa_carreta_2 || null,
+                  tipo_veiculo: pendente.tipo_veiculo,
+                  data_agendamento: pendente.data_agendamento,
+                  tipo_dia: pendente.tipo_dia || (isDataSabado(pendente.data_agendamento) ? 'sabado' : 'dia_util'),
+                  horario_agendamento: pendente.horario_agendamento,
+                  justificativa_outros: pendente.justificativa_outros || null,
+                  observacoes: pendente.observacoes || null,
+                  status: pendente.status || STATUS_AGENDAMENTO.AGUARDANDO
+                };
+
+                const { data: dataInsert, error: errInsert } = await supabase
                   .from('agendamentos_pedreira')
-                  .insert([{ ...pendente, id: pendente.id?.startsWith('VT-') ? undefined : pendente.id }]);
-                if (!errInsert) {
+                  .insert([payloadSync])
+                  .select()
+                  .single();
+
+                if (!errInsert && dataInsert) {
                   console.info('[Sync] Agendamento local sincronizado com Supabase:', pendente.numero_bloco);
+                  if (pendente.id && String(pendente.id).startsWith('VT-')) {
+                    const listaLocais = obterAgendamentosLocais();
+                    const idx = listaLocais.findIndex(item => String(item.id) === String(pendente.id));
+                    if (idx !== -1) {
+                      listaLocais[idx] = { ...listaLocais[idx], ...dataInsert, id: dataInsert.id };
+                      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(listaLocais));
+                    }
+                  }
+                } else if (errInsert) {
+                  // Fallback com colunas essenciais
+                  const essencialSync = {
+                    pedreira: pendente.pedreira,
+                    material: pendente.material,
+                    numero_bloco: pendente.numero_bloco,
+                    cliente: pendente.cliente,
+                    transportadora: pendente.transportadora,
+                    motorista_nome: pendente.motorista_nome,
+                    motorista_cpf: pendente.motorista_cpf,
+                    motorista_telefone: pendente.motorista_telefone || null,
+                    placa_cavalo: pendente.placa_cavalo,
+                    placa_carreta: pendente.placa_carreta || null,
+                    tipo_veiculo: pendente.tipo_veiculo,
+                    data_agendamento: pendente.data_agendamento,
+                    horario_agendamento: pendente.horario_agendamento,
+                    observacoes: pendente.observacoes ? limparObservacoesDuplicadas(pendente.observacoes) : null,
+                    status: pendente.status || STATUS_AGENDAMENTO.AGUARDANDO
+                  };
+                  const { data: dataEssencial, error: errEssencial } = await supabase
+                    .from('agendamentos_pedreira')
+                    .insert([essencialSync])
+                    .select()
+                    .single();
+
+                  if (!errEssencial && dataEssencial) {
+                    console.info('[Sync] Agendamento local sincronizado via fallback essencial:', pendente.numero_bloco);
+                    if (pendente.id && String(pendente.id).startsWith('VT-')) {
+                      const listaLocais = obterAgendamentosLocais();
+                      const idx = listaLocais.findIndex(item => String(item.id) === String(pendente.id));
+                      if (idx !== -1) {
+                        listaLocais[idx] = { ...listaLocais[idx], ...dataEssencial, id: dataEssencial.id };
+                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(listaLocais));
+                      }
+                    }
+                  }
                 }
               } catch (eSync) {}
             });
@@ -2917,6 +2987,15 @@ export async function salvarAgendamento(dados) {
         } else if (error) {
           console.warn('Falha no insert Supabase completo, tentando payload essencial:', error.message);
           // Fallback caso a tabela ainda não tenha colunas opcionais como transportadora_cnpj ou cliente_cnpj
+          const obsExtra = [];
+          if (payload.transportadora_cnpj) obsExtra.push(`CNPJ Transp: ${payload.transportadora_cnpj}`);
+          if (payload.cliente_cnpj) obsExtra.push(`CNPJ Cliente: ${payload.cliente_cnpj}`);
+          if (payload.placa_carreta_2) obsExtra.push(`2ª Carreta: ${payload.placa_carreta_2}`);
+          if (payload.justificativa_outros) obsExtra.push(`Justificativa: ${payload.justificativa_outros}`);
+
+          const obsBase = payload.observacoes ? limparObservacoesDuplicadas(payload.observacoes) : '';
+          const obsConsolidada = [obsBase, ...obsExtra].filter(Boolean).join(' | ') || null;
+
           const payloadEssencial = {
             pedreira: payload.pedreira,
             material: payload.material,
@@ -2925,12 +3004,13 @@ export async function salvarAgendamento(dados) {
             transportadora: payload.transportadora,
             motorista_nome: payload.motorista_nome,
             motorista_cpf: payload.motorista_cpf,
-            motorista_telefone: payload.motorista_telefone,
+            motorista_telefone: payload.motorista_telefone || null,
             placa_cavalo: payload.placa_cavalo,
-            placa_carreta: payload.placa_carreta,
+            placa_carreta: payload.placa_carreta || null,
             tipo_veiculo: payload.tipo_veiculo,
             data_agendamento: payload.data_agendamento,
-            observacoes: payload.observacoes ? limparObservacoesDuplicadas(payload.observacoes) : null,
+            horario_agendamento: payload.horario_agendamento,
+            observacoes: obsConsolidada,
             status: payload.status
           };
 
