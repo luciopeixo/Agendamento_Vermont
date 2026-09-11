@@ -487,6 +487,14 @@ export function PainelGestao({
   };
 
   const handleTestarEnvioDireto = async () => {
+    if (!EMAIL_NOTIFICACAO_DESTINO) {
+      setStatusEmailTeste({
+        tipo: 'aviso',
+        mensagem: 'E-mail de notificação não configurado no arquivo .env (VITE_EMAIL_NOTIFICACAO_DESTINO).'
+      });
+      return;
+    }
+
     setTestandoEmail(true);
     setStatusEmailTeste(null);
 
@@ -996,7 +1004,9 @@ export function PainelGestao({
           <Mail size={22} color="#4ade80" style={{ flexShrink: 0, marginTop: 2 }} />
           <div style={{ fontSize: '0.86rem' }}>
             <strong style={{ color: '#fff' }}>Notificações por E-mail para: </strong>
-            <span style={{ color: '#4ade80', fontWeight: 600 }}>{EMAIL_NOTIFICACAO_DESTINO}</span>
+            <span style={{ color: '#4ade80', fontWeight: 600 }}>
+              {EMAIL_NOTIFICACAO_DESTINO || 'E-mail Institucional da Logística (Configurado via .env)'}
+            </span>
             <p style={{ margin: '3px 0 0 0', color: 'var(--slate-300)', fontSize: '0.8rem' }}>
               Cada agendamento e atualização é registrado com cópia imediata para a coordenação de logística.
             </p>

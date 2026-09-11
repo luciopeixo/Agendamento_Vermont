@@ -15,16 +15,17 @@ build/
 *.tsbuildinfo
 
 # Variáveis de Ambiente e Credenciais Seguras (NUNCA SUBIR AO GITHUB)
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-.env.*.local
-*.env
+.env*
+*.env*
+.secrets*
+*secret*
+*credential*
 *.pem
 *.key
 *.cert
+*.bak
+*.backup
+*.dump
 
 # Permitir apenas o template público de variáveis
 !.env.example

@@ -644,7 +644,7 @@ export const TIPOS_VEICULO = [
   'Outro'
 ];
 
-export const EMAIL_NOTIFICACAO_DESTINO = import.meta.env.VITE_EMAIL_NOTIFICACAO_DESTINO || 'faturamento@vermontmineracao.com.br';
+export const EMAIL_NOTIFICACAO_DESTINO = import.meta.env.VITE_EMAIL_NOTIFICACAO_DESTINO || '';
 export const WHATSAPP_ADMIN_PADRAO = import.meta.env.VITE_WHATSAPP_ADMIN_NUMERO || '';
 
 /**
