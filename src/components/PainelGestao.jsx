@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Search, RefreshCw, Printer, CheckCircle, CheckCircle2, Clock, Truck, Mail, FileText, 
   AlertCircle, AlertTriangle, Trash2, ShieldCheck, ShieldAlert, RotateCcw, Edit3, CheckCheck, PlayCircle,
-  FileSpreadsheet, Download, History, Bell, BellRing, Volume2, VolumeX, Eye, Check, X, BarChart3, TrendingUp
+  FileSpreadsheet, Download, History, Bell, BellRing, Volume2, VolumeX, Eye, Check, X, BarChart3, TrendingUp,
+  Filter, ChevronDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -76,6 +77,14 @@ export function tocarAlertaSonoro() {
   }
 }
 
+export const STATUS_OPCOES_FILTRO = [
+  { id: 'Aguardando Liberação', label: 'Aguardando Liberação', cor: '#f59e0b', dot: '🟡', bg: 'rgba(245, 158, 11, 0.15)', border: '#f59e0b' },
+  { id: 'Liberado para Carregar', label: 'Liberados p/ Carregar', cor: '#a855f7', dot: '🟣', bg: 'rgba(168, 85, 247, 0.15)', border: '#a855f7' },
+  { id: 'Carregando', label: 'Carregando', cor: '#38bdf8', dot: '🔵', bg: 'rgba(56, 189, 248, 0.15)', border: '#38bdf8' },
+  { id: 'Finalizado', label: 'Finalizados', cor: '#22c55e', dot: '🟢', bg: 'rgba(34, 197, 94, 0.15)', border: '#22c55e' },
+  { id: 'Cancelado', label: 'Cancelados', cor: '#ef4444', dot: '🔴', bg: 'rgba(239, 68, 68, 0.15)', border: '#ef4444' }
+];
+
 export function PainelGestao({ 
   onVisualizarComprovante,
   usuario = null,
@@ -110,7 +119,67 @@ export function PainelGestao({
     }
   }, [isAdmin, pedreiraOperador]);
 
-  const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [filtroStatus, setFiltroStatus] = useState(['todos']);
+  const [dropdownStatusAberto, setDropdownStatusAberto] = useState(false);
+  const dropdownStatusRef = useRef(null);
+
+  // Fecha o dropdown de status ao clicar fora
+  useEffect(() => {
+    const handleClickFora = (event) => {
+      if (dropdownStatusRef.current && !dropdownStatusRef.current.contains(event.target)) {
+        setDropdownStatusAberto(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickFora);
+    return () => document.removeEventListener('mousedown', handleClickFora);
+  }, []);
+
+  const isTodosStatus = useMemo(() => {
+    if (!filtroStatus || filtroStatus === 'todos') return true;
+    if (Array.isArray(filtroStatus)) {
+      return filtroStatus.length === 0 || filtroStatus.includes('todos') || filtroStatus.length === STATUS_OPCOES_FILTRO.length;
+    }
+    return false;
+  }, [filtroStatus]);
+
+  const isStatusSelecionado = (statusId) => {
+    if (isTodosStatus) return true;
+    if (Array.isArray(filtroStatus)) {
+      return filtroStatus.includes(statusId);
+    }
+    return filtroStatus === statusId;
+  };
+
+  const handleToggleStatus = (statusId) => {
+    if (statusId === 'todos') {
+      setFiltroStatus(['todos']);
+      return;
+    }
+
+    const selecionadosAtuais = isTodosStatus 
+      ? [] 
+      : (Array.isArray(filtroStatus) ? [...filtroStatus.filter(s => s !== 'todos')] : [filtroStatus]);
+
+    let novos;
+    if (isTodosStatus) {
+      novos = [statusId];
+    } else if (selecionadosAtuais.includes(statusId)) {
+      novos = selecionadosAtuais.filter(s => s !== statusId);
+    } else {
+      novos = [...selecionadosAtuais, statusId];
+    }
+
+    if (novos.length === 0 || novos.length === STATUS_OPCOES_FILTRO.length) {
+      setFiltroStatus(['todos']);
+    } else {
+      setFiltroStatus(novos);
+    }
+  };
+
+  const handleSelecionarTodosStatus = () => {
+    setFiltroStatus(['todos']);
+  };
+
   const [filtroData, setFiltroData] = useState(() => hojeStr);
   const [abaAtiva, setAbaAtiva] = useState('tabela'); // 'tabela' ou 'graficos'
   const [notificandoEmailId, setNotificandoEmailId] = useState(null);
@@ -1272,20 +1341,205 @@ export function PainelGestao({
             )}
           </div>
 
-          <div style={{ flex: '0 1 200px' }}>
-            <select
-              className="form-select"
-              value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value)}
+          <div ref={dropdownStatusRef} style={{ flex: '0 1 230px', position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => !exibindoPendenciasAnteriores && setDropdownStatusAberto(prev => !prev)}
               disabled={exibindoPendenciasAnteriores}
+              className="form-select"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 6,
+                textAlign: 'left',
+                padding: '8px 12px',
+                cursor: exibindoPendenciasAnteriores ? 'not-allowed' : 'pointer',
+                background: !isTodosStatus ? 'rgba(0, 118, 44, 0.14)' : undefined,
+                borderColor: !isTodosStatus ? 'var(--vermont-green)' : undefined,
+                userSelect: 'none'
+              }}
+              title="Filtrar por um ou múltiplos status"
             >
-              <option value="todos">Todos os Status</option>
-              <option value="Aguardando Liberação">🟡 Aguardando Liberação</option>
-              <option value="Liberado para Carregar">🟣 Liberados p/ Carregar</option>
-              <option value="Carregando">🔵 Carregando</option>
-              <option value="Finalizado">✅ Finalizados</option>
-              <option value="Cancelado">❌ Cancelados</option>
-            </select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Filter size={15} color={!isTodosStatus ? '#4ade80' : 'var(--slate-400)'} style={{ flexShrink: 0 }} />
+                {isTodosStatus ? (
+                  <span style={{ color: 'var(--slate-200)', fontSize: '0.85rem' }}>Todos os Status</span>
+                ) : filtroStatus.length === 1 ? (
+                  (() => {
+                    const opt = STATUS_OPCOES_FILTRO.find(o => o.id === filtroStatus[0]);
+                    return (
+                      <span style={{ color: opt?.cor || '#fff', fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {opt?.dot} {opt?.label || filtroStatus[0]}
+                      </span>
+                    );
+                  })()
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                    <span style={{ color: '#4ade80', fontSize: '0.85rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      {filtroStatus.length} status sel.
+                    </span>
+                    <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
+                      {filtroStatus.map(stId => {
+                        const opt = STATUS_OPCOES_FILTRO.find(o => o.id === stId);
+                        return opt ? <span key={stId} style={{ fontSize: '0.75rem' }}>{opt.dot}</span> : null;
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                {!isTodosStatus && (
+                  <span
+                    role="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFiltroStatus(['todos']);
+                    }}
+                    title="Limpar filtro de status (selecionar todos)"
+                    style={{
+                      cursor: 'pointer',
+                      padding: '2px',
+                      color: 'var(--slate-400)',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <X size={14} />
+                  </span>
+                )}
+                <ChevronDown size={15} style={{ transform: dropdownStatusAberto ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', color: 'var(--slate-400)' }} />
+              </div>
+            </button>
+
+            {/* Menu Popover Multi-Select */}
+            {dropdownStatusAberto && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                left: 0,
+                minWidth: 260,
+                width: '100%',
+                zIndex: 600,
+                background: '#0d1512',
+                border: '1px solid var(--vermont-green-border)',
+                borderRadius: 10,
+                boxShadow: '0 15px 35px rgba(0,0,0,0.85), var(--vermont-green-glow)',
+                padding: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                animation: 'fadeIn 0.15s ease'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '4px 8px 8px 8px',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                  marginBottom: 4
+                }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--slate-300)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Status ({isTodosStatus ? 'Todos' : `${filtroStatus.length}/${STATUS_OPCOES_FILTRO.length}`})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSelecionarTodosStatus}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#4ade80',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      padding: '2px 4px'
+                    }}
+                  >
+                    Marcar Todos
+                  </button>
+                </div>
+
+                {/* Opção: Todos os Status */}
+                <div
+                  onClick={() => handleToggleStatus('todos')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    background: isTodosStatus ? 'rgba(0, 118, 44, 0.25)' : 'transparent',
+                    border: isTodosStatus ? '1px solid var(--vermont-green-border)' : '1px solid transparent',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => { if (!isTodosStatus) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                  onMouseLeave={(e) => { if (!isTodosStatus) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isTodosStatus}
+                    onChange={() => handleToggleStatus('todos')}
+                    style={{ accentColor: '#00762c', cursor: 'pointer' }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <span style={{ fontSize: '0.84rem', fontWeight: isTodosStatus ? 700 : 500, color: isTodosStatus ? '#fff' : 'var(--slate-300)' }}>
+                    📋 Todos os Status
+                  </span>
+                </div>
+
+                <div style={{ height: 1, background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
+
+                {/* Lista de Status com Checkbox e Cores */}
+                {STATUS_OPCOES_FILTRO.map((opt) => {
+                  const selecionado = isStatusSelecionado(opt.id);
+                  return (
+                    <div
+                      key={opt.id}
+                      onClick={() => handleToggleStatus(opt.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '7px 10px',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        background: (!isTodosStatus && selecionado) ? opt.bg : 'transparent',
+                        border: (!isTodosStatus && selecionado) ? `1px solid ${opt.border}` : '1px solid transparent',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { if (isTodosStatus || !selecionado) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                      onMouseLeave={(e) => { if (isTodosStatus || !selecionado) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selecionado}
+                        onChange={() => handleToggleStatus(opt.id)}
+                        style={{ accentColor: opt.cor, cursor: 'pointer' }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <span style={{ fontSize: '0.84rem', display: 'flex', alignItems: 'center', gap: 6, color: selecionado ? '#fff' : 'var(--slate-300)', fontWeight: (!isTodosStatus && selecionado) ? 700 : 500 }}>
+                        <span>{opt.dot}</span>
+                        <span>{opt.label}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {/* Rodapé com botão Fechar */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 6, marginTop: 4, borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setDropdownStatusAberto(false)}
+                    className="btn btn-vermont"
+                    style={{ padding: '4px 12px', fontSize: '0.75rem', borderRadius: 6 }}
+                  >
+                    Aplicar / Fechar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={{ flex: '0 1 160px' }}>
@@ -1458,7 +1712,7 @@ export function PainelGestao({
                           type="button"
                           onClick={() => {
                             setFiltroData('');
-                            setFiltroStatus('todos');
+                            setFiltroStatus(['todos']);
                             setFiltroPedreira(isAdmin ? 'todas' : (pedreiraOperador || 'todas'));
                           }}
                           className="btn btn-vermont"

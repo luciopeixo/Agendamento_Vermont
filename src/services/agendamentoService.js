@@ -2134,11 +2134,49 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
 }
 
 /**
+ * Normaliza e expande o filtro de status (suporta string única, array de status e expansão de aliases)
+ */
+export function normalizarFiltroStatus(statusFiltro) {
+  if (!statusFiltro) return null;
+  let arr = [];
+  if (Array.isArray(statusFiltro)) {
+    arr = statusFiltro;
+  } else if (typeof statusFiltro === 'string') {
+    if (statusFiltro === 'todos' || !statusFiltro.trim()) return null;
+    arr = [statusFiltro];
+  } else {
+    return null;
+  }
+
+  // Se o array contém 'todos' ou está vazio, significa que não há restrição de status
+  if (arr.length === 0 || arr.includes('todos')) {
+    return null;
+  }
+
+  const expandido = new Set();
+  arr.forEach(st => {
+    if (!st || st === 'todos') return;
+    if (st === 'Liberado para Carregar' || st === 'Confirmado') {
+      expandido.add('Liberado para Carregar');
+      expandido.add('Confirmado');
+    } else if (st === 'Finalizado' || st === 'Carregado') {
+      expandido.add('Finalizado');
+      expandido.add('Carregado');
+    } else {
+      expandido.add(st);
+    }
+  });
+
+  return expandido.size > 0 ? Array.from(expandido) : null;
+}
+
+/**
  * Lista todos os agendamentos com filtros
  */
 export async function listarAgendamentos(filtros = {}) {
   try {
     const idsExcluidos = obterIdsExcluidos();
+    const statusArray = normalizarFiltroStatus(filtros.status);
     let listaSup = [];
     const locais = obterAgendamentosLocais().filter(l => !idsExcluidos.has(String(l.id).trim()));
     const locaisMap = new Map(locais.map(l => [String(l.id).trim(), l]));
@@ -2151,14 +2189,8 @@ export async function listarAgendamentos(filtros = {}) {
           .order('data_agendamento', { ascending: false })
           .order('created_at', { ascending: false });
 
-        if (filtros.status && filtros.status !== 'todos') {
-          if (filtros.status === 'Liberado para Carregar') {
-            query = query.in('status', ['Liberado para Carregar', 'Confirmado']);
-          } else if (filtros.status === 'Finalizado' || filtros.status === 'Carregado') {
-            query = query.in('status', ['Finalizado', 'Carregado']);
-          } else {
-            query = query.eq('status', filtros.status);
-          }
+        if (statusArray && statusArray.length > 0) {
+          query = query.in('status', statusArray);
         }
 
         if (filtros.data) {
@@ -2212,10 +2244,8 @@ export async function listarAgendamentos(filtros = {}) {
             // Se filtro de data estiver ativo, checa se o agendamento local bate com a data
             if (filtros.data && l.data_agendamento !== filtros.data) return false;
             // Se filtro de status estiver ativo, checa status
-            if (filtros.status && filtros.status !== 'todos') {
-              if (filtros.status === 'Liberado para Carregar' && !['Liberado para Carregar', 'Confirmado'].includes(l.status)) return false;
-              if ((filtros.status === 'Finalizado' || filtros.status === 'Carregado') && !['Finalizado', 'Carregado'].includes(l.status)) return false;
-              if (l.status !== filtros.status) return false;
+            if (statusArray && statusArray.length > 0) {
+              if (!statusArray.includes(l.status)) return false;
             }
             return true;
           }).map(l => ({
@@ -2289,14 +2319,8 @@ export async function listarAgendamentos(filtros = {}) {
     if (filtros.pedreira && filtros.pedreira !== 'todas') {
       resultado = resultado.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
     }
-    if (filtros.status && filtros.status !== 'todos') {
-      if (filtros.status === 'Liberado para Carregar') {
-        resultado = resultado.filter(item => item.status === 'Liberado para Carregar' || item.status === 'Confirmado');
-      } else if (filtros.status === 'Finalizado' || filtros.status === 'Carregado') {
-        resultado = resultado.filter(item => item.status === 'Finalizado' || item.status === 'Carregado');
-      } else {
-        resultado = resultado.filter(item => item.status === filtros.status);
-      }
+    if (statusArray && statusArray.length > 0) {
+      resultado = resultado.filter(item => statusArray.includes(item.status));
     }
     if (filtros.data) {
       resultado = resultado.filter(item => item.data_agendamento === filtros.data);
