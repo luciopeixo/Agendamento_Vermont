@@ -2361,31 +2361,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   ⚠️ {statusCPF.erro}
                 </span>
               )}
-              {statusCPF.encontrado && (
-                <div className="animate-fade" style={{
-                  marginTop: 4,
-                  padding: '6px 10px',
-                  background: 'rgba(0, 118, 44, 0.15)',
-                  border: '1px solid rgba(0, 118, 44, 0.4)',
-                  borderRadius: 6,
-                  fontSize: '0.74rem',
-                  color: '#86efac',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}>
-                  <Sparkles size={14} color="#4ade80" />
-                  <span>
-                    Motorista <strong>{statusCPF.nomeEncontrado}</strong> localizado na base! Nome e telefone preenchidos.
-                  </span>
-                </div>
-              )}
-              {statusCPF.valido === true && !statusCPF.encontrado && (
-                <span className="animate-fade" style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 2 }}>
-                  ℹ️ Novo motorista. Os dados informados serão salvos na base interna para os próximos agendamentos.
-                </span>
-              )}
-
             </div>
 
             {/* Nome do Motorista */}

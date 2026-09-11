@@ -239,23 +239,54 @@ export function validarCPF(cpf = '') {
 }
 
 /**
+ * Decodifica o armazenamento local de motoristas com suporte a formato ofuscado e legado
+ */
+function decodificarBaseMotoristasLocal(raw) {
+  if (!raw) return [];
+  try {
+    // Tenta primeiro o formato ofuscado em Base64
+    const jsonStr = decodeURIComponent(escape(atob(raw)));
+    const parsed = JSON.parse(jsonStr);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_e) {
+    try {
+      // Fallback para JSON direto (compatibilidade)
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_e2) {
+      return [];
+    }
+  }
+}
+
+/**
+ * Codifica a base local para evitar texto puro em inspecionamento de navegador
+ */
+function codificarBaseMotoristasLocal(lista = []) {
+  try {
+    const json = JSON.stringify(lista);
+    return btoa(unescape(encodeURIComponent(json)));
+  } catch (_e) {
+    return JSON.stringify(lista);
+  }
+}
+
+/**
  * Retorna todos os motoristas salvos na base local interna
  */
 export function obterBaseMotoristas() {
   try {
     const raw = localStorage.getItem(MOTORISTAS_BASE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return decodificarBaseMotoristasLocal(raw);
   } catch (e) {
     return [];
   }
 }
 
 /**
- * Salva ou atualiza um motorista na base cadastral
+ * Salva ou atualiza um motorista na base cadastral (local e sincronizado criptografado no Supabase)
  */
-export function salvarMotoristaNaBase(dadosMotorista = {}) {
+export async function salvarMotoristaNaBase(dadosMotorista = {}) {
   try {
     const rawCpf = dadosMotorista.motorista_cpf || dadosMotorista.cpf;
     if (!rawCpf) return;
@@ -267,11 +298,13 @@ export function salvarMotoristaNaBase(dadosMotorista = {}) {
 
     const transpLimpa = limparNomeEmpresa(dadosMotorista.transportadora || dadosMotorista.nome_transportadora || '').toUpperCase() || null;
     const transpCnpj = dadosMotorista.transportadora_cnpj || extrairCnpj(dadosMotorista.transportadora) || obterCnpjEmpresaCache(transpLimpa) || null;
+    const nomeLimpo = (dadosMotorista.motorista_nome || dadosMotorista.nome || '').trim().toUpperCase();
+    const telLimpo = dadosMotorista.motorista_telefone || dadosMotorista.telefone || null;
 
     const novoRegistro = {
       cpf: cpfLimpo,
-      nome: (dadosMotorista.motorista_nome || dadosMotorista.nome || '').trim().toUpperCase(),
-      telefone: dadosMotorista.motorista_telefone || dadosMotorista.telefone || null,
+      nome: nomeLimpo,
+      telefone: telLimpo,
       transportadora: transpLimpa,
       transportadora_cnpj: transpCnpj,
       tipo_veiculo: dadosMotorista.tipo_veiculo || null,
@@ -287,14 +320,28 @@ export function salvarMotoristaNaBase(dadosMotorista = {}) {
       base.push(novoRegistro);
     }
 
-    localStorage.setItem(MOTORISTAS_BASE_KEY, JSON.stringify(base));
+    localStorage.setItem(MOTORISTAS_BASE_KEY, codificarBaseMotoristasLocal(base));
+
+    // Sincroniza de forma criptografada no Supabase via RPC segura se configurado
+    if (isSupabaseConfigurado() && nomeLimpo) {
+      try {
+        await supabase.rpc('salvar_motorista', {
+          p_cpf: cpfLimpo,
+          p_nome: nomeLimpo,
+          p_telefone: telLimpo || '',
+          p_transportadora: transpLimpa || ''
+        });
+      } catch (_errRpc) {
+        // Fallback silencioso se a migration RPC estiver pendente no banco
+      }
+    }
   } catch (e) {
     console.warn('Erro ao salvar motorista na base:', e);
   }
 }
 
 /**
- * Consulta um motorista pelo CPF na base interna e no histórico
+ * Consulta um motorista pelo CPF na base interna e no histórico (com suporte a criptografia Supabase)
  */
 export async function consultarMotoristaPorCPF(cpf = '') {
   if (!cpf) return { valido: null, encontrado: false, motorista: null };
@@ -315,7 +362,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
     };
   }
 
-  // 2. Busca na base local (cadastros e sementes)
+  // 2. Busca na base local (cadastros e sementes protegidos)
   const baseLocal = obterBaseMotoristas();
   const encontradoLocal = baseLocal.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
 
@@ -339,30 +386,28 @@ export async function consultarMotoristaPorCPF(cpf = '') {
     };
   }
 
-  // 3. Busca no histórico de agendamentos locais
-  const agendamentosLocais = obterAgendamentosLocais();
-  const agLocal = agendamentosLocais.find(a => a.motorista_cpf && a.motorista_cpf.replace(/\D/g, '') === cpfLimpo && a.motorista_nome);
-  if (agLocal) {
-    const transpNome = limparNomeEmpresa(agLocal.transportadora || '');
-    const transpCnpj = agLocal.transportadora_cnpj || resolverCnpjTransportadora(agLocal) || null;
-    const mot = {
-      nome: agLocal.motorista_nome,
-      telefone: agLocal.motorista_telefone || '',
-      transportadora: transpNome,
-      transportadora_cnpj: transpCnpj,
-      tipo_veiculo: agLocal.tipo_veiculo || '',
-      placa_cavalo: agLocal.placa_cavalo || '',
-      placa_carreta: agLocal.placa_carreta || '',
-      placa_carreta_2: agLocal.placa_carreta_2 || ''
-    };
-    salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
-    return { valido: true, encontrado: true, origem: 'historico_local', motorista: mot };
-  }
-
-  // 4. Se Supabase configurado, busca na base de motoristas e no histórico do Supabase
+  // 3. Se Supabase configurado, busca primeiro via RPC criptografada segura (PostgreSQL PGCrypto)
   if (isSupabaseConfigurado()) {
     try {
-      // 4.1 Consulta direta na tabela base_motoristas (mais direta e rápida)
+      // 3.1 Consulta via RPC segura criptografada (descriptografa em runtime no banco)
+      const { data: dataRpc, error: errorRpc } = await supabase
+        .rpc('consultar_motorista', { p_cpf: cpfLimpo });
+
+      if (!errorRpc && dataRpc && dataRpc.length > 0 && dataRpc[0].nome) {
+        const mot = {
+          nome: dataRpc[0].nome,
+          telefone: dataRpc[0].telefone || '',
+          transportadora: dataRpc[0].transportadora || '',
+          tipo_veiculo: '',
+          placa_cavalo: '',
+          placa_carreta: '',
+          placa_carreta_2: ''
+        };
+        salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
+        return { valido: true, encontrado: true, origem: 'base_supabase_criptografada', motorista: mot };
+      }
+
+      // 3.2 Consulta direta na tabela base_motoristas (caso legado/não-migrado)
       const { data: dataBase, error: errorBase } = await supabase
         .from('base_motoristas')
         .select('nome, telefone, transportadora')
@@ -383,25 +428,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
         return { valido: true, encontrado: true, origem: 'base_supabase', motorista: mot };
       }
 
-      // 4.2 Consulta via RPC segura (função SQL)
-      const { data: dataRpc, error: errorRpc } = await supabase
-        .rpc('consultar_motorista', { p_cpf: cpfLimpo });
-
-      if (!errorRpc && dataRpc && dataRpc.length > 0 && dataRpc[0].nome) {
-        const mot = {
-          nome: dataRpc[0].nome,
-          telefone: dataRpc[0].telefone || '',
-          transportadora: dataRpc[0].transportadora || '',
-          tipo_veiculo: '',
-          placa_cavalo: '',
-          placa_carreta: '',
-          placa_carreta_2: ''
-        };
-        salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
-        return { valido: true, encontrado: true, origem: 'base_supabase', motorista: mot };
-      }
-
-      // 4.3 Consulta no histórico de agendamentos salvos no Supabase
+      // 3.3 Consulta no histórico de agendamentos salvos no Supabase
       const { data, error } = await supabase
         .from('agendamentos_pedreira')
         .select('motorista_nome, motorista_telefone, transportadora, tipo_veiculo, placa_cavalo, placa_carreta, placa_carreta_2')
@@ -425,8 +452,26 @@ export async function consultarMotoristaPorCPF(cpf = '') {
     } catch (e) {
       console.warn('[Supabase Motorista] Erro ao consultar motorista no Supabase:', e);
     }
-  } else {
-    console.warn('[Supabase Motorista] Supabase não configurado ou variáveis VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY ausentes.');
+  }
+
+  // 4. Busca no histórico de agendamentos locais
+  const agendamentosLocais = obterAgendamentosLocais();
+  const agLocal = agendamentosLocais.find(a => a.motorista_cpf && a.motorista_cpf.replace(/\D/g, '') === cpfLimpo && a.motorista_nome);
+  if (agLocal) {
+    const transpNome = limparNomeEmpresa(agLocal.transportadora || '');
+    const transpCnpj = agLocal.transportadora_cnpj || resolverCnpjTransportadora(agLocal) || null;
+    const mot = {
+      nome: agLocal.motorista_nome,
+      telefone: agLocal.motorista_telefone || '',
+      transportadora: transpNome,
+      transportadora_cnpj: transpCnpj,
+      tipo_veiculo: agLocal.tipo_veiculo || '',
+      placa_cavalo: agLocal.placa_cavalo || '',
+      placa_carreta: agLocal.placa_carreta || '',
+      placa_carreta_2: agLocal.placa_carreta_2 || ''
+    };
+    salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
+    return { valido: true, encontrado: true, origem: 'historico_local', motorista: mot };
   }
 
   return { valido: true, encontrado: false, motorista: null };
