@@ -1119,6 +1119,40 @@ export function formatarPlacasExibicao(ag) {
 
 // Utilitários de Persistência Local (Fallback transparente quando Supabase não estiver conectado ou em ambiente local)
 const LOCAL_STORAGE_KEY = 'vermont_agendamentos_local';
+export const AGENDAMENTOS_EXCLUIDOS_KEY = 'vermont_agendamentos_excluidos_ids';
+
+/**
+ * Retorna o conjunto (Set) de IDs de agendamentos excluídos definitivamente pelo administrador
+ */
+export function obterIdsExcluidos() {
+  try {
+    const raw = localStorage.getItem(AGENDAMENTOS_EXCLUIDOS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) {
+      return new Set(arr.map(id => String(id).trim()).filter(Boolean));
+    }
+    return new Set();
+  } catch (e) {
+    return new Set();
+  }
+}
+
+/**
+ * Registra um ID de agendamento na lista de exclusão permanente (tombstone)
+ */
+export function registrarIdExcluido(id) {
+  if (!id && id !== 0) return;
+  try {
+    const idStr = String(typeof id === 'object' && id?.id ? id.id : id).trim();
+    if (!idStr) return;
+    const setIds = obterIdsExcluidos();
+    setIds.add(idStr);
+    localStorage.setItem(AGENDAMENTOS_EXCLUIDOS_KEY, JSON.stringify(Array.from(setIds)));
+  } catch (e) {
+    console.warn('Erro ao registrar ID excluído:', e);
+  }
+}
 
 export function isSupabaseConfigurado() {
   const url = import.meta.env.VITE_SUPABASE_URL || '';
@@ -1198,13 +1232,16 @@ export function fundirHistoricosStatus(histA = [], histB = []) {
 
 export function obterAgendamentosLocais() {
   try {
+    const idsExcluidos = obterIdsExcluidos();
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     const lista = raw ? JSON.parse(raw) : [];
     if (Array.isArray(lista)) {
-      return lista.map(item => ({
-        ...item,
-        historico_status: normalizarHistoricoStatus(item.historico_status)
-      }));
+      return lista
+        .filter(item => item && !idsExcluidos.has(String(item.id).trim()))
+        .map(item => ({
+          ...item,
+          historico_status: normalizarHistoricoStatus(item.historico_status)
+        }));
     }
     return [];
   } catch (e) {
@@ -1397,8 +1434,9 @@ export function registrarHistoricoStatus(agendamentoAtual, novoStatus, usuarioIn
 
 export function atualizarAgendamentoLocal(id, novoStatus, usuarioInfo = {}) {
   try {
+    const idStr = String(typeof id === 'object' && id?.id ? id.id : id).trim();
     const lista = obterAgendamentosLocais();
-    const index = lista.findIndex(item => item.id === id);
+    const index = lista.findIndex(item => String(item.id).trim() === idStr);
     if (index !== -1) {
       const historicoAtualizado = registrarHistoricoStatus(lista[index], novoStatus, usuarioInfo);
       lista[index].status = novoStatus;
@@ -1416,8 +1454,9 @@ export function atualizarAgendamentoLocal(id, novoStatus, usuarioInfo = {}) {
 
 export function atualizarAgendamentoLocalCompleto(agendamentoAtualizado, usuarioInfo = {}) {
   try {
+    const idStr = String(agendamentoAtualizado?.id || '').trim();
     const lista = obterAgendamentosLocais();
-    const index = lista.findIndex(item => item.id === agendamentoAtualizado.id);
+    const index = lista.findIndex(item => String(item.id).trim() === idStr);
     if (index !== -1) {
       const itemAtual = lista[index];
       const historicoNovo = normalizarHistoricoStatus(agendamentoAtualizado.historico_status);
@@ -1454,13 +1493,14 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
     }
 
     const id = agendamentoAtualizado.id;
+    const idStr = String(id).trim();
 
     // 1. Obtém o item anterior de forma 100% confiável
-    let itemAtual = agendamentoOriginal && agendamentoOriginal.id === id ? { ...agendamentoOriginal } : null;
+    let itemAtual = agendamentoOriginal && String(agendamentoOriginal.id).trim() === idStr ? { ...agendamentoOriginal } : null;
 
     if (!itemAtual) {
       const listaLocal = obterAgendamentosLocais();
-      const achado = listaLocal.find(item => item.id === id);
+      const achado = listaLocal.find(item => String(item.id).trim() === idStr);
       if (achado) itemAtual = { ...achado };
     }
 
@@ -1614,8 +1654,14 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
 
 export function excluirAgendamentoLocal(id) {
   try {
-    const lista = obterAgendamentosLocais();
-    const filtrados = lista.filter(item => item.id !== id);
+    const idStr = String(typeof id === 'object' && id?.id ? id.id : id).trim();
+    if (!idStr) return false;
+    registrarIdExcluido(idStr);
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const lista = raw ? JSON.parse(raw) : [];
+    const filtrados = Array.isArray(lista)
+      ? lista.filter(item => item && String(item.id).trim() !== idStr)
+      : [];
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtrados));
     return true;
   } catch (e) {
@@ -1697,18 +1743,28 @@ export function normalizarNomeMaterial(material, pedreira = '') {
 export async function obterHorariosOcupados(dataStr, pedreira) {
   try {
     if (!dataStr || !pedreira) return [];
+    const idsExcluidos = obterIdsExcluidos();
 
     let ocupados = [];
     if (isSupabaseConfigurado()) {
       try {
         const { data, error } = await supabase
           .from('agendamentos_pedreira')
-          .select('horario_agendamento, pedreira, status')
+          .select('id, horario_agendamento, pedreira, status, observacoes')
           .eq('data_agendamento', dataStr)
           .neq('status', 'Cancelado');
 
         if (!error && data) {
           ocupados = data
+            .filter(item => {
+              const idStr = String(item.id).trim();
+              if (idsExcluidos.has(idStr)) return false;
+              if (typeof item.observacoes === 'string' && item.observacoes.includes('[EXCLUÍDO DEFINITIVAMENTE PELO ADMINISTRADOR]')) {
+                registrarIdExcluido(idStr);
+                return false;
+              }
+              return true;
+            })
             .filter(item => saoMesmaPedreira(item.pedreira, pedreira))
             .map(item => item.horario_agendamento)
             .filter(h => h && h !== 'outros' && !h.startsWith('Sábado'));
@@ -1721,6 +1777,7 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
 
     const locais = obterAgendamentosLocais();
     ocupados = locais
+      .filter(item => !idsExcluidos.has(String(item.id).trim()))
       .filter(item => item.data_agendamento === dataStr && saoMesmaPedreira(item.pedreira, pedreira) && item.status !== 'Cancelado')
       .map(item => item.horario_agendamento)
       .filter(h => h && h !== 'outros' && !h.startsWith('Sábado'));
@@ -1787,6 +1844,7 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
       return { total: 0, limite: 12, disponivel: 12, lotado: false, totalBlocos: 0 };
     }
 
+    const idsExcluidos = obterIdsExcluidos();
     let todosAgendamentosSabado = [];
     const mapaUnificados = new Map();
 
@@ -1800,6 +1858,12 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
 
         if (!error && Array.isArray(data)) {
           data.forEach(item => {
+            const idStr = String(item.id).trim();
+            if (idsExcluidos.has(idStr)) return;
+            if (typeof item.observacoes === 'string' && item.observacoes.includes('[EXCLUÍDO DEFINITIVAMENTE PELO ADMINISTRADOR]')) {
+              registrarIdExcluido(idStr);
+              return;
+            }
             const statusLimpo = String(item.status || '').toLowerCase().trim();
             if (statusLimpo !== 'cancelado') {
               mapaUnificados.set(String(item.id || item.codigo_agendamento || item.numero_bloco), item);
@@ -1814,6 +1878,8 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
     // 2. Mescla com o armazenamento local (offline/cache)
     const locais = obterAgendamentosLocais();
     locais.forEach(item => {
+      const idStr = String(item.id).trim();
+      if (idsExcluidos.has(idStr)) return;
       if (item.data_agendamento === dataStr) {
         const statusLimpo = String(item.status || '').toLowerCase().trim();
         if (statusLimpo !== 'cancelado') {
@@ -1858,6 +1924,7 @@ export async function obterOcupacaoSabado(dataStr, pedreira = null) {
  */
 export async function obterPendenciasAnteriores({ pedreira = 'todas', dataReferencia = null } = {}) {
   try {
+    const idsExcluidos = obterIdsExcluidos();
     const hoje = dataReferencia || new Date().toISOString().split('T')[0];
 
     if (isSupabaseConfigurado()) {
@@ -1872,31 +1939,41 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
 
         const { data, error } = await query;
         if (!error && Array.isArray(data)) {
-          const locais = obterAgendamentosLocais();
-          const locaisMap = new Map(locais.map(l => [l.id, l]));
+          const locais = obterAgendamentosLocais().filter(l => !idsExcluidos.has(String(l.id).trim()));
+          const locaisMap = new Map(locais.map(l => [String(l.id).trim(), l]));
 
-          let lista = data.map(item => {
-            const loc = locaisMap.get(item.id);
-            const histSup = normalizarHistoricoStatus(item.historico_status);
-            const histLoc = normalizarHistoricoStatus(loc?.historico_status);
-            const historicoFinal = fundirHistoricosStatus(histSup, histLoc);
+          let lista = data
+            .filter(item => {
+              const idStr = String(item.id).trim();
+              if (idsExcluidos.has(idStr)) return false;
+              if (typeof item.observacoes === 'string' && item.observacoes.includes('[EXCLUÍDO DEFINITIVAMENTE PELO ADMINISTRADOR]')) {
+                registrarIdExcluido(idStr);
+                return false;
+              }
+              return true;
+            })
+            .map(item => {
+              const loc = locaisMap.get(String(item.id).trim());
+              const histSup = normalizarHistoricoStatus(item.historico_status);
+              const histLoc = normalizarHistoricoStatus(loc?.historico_status);
+              const historicoFinal = fundirHistoricosStatus(histSup, histLoc);
 
-            const clienteCnpj = resolverCnpjCliente(item, loc);
-            const transpCnpj = resolverCnpjTransportadora(item, loc);
-            const clienteLimpo = limparNomeEmpresa(item.cliente || loc?.cliente || '');
-            const transpLimpa = limparNomeEmpresa(item.transportadora || loc?.transportadora || '');
+              const clienteCnpj = resolverCnpjCliente(item, loc);
+              const transpCnpj = resolverCnpjTransportadora(item, loc);
+              const clienteLimpo = limparNomeEmpresa(item.cliente || loc?.cliente || '');
+              const transpLimpa = limparNomeEmpresa(item.transportadora || loc?.transportadora || '');
 
-            return {
-              ...(loc || {}),
-              ...item,
-              cliente: clienteLimpo || item.cliente,
-              cliente_cnpj: clienteCnpj || null,
-              transportadora: transpLimpa || item.transportadora,
-              transportadora_cnpj: transpCnpj || null,
-              historico_status: historicoFinal,
-              ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || (historicoFinal.length > 0 ? historicoFinal[0].usuario_nome : null)
-            };
-          });
+              return {
+                ...(loc || {}),
+                ...item,
+                cliente: clienteLimpo || item.cliente,
+                cliente_cnpj: clienteCnpj || null,
+                transportadora: transpLimpa || item.transportadora,
+                transportadora_cnpj: transpCnpj || null,
+                historico_status: historicoFinal,
+                ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || (historicoFinal.length > 0 ? historicoFinal[0].usuario_nome : null)
+              };
+            });
 
           if (pedreira && pedreira !== 'todas') {
             lista = lista.filter(item => saoMesmaPedreira(item.pedreira, pedreira));
@@ -1909,7 +1986,7 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
       }
     }
 
-    const locais = obterAgendamentosLocais().map(item => ({
+    const locais = obterAgendamentosLocais().filter(l => !idsExcluidos.has(String(l.id).trim())).map(item => ({
       ...item,
       cliente: limparNomeEmpresa(item.cliente),
       cliente_cnpj: item.cliente_cnpj || resolverCnpjCliente(item) || null,
@@ -1934,9 +2011,10 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
  */
 export async function listarAgendamentos(filtros = {}) {
   try {
+    const idsExcluidos = obterIdsExcluidos();
     let listaSup = [];
-    const locais = obterAgendamentosLocais();
-    const locaisMap = new Map(locais.map(l => [String(l.id), l]));
+    const locais = obterAgendamentosLocais().filter(l => !idsExcluidos.has(String(l.id).trim()));
+    const locaisMap = new Map(locais.map(l => [String(l.id).trim(), l]));
 
     if (isSupabaseConfigurado()) {
       try {
@@ -1962,8 +2040,20 @@ export async function listarAgendamentos(filtros = {}) {
 
         const { data, error } = await query;
         if (!error && data) {
-          listaSup = data.map(item => {
-            const loc = locaisMap.get(String(item.id));
+          // Filtra registros excluídos definitivamente (tombstone e observação de auditoria)
+          const dataFiltrada = data.filter(item => {
+            const idStr = String(item.id).trim();
+            if (idsExcluidos.has(idStr)) return false;
+            if (typeof item.observacoes === 'string' && item.observacoes.includes('[EXCLUÍDO DEFINITIVAMENTE PELO ADMINISTRADOR]')) {
+              registrarIdExcluido(idStr);
+              return false;
+            }
+            return true;
+          });
+
+          listaSup = dataFiltrada.map(item => {
+            const idStr = String(item.id).trim();
+            const loc = locaisMap.get(idStr);
             const histSup = normalizarHistoricoStatus(item.historico_status);
             const histLoc = normalizarHistoricoStatus(loc?.historico_status);
             const historicoFinal = fundirHistoricosStatus(histSup, histLoc);
@@ -1986,9 +2076,12 @@ export async function listarAgendamentos(filtros = {}) {
           });
 
           // Identifica registros que existem localmente mas ainda não subiram para o Supabase
-          const supabaseIds = new Set(data.map(d => String(d.id)));
+          const supabaseIds = new Set(data.map(d => String(d.id).trim()));
           const locaisNaoNoSupabase = locais.filter(l => {
-            if (supabaseIds.has(String(l.id))) return false;
+            const idStr = String(l.id).trim();
+            if (idsExcluidos.has(idStr)) return false;
+            if (l.status === 'Cancelado') return false;
+            if (supabaseIds.has(idStr)) return false;
             // Se filtro de data estiver ativo, checa se o agendamento local bate com a data
             if (filtros.data && l.data_agendamento !== filtros.data) return false;
             // Se filtro de status estiver ativo, checa status
@@ -2013,13 +2106,15 @@ export async function listarAgendamentos(filtros = {}) {
             listaUnificada = listaUnificada.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
           }
 
-          // Mantém localStorage sempre sincronizado sem perder dados enriquecidos ou histórico
+          // Mantém localStorage sempre sincronizado sem readicionar itens excluídos
           try {
-            const mapaAtualizado = new Map(locais.map(l => [String(l.id), l]));
+            const mapaAtualizado = new Map(locais.filter(l => !idsExcluidos.has(String(l.id).trim())).map(l => [String(l.id).trim(), l]));
             listaSup.forEach(item => {
-              const anterior = mapaAtualizado.get(String(item.id)) || {};
+              const idItemStr = String(item.id).trim();
+              if (idsExcluidos.has(idItemStr)) return;
+              const anterior = mapaAtualizado.get(idItemStr) || {};
               const histMesclado = fundirHistoricosStatus(item.historico_status, anterior.historico_status);
-              mapaAtualizado.set(String(item.id), {
+              mapaAtualizado.set(idItemStr, {
                 ...anterior,
                 ...item,
                 cliente: item.cliente || anterior.cliente,
@@ -2032,9 +2127,11 @@ export async function listarAgendamentos(filtros = {}) {
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(Array.from(mapaAtualizado.values())));
           } catch (e) {}
 
-          // Tenta subir registros pendentes para o Supabase em segundo plano
+          // Tenta subir registros pendentes para o Supabase em segundo plano (NUNCA re-insere excluídos)
           if (locaisNaoNoSupabase.length > 0) {
             locaisNaoNoSupabase.forEach(async (pendente) => {
+              const idPendenteStr = String(pendente.id).trim();
+              if (idsExcluidos.has(idPendenteStr) || pendente.status === 'Cancelado') return;
               try {
                 const { error: errInsert } = await supabase
                   .from('agendamentos_pedreira')
@@ -2053,7 +2150,7 @@ export async function listarAgendamentos(filtros = {}) {
       }
     }
 
-    let resultado = obterAgendamentosLocais().map(item => ({
+    let resultado = obterAgendamentosLocais().filter(l => !idsExcluidos.has(String(l.id).trim())).map(item => ({
       ...item,
       cliente: limparNomeEmpresa(item.cliente),
       cliente_cnpj: item.cliente_cnpj || resolverCnpjCliente(item) || null,
@@ -2094,8 +2191,9 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
     let itemAtual = typeof agendamentoOuId === 'object' && agendamentoOuId ? { ...agendamentoOuId } : null;
 
     if (!itemAtual || !itemAtual.status) {
+      const idStr = String(id).trim();
       const listaLocal = obterAgendamentosLocais();
-      const achado = listaLocal.find(item => item.id === id);
+      const achado = listaLocal.find(item => String(item.id).trim() === idStr);
       if (achado) itemAtual = { ...achado };
     }
 
@@ -2201,19 +2299,44 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
 }
 
 /**
- * Exclui um agendamento permanentemente (libera o horário na hora)
+ * Exclui um agendamento permanentemente (libera o horário na hora e evita retorno pós-sincronização)
  */
-export async function excluirAgendamento(id) {
+export async function excluirAgendamento(agendamentoOuId) {
   try {
+    const id = typeof agendamentoOuId === 'object' && agendamentoOuId ? agendamentoOuId.id : agendamentoOuId;
+    if (!id && id !== 0) return { success: false, error: 'ID inválido' };
+
+    const idStr = String(id).trim();
+    const isNumero = /^\d+$/.test(idStr);
+    const idQuery = isNumero ? Number(idStr) : idStr;
+
+    // 1. Registra imediatamente no tombstone e expurga do localStorage
+    registrarIdExcluido(idStr);
+    excluirAgendamentoLocal(idStr);
+
+    // 2. Se Supabase estiver conectado, executa exclusão física e soft-delete de contingência
     if (isSupabaseConfigurado()) {
       try {
-        await supabase
+        const { error: errDelete } = await supabase
           .from('agendamentos_pedreira')
           .delete()
-          .eq('id', id);
-      } catch (e) {}
+          .eq('id', idQuery);
+
+        if (errDelete) {
+          console.warn('DELETE no Supabase falhou (provável restrição RLS), aplicando soft-delete de contingência:', errDelete.message);
+          await supabase
+            .from('agendamentos_pedreira')
+            .update({ 
+              status: 'Cancelado',
+              observacoes: '[EXCLUÍDO DEFINITIVAMENTE PELO ADMINISTRADOR]'
+            })
+            .eq('id', idQuery);
+        }
+      } catch (eSup) {
+        console.warn('Erro ao comunicar exclusão no Supabase:', eSup);
+      }
     }
-    excluirAgendamentoLocal(id);
+
     return { success: true };
   } catch (err) {
     console.error('Erro ao excluir agendamento:', err);

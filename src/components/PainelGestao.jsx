@@ -177,12 +177,13 @@ export function PainelGestao({
       const novosCarregamentos = [];
 
       lista.forEach(ag => {
-        const statusAntigo = mapaAnterior.get(ag.id);
+        const agIdStr = String(ag.id).trim();
+        const statusAntigo = mapaAnterior.get(agIdStr);
         // Se mudou para 'Carregando' em relação à checagem anterior:
         if (!isPrimeiraCargaRef.current && statusAntigo && statusAntigo !== 'Carregando' && ag.status === 'Carregando') {
           novosCarregamentos.push(ag);
         }
-        mapaAnterior.set(ag.id, ag.status);
+        mapaAnterior.set(agIdStr, ag.status);
       });
 
       if (isPrimeiraCargaRef.current) {
@@ -397,15 +398,16 @@ export function PainelGestao({
         ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema'
       };
 
-      setAgendamentos(prev => prev.map(ag => ag.id === agendamento.id ? agAtualizado : ag));
-      setTodosAgendamentos(prev => prev.map(ag => ag.id === agendamento.id ? agAtualizado : ag));
+      const agIdStr = String(agendamento.id).trim();
+      setAgendamentos(prev => prev.map(ag => String(ag.id).trim() === agIdStr ? agAtualizado : ag));
+      setTodosAgendamentos(prev => prev.map(ag => String(ag.id).trim() === agIdStr ? agAtualizado : ag));
 
       // Mantém a lista de pendências anteriores sincronizada
       setPendenciasAnteriores(prev => {
         if (['Finalizado', 'Carregado', 'Cancelado'].includes(novoStatus)) {
-          return prev.filter(ag => ag.id !== agendamento.id);
+          return prev.filter(ag => String(ag.id).trim() !== agIdStr);
         }
-        return prev.map(ag => ag.id === agendamento.id ? agAtualizado : ag);
+        return prev.map(ag => String(ag.id).trim() === agIdStr ? agAtualizado : ag);
       });
 
       setMensagemAviso(`Status do Bloco ${agendamento.numero_bloco} atualizado para "${novoStatus}" com sucesso.`);
@@ -424,19 +426,20 @@ export function PainelGestao({
       ...agendamentoAtualizado,
       historico_status: normalizarHistoricoStatus(agendamentoAtualizado.historico_status)
     };
+    const agIdStr = String(itemFormatado.id).trim();
 
-    setAgendamentos(prev => prev.map(ag => ag.id === itemFormatado.id ? itemFormatado : ag));
-    setTodosAgendamentos(prev => prev.map(ag => ag.id === itemFormatado.id ? itemFormatado : ag));
+    setAgendamentos(prev => prev.map(ag => String(ag.id).trim() === agIdStr ? itemFormatado : ag));
+    setTodosAgendamentos(prev => prev.map(ag => String(ag.id).trim() === agIdStr ? itemFormatado : ag));
 
     setPendenciasAnteriores(prev => {
       const isAnterior = itemFormatado.data_agendamento && itemFormatado.data_agendamento < hojeStr;
       const isPendente = itemFormatado.status && !['Finalizado', 'Carregado', 'Cancelado'].includes(itemFormatado.status);
       if (!isAnterior || !isPendente) {
-        return prev.filter(ag => ag.id !== itemFormatado.id);
+        return prev.filter(ag => String(ag.id).trim() !== agIdStr);
       }
-      const existe = prev.some(ag => ag.id === itemFormatado.id);
+      const existe = prev.some(ag => String(ag.id).trim() === agIdStr);
       if (existe) {
-        return prev.map(ag => ag.id === itemFormatado.id ? itemFormatado : ag);
+        return prev.map(ag => String(ag.id).trim() === agIdStr ? itemFormatado : ag);
       }
       return [itemFormatado, ...prev];
     });
@@ -462,13 +465,21 @@ export function PainelGestao({
 
     if (!confirmou) return;
 
+    const agIdStr = String(ag.id).trim();
     setExcluindoId(ag.id);
-    const res = await excluirAgendamento(ag.id);
+    const res = await excluirAgendamento(ag);
     setExcluindoId(null);
 
     if (res.success) {
-      setAgendamentos(prev => prev.filter(item => item.id !== ag.id));
-      setTodosAgendamentos(prev => prev.filter(item => item.id !== ag.id));
+      setAgendamentos(prev => prev.filter(item => String(item.id).trim() !== agIdStr));
+      setTodosAgendamentos(prev => prev.filter(item => String(item.id).trim() !== agIdStr));
+      setPendenciasAnteriores(prev => prev.filter(item => String(item.id).trim() !== agIdStr));
+
+      if (statusAnterioresMapRef.current) {
+        statusAnterioresMapRef.current.delete(ag.id);
+        statusAnterioresMapRef.current.delete(agIdStr);
+      }
+
       setMensagemAviso(`Agendamento do Bloco ${ag.numero_bloco} apagado com sucesso. O horário ${ag.horario_agendamento} do dia ${formatarDataBR(ag.data_agendamento)} foi liberado!`);
       setTimeout(() => setMensagemAviso(''), 7000);
     } else {
@@ -483,7 +494,7 @@ export function PainelGestao({
     if (res.success) {
       setMensagemAviso(`Notificação enviada para o e-mail da logística!`);
       setTimeout(() => setMensagemAviso(''), 7000);
-      setAgendamentos(prev => prev.map(ag => ag.id === agendamento.id ? { ...ag, email_notificado: true } : ag));
+      setAgendamentos(prev => prev.map(ag => String(ag.id).trim() === String(agendamento.id).trim() ? { ...ag, email_notificado: true } : ag));
     } else {
       alert('Aviso no envio: ' + (res.error || 'Falha temporária'));
     }
@@ -1458,7 +1469,7 @@ export function PainelGestao({
                   const isSabado = ag.tipo_dia === 'sabado' || isDataSabado(ag.data_agendamento) || String(ag.horario_agendamento || '').includes('Sábado');
                   const isOutros = ag.horario_agendamento === 'outros' || String(ag.horario_agendamento).toLowerCase().startsWith('outro');
                   const listaPlacasTabela = formatarPlacasExibicao(ag);
-                  const estaExcluindo = excluindoId === ag.id;
+                  const estaExcluindo = String(excluindoId) === String(ag.id);
                   const histArr = normalizarHistoricoStatus(ag.historico_status);
                   const isDataAnteriorPendente = ag.data_agendamento && ag.data_agendamento < hojeStr && !['Finalizado', 'Carregado', 'Cancelado'].includes(ag.status);
 
