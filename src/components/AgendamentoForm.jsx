@@ -111,20 +111,10 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   const [carregandoOcupacao, setCarregandoOcupacao] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [mensagemErro, setMensagemErro] = useState('');
-
-  // Trava de Sábado calculada em tempo real de forma síncrona
+  // Lembretes operacionais de sábado
   const statusTravaSabado = obterStatusTravaSabado(formData.data_agendamento);
-  const isBloqueadoSabado1 = isDataSabado(formData.data_agendamento) && (statusTravaSabado.bloqueado || ocupacaoSabado.bloqueado);
-
   const statusTravaSabado2 = obterStatusTravaSabado(ponto2.data_agendamento);
-  const isBloqueadoSabado2 = isDataSabado(ponto2.data_agendamento) && (statusTravaSabado2.bloqueado || ocupacaoSabado2.bloqueado);
-
   const statusTravaSabado3 = obterStatusTravaSabado(ponto3.data_agendamento);
-  const isBloqueadoSabado3 = isDataSabado(ponto3.data_agendamento) && (statusTravaSabado3.bloqueado || ocupacaoSabado3.bloqueado);
-
-  const algumSabadoBloqueado = isBloqueadoSabado1 || 
-    (tipoCarregamento === 'combinado' && isBloqueadoSabado2) || 
-    (tipoCarregamento === 'combinado' && qtdBlocosCombinados === 3 && isBloqueadoSabado3);
 
   // Configuração dinâmica de placas baseada no tipo de veículo selecionado
   const configPlacas = obterConfigPlacas(formData.tipo_veiculo);
@@ -651,11 +641,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return;
     }
 
-    if (tipoDia === 'sabado' && isAgendamentoSabadoBloqueado(formData.data_agendamento)) {
-      setMensagemErro(`A agenda para o sábado (${formatarDataBR(formData.data_agendamento)}) está encerrada (1º carregamento). Conforme regra operacional, as solicitações para carregamento no sábado devem ser realizadas impreterivelmente até as 14:00 da sexta-feira anterior.`);
-      return;
-    }
-
     if (tipoDia === 'sabado' && ocupacaoSabado.lotado) {
       setMensagemErro('O limite máximo de 12 veículos para este sábado na pedreira de Uruoca foi atingido (1º carregamento). Escolha outra data.');
       return;
@@ -722,11 +707,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         return;
       }
 
-      if (tipoDia2 === 'sabado' && isAgendamentoSabadoBloqueado(ponto2.data_agendamento)) {
-        setMensagemErro(`A agenda para o sábado (${formatarDataBR(ponto2.data_agendamento)}) está encerrada (2º carregamento). As solicitações de sábado devem ser realizadas até as 14:00 da sexta-feira anterior.`);
-        return;
-      }
-
       if (tipoDia2 === 'sabado' && ocupacaoSabado2.lotado) {
         setMensagemErro('O limite máximo de 12 veículos para este sábado na pedreira de Uruoca foi atingido (2º carregamento). Escolha outra data.');
         return;
@@ -790,11 +770,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
         if (tipoDia3 === 'sabado' && !isPedreiraUruoca(ponto3.pedreira)) {
           setMensagemErro('Aos sábados, o carregamento opera exclusivamente na pedreira de Uruoca - CE (Taj Mahal). Por favor, selecione uma data entre segunda e sexta-feira para o 3º carregamento.');
-          return;
-        }
-
-        if (tipoDia3 === 'sabado' && isAgendamentoSabadoBloqueado(ponto3.data_agendamento)) {
-          setMensagemErro(`A agenda para o sábado (${formatarDataBR(ponto3.data_agendamento)}) está encerrada (3º carregamento). As solicitações de sábado devem ser realizadas até as 14:00 da sexta-feira anterior.`);
           return;
         }
 
@@ -1462,51 +1437,43 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 {tipoDia === 'sabado' && isPedreiraUruoca(formData.pedreira) && (
                   <div className="animate-fade" style={{
                     gridColumn: '1 / -1',
-                    background: isBloqueadoSabado1 
-                      ? 'rgba(239, 68, 68, 0.12)' 
-                      : (ocupacaoSabado.lotado ? 'var(--danger-bg)' : 'var(--vermont-green-subtle)'),
-                    border: `1px solid ${isBloqueadoSabado1 ? '#ef4444' : (ocupacaoSabado.lotado ? 'var(--danger-border)' : 'var(--vermont-green-border)')}`,
+                    background: ocupacaoSabado.lotado ? 'var(--danger-bg)' : 'var(--vermont-green-subtle)',
+                    border: `1px solid ${ocupacaoSabado.lotado ? 'var(--danger-border)' : 'var(--vermont-green-border)'}`,
                     borderRadius: 12,
                     padding: 16
                   }}>
-                    {isBloqueadoSabado1 ? (
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <AlertTriangle size={20} color="#f87171" />
-                            <strong style={{ color: '#fca5a5', fontSize: '0.94rem' }}>
-                              🔒 Agenda de Sábado Encerrada ({formatarDataBR(formData.data_agendamento)})
-                            </strong>
-                          </div>
-                          <span className="badge badge-danger" style={{ fontSize: '0.74rem' }}>
-                            Agendamento Bloqueado
-                          </span>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Truck size={20} color={ocupacaoSabado.lotado ? '#f87171' : '#4ade80'} />
+                          <strong style={{ color: ocupacaoSabado.lotado ? '#fca5a5' : '#4ade80', fontSize: '0.92rem' }}>
+                            {ocupacaoSabado.lotado 
+                              ? `🚨 Limite de 12 Veículos Atingido para este Sábado (${ocupacaoSabado.total} de 12 veículos ocupados)` 
+                              : `✅ Cota do Sábado (Uruoca): ${ocupacaoSabado.total} de 12 veículos ocupados (${ocupacaoSabado.disponivel} vaga${ocupacaoSabado.disponivel === 1 ? '' : 's'} restante${ocupacaoSabado.disponivel === 1 ? '' : 's'})`}
+                          </strong>
                         </div>
-                        <p style={{ margin: 0, fontSize: '0.84rem', color: '#fecaca', lineHeight: 1.4 }}>
-                          {statusTravaSabado.motivo || ocupacaoSabado.motivoTrava || 'As inclusões para este sábado foram encerradas às 14:00 da sexta-feira anterior.'} Para carregar no sábado, realize a solicitação antes das 14:00 de sexta-feira ou escolha um dia útil (segunda a sexta-feira).
-                        </p>
+                        <span className={`badge ${ocupacaoSabado.lotado ? 'badge-danger' : 'badge-vermont'}`} style={{ fontSize: '0.74rem' }}>
+                          {ocupacaoSabado.lotado ? 'Esgotado (12/12)' : `${ocupacaoSabado.disponivel} vagas livres`}
+                        </span>
                       </div>
-                    ) : (
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Truck size={20} color={ocupacaoSabado.lotado ? '#f87171' : '#4ade80'} />
-                            <strong style={{ color: ocupacaoSabado.lotado ? '#fca5a5' : '#4ade80', fontSize: '0.92rem' }}>
-                              {ocupacaoSabado.lotado 
-                                ? `🚨 Limite de 12 Veículos Atingido para este Sábado (${ocupacaoSabado.total} de 12 veículos ocupados)` 
-                                : `✅ Cota do Sábado (Uruoca): ${ocupacaoSabado.total} de 12 veículos ocupados (${ocupacaoSabado.disponivel} vaga${ocupacaoSabado.disponivel === 1 ? '' : 's'} restante${ocupacaoSabado.disponivel === 1 ? '' : 's'})`}
-                            </strong>
-                          </div>
-                          <span className={`badge ${ocupacaoSabado.lotado ? 'badge-danger' : 'badge-vermont'}`} style={{ fontSize: '0.74rem' }}>
-                            {ocupacaoSabado.lotado ? 'Esgotado (12/12)' : `${ocupacaoSabado.disponivel} vagas livres`}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: '#fbbf24', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Clock size={13} />
-                          <span>{ocupacaoSabado.motivoTrava || statusTravaSabado.motivo || 'Horário limite: Os agendamentos para este sábado encerram-se na sexta-feira às 14:00.'}</span>
-                        </div>
+                      
+                      {/* Recado / Aviso Operacional sobre limite de sexta às 14h */}
+                      <div style={{ 
+                        fontSize: '0.80rem', 
+                        color: '#fef3c7', 
+                        marginTop: 10, 
+                        padding: '8px 12px',
+                        background: 'rgba(245, 158, 11, 0.12)',
+                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        borderRadius: 8,
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 8 
+                      }}>
+                        <Clock size={15} color="#fbbf24" style={{ flexShrink: 0 }} />
+                        <span><strong>Lembrete Operacional:</strong> Temos um limite de horário para agendamento dos sábados até <strong>sexta-feira às 14:00</strong>.</span>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
 
@@ -1941,42 +1908,43 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 {tipoDia2 === 'sabado' && isPedreiraUruoca(ponto2.pedreira) && (
                   <div className="animate-fade" style={{
                     gridColumn: '1 / -1',
-                    background: isBloqueadoSabado2 
-                      ? 'rgba(239, 68, 68, 0.12)' 
-                      : (ocupacaoSabado2.lotado ? 'var(--danger-bg)' : 'var(--vermont-green-subtle)'),
-                    border: `1px solid ${isBloqueadoSabado2 ? '#ef4444' : (ocupacaoSabado2.lotado ? 'var(--danger-border)' : 'var(--vermont-green-border)')}`,
+                    background: ocupacaoSabado2.lotado ? 'var(--danger-bg)' : 'var(--vermont-green-subtle)',
+                    border: `1px solid ${ocupacaoSabado2.lotado ? 'var(--danger-border)' : 'var(--vermont-green-border)'}`,
                     borderRadius: 12,
                     padding: 14
                   }}>
-                    {isBloqueadoSabado2 ? (
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <AlertTriangle size={18} color="#f87171" />
-                            <strong style={{ color: '#fca5a5', fontSize: '0.88rem' }}>
-                              🔒 Agenda de Sábado Encerrada (2º Carregamento)
-                            </strong>
-                          </div>
-                          <span className="badge badge-danger" style={{ fontSize: '0.72rem' }}>
-                            Bloqueado
-                          </span>
-                        </div>
-                        <p style={{ margin: 0, fontSize: '0.80rem', color: '#fecaca', lineHeight: 1.35 }}>
-                          {statusTravaSabado2.motivo || ocupacaoSabado2.motivoTrava || 'As inclusões para o sábado foram encerradas às 14:00 de sexta-feira.'}
-                        </p>
-                      </div>
-                    ) : (
+                    <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <Truck size={18} color={ocupacaoSabado2.lotado ? '#f87171' : '#4ade80'} />
-                          <strong style={{ color: '#fca5a5', fontSize: '0.88rem' }}>
+                          <strong style={{ color: ocupacaoSabado2.lotado ? '#fca5a5' : '#4ade80', fontSize: '0.88rem' }}>
                             {ocupacaoSabado2.lotado 
                               ? `🚨 Limite de 12 Veículos Atingido para este Sábado (${ocupacaoSabado2.total} de 12 ocupados)` 
                               : `✅ Cota do Sábado (Uruoca): ${ocupacaoSabado2.total} de 12 veículos ocupados (${ocupacaoSabado2.disponivel} vagas disponíveis)`}
                           </strong>
                         </div>
+                        <span className={`badge ${ocupacaoSabado2.lotado ? 'badge-danger' : 'badge-vermont'}`} style={{ fontSize: '0.72rem' }}>
+                          {ocupacaoSabado2.lotado ? 'Esgotado (12/12)' : `${ocupacaoSabado2.disponivel} vagas`}
+                        </span>
                       </div>
-                    )}
+                      
+                      {/* Recado / Aviso Operacional */}
+                      <div style={{ 
+                        fontSize: '0.78rem', 
+                        color: '#fef3c7', 
+                        marginTop: 8, 
+                        padding: '6px 10px',
+                        background: 'rgba(245, 158, 11, 0.12)',
+                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        borderRadius: 6,
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 6 
+                      }}>
+                        <Clock size={14} color="#fbbf24" style={{ flexShrink: 0 }} />
+                        <span><strong>Lembrete:</strong> Limite de agendamento de sábado até sexta-feira às 14:00.</span>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -2251,31 +2219,12 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   {tipoDia3 === 'sabado' && isPedreiraUruoca(ponto3.pedreira) && (
                     <div className="animate-fade" style={{
                       gridColumn: '1 / -1',
-                      background: isBloqueadoSabado3 
-                        ? 'rgba(239, 68, 68, 0.12)' 
-                        : (ocupacaoSabado3.lotado ? 'var(--danger-bg)' : 'var(--vermont-green-subtle)'),
-                      border: `1px solid ${isBloqueadoSabado3 ? '#ef4444' : (ocupacaoSabado3.lotado ? 'var(--danger-border)' : 'var(--vermont-green-border)')}`,
+                      background: ocupacaoSabado3.lotado ? 'var(--danger-bg)' : 'var(--vermont-green-subtle)',
+                      border: `1px solid ${ocupacaoSabado3.lotado ? 'var(--danger-border)' : 'var(--vermont-green-border)'}`,
                       borderRadius: 12,
                       padding: 14
                     }}>
-                      {isBloqueadoSabado3 ? (
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <AlertTriangle size={18} color="#f87171" />
-                              <strong style={{ color: '#fca5a5', fontSize: '0.88rem' }}>
-                                🔒 Agenda de Sábado Encerrada (3º Carregamento)
-                              </strong>
-                            </div>
-                            <span className="badge badge-danger" style={{ fontSize: '0.72rem' }}>
-                              Bloqueado
-                            </span>
-                          </div>
-                          <p style={{ margin: 0, fontSize: '0.80rem', color: '#fecaca', lineHeight: 1.35 }}>
-                            {statusTravaSabado3.motivo || ocupacaoSabado3.motivoTrava || 'As inclusões para o sábado foram encerradas às 14:00 de sexta-feira.'}
-                          </p>
-                        </div>
-                      ) : (
+                      <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Truck size={18} color={ocupacaoSabado3.lotado ? '#f87171' : '#4ade80'} />
@@ -2285,8 +2234,28 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                                 : `✅ Cota do Sábado (Uruoca): ${ocupacaoSabado3.total} de 12 veículos ocupados (${ocupacaoSabado3.disponivel} vagas disponíveis)`}
                             </strong>
                           </div>
+                          <span className={`badge ${ocupacaoSabado3.lotado ? 'badge-danger' : 'badge-vermont'}`} style={{ fontSize: '0.72rem' }}>
+                            {ocupacaoSabado3.lotado ? 'Esgotado (12/12)' : `${ocupacaoSabado3.disponivel} vagas`}
+                          </span>
                         </div>
-                      )}
+                        
+                        {/* Recado / Aviso Operacional */}
+                        <div style={{ 
+                          fontSize: '0.78rem', 
+                          color: '#fef3c7', 
+                          marginTop: 8, 
+                          padding: '6px 10px',
+                          background: 'rgba(245, 158, 11, 0.12)',
+                          border: '1px solid rgba(245, 158, 11, 0.35)',
+                          borderRadius: 6,
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 6 
+                        }}>
+                          <Clock size={14} color="#fbbf24" style={{ flexShrink: 0 }} />
+                          <span><strong>Lembrete:</strong> Limite de agendamento de sábado até sexta-feira às 14:00.</span>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -2677,38 +2646,37 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           </div>
         </div>
 
-        {/* Alerta Destacado no Rodapé se Sábado Estiver Travado */}
-        {algumSabadoBloqueado && (
+        {/* Recado Operacional se Sábado Estiver Selecionado */}
+        {((tipoDia === 'sabado') || (tipoCarregamento === 'combinado' && tipoDia2 === 'sabado') || (tipoCarregamento === 'combinado' && qtdBlocosCombinados === 3 && tipoDia3 === 'sabado')) && (
           <div className="animate-fade" style={{
-            padding: '16px 20px',
-            background: 'rgba(239, 68, 68, 0.16)',
-            border: '2px solid #ef4444',
-            borderRadius: 14,
+            padding: '14px 18px',
+            background: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
+            borderRadius: 12,
             display: 'flex',
             alignItems: 'center',
-            gap: 14,
-            boxShadow: '0 4px 25px rgba(239, 68, 68, 0.25)'
+            gap: 12
           }}>
             <div style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              background: 'rgba(239, 68, 68, 0.25)',
-              border: '1px solid #ef4444',
-              color: '#f87171',
+              width: 38,
+              height: 38,
+              borderRadius: 8,
+              background: 'rgba(245, 158, 11, 0.2)',
+              border: '1px solid rgba(245, 158, 11, 0.5)',
+              color: '#fbbf24',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0
             }}>
-              <AlertTriangle size={24} />
+              <AlertTriangle size={20} />
             </div>
             <div>
-              <strong style={{ color: '#fca5a5', fontSize: '0.98rem', display: 'block', marginBottom: 3 }}>
-                🔒 Agenda de Sábado Encerrada
+              <strong style={{ color: '#fde047', fontSize: '0.92rem', display: 'block', marginBottom: 2 }}>
+                Lembrete Operacional - Agendamentos de Sábado:
               </strong>
-              <p style={{ margin: 0, color: '#fecaca', fontSize: '0.86rem', lineHeight: '1.4' }}>
-                {statusTravaSabado.motivo || 'Os agendamentos para o sábado foram encerrados às 14:00 da sexta-feira anterior conforme as diretrizes operacionais. Por favor, escolha um dia útil (segunda a sexta-feira) ou um sábado futuro.'}
+              <p style={{ margin: 0, color: '#fef3c7', fontSize: '0.84rem', lineHeight: '1.4' }}>
+                Temos um limite de horário para agendamento dos sábados até <strong>sexta-feira às 14:00</strong>. A operação no sábado é exclusiva da pedreira de Uruoca com capacidade de até 12 veículos no dia.
               </p>
             </div>
           </div>
@@ -2738,7 +2706,6 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             type="submit"
             disabled={
               enviando || 
-              algumSabadoBloqueado ||
               tipoDia === 'domingo' || 
               (tipoDia === 'sabado' && (!isPedreiraUruoca(formData.pedreira) || ocupacaoSabado.lotado)) ||
               (tipoCarregamento === 'combinado' && (
@@ -2751,24 +2718,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               ))
             }
             className="btn btn-vermont glow-effect"
-            style={{ 
-              padding: '14px 34px', 
-              fontSize: '1.05rem', 
-              minWidth: 280,
-              background: algumSabadoBloqueado ? 'rgba(239, 68, 68, 0.2)' : undefined,
-              borderColor: algumSabadoBloqueado ? '#ef4444' : undefined,
-              color: algumSabadoBloqueado ? '#fca5a5' : undefined,
-              cursor: algumSabadoBloqueado ? 'not-allowed' : undefined
-            }}
+            style={{ padding: '14px 34px', fontSize: '1.05rem', minWidth: 280 }}
           >
             {enviando ? (
               <>
                 <span className="spinner" /> Gravando agendamento...
-              </>
-            ) : algumSabadoBloqueado ? (
-              <>
-                <AlertTriangle size={20} color="#f87171" />
-                🔒 Agenda de Sábado Encerrada (Bloqueado)
               </>
             ) : (
               <>

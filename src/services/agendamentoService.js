@@ -1949,65 +1949,28 @@ export function obterSextaFeiraAnterior(dataSabadoStr) {
 
 /**
  * Verifica se o agendamento para um determinado sábado está bloqueado por horário limite.
- * REGRA OFICIAL VERMONT: A agenda para carregamento aos sábados é travada/encerrada toda sexta-feira às 14:00 (Brasília/Fortaleza).
+ * (Aviso orientativo: não bloqueia a submissão, apenas orienta sobre o limite de sexta-feira às 14h)
  */
 export function isAgendamentoSabadoBloqueado(dataSabadoStr) {
-  if (!dataSabadoStr || !isDataSabado(dataSabadoStr)) return false;
-
-  const { dataHoje, minutosTotais } = obterDataHoraAtualBrasil();
-  const sextaAnteriorStr = obterSextaFeiraAnterior(dataSabadoStr);
-  const limiteMinutosSexta = 14 * 60; // 14:00 = 840 minutos
-
-  // Se a data de hoje já for posterior à sexta-feira anterior (ex: é o próprio sábado ou data posterior)
-  if (dataHoje > sextaAnteriorStr) {
-    return true;
-  }
-
-  // Se a data de hoje for a sexta-feira anterior e o horário atual for igual ou posterior a 14:00
-  if (dataHoje === sextaAnteriorStr) {
-    return minutosTotais >= limiteMinutosSexta;
-  }
-
-  // Se a data de hoje for anterior à sexta-feira (ex: quinta, quarta, etc.), ainda está dentro do prazo
   return false;
 }
 
 /**
- * Retorna o status detalhado da trava de horário para agendamentos de sábado
+ * Retorna o status detalhado e lembrete operacional de agendamentos de sábado
  */
 export function obterStatusTravaSabado(dataSabadoStr) {
   if (!dataSabadoStr || !isDataSabado(dataSabadoStr)) {
-    return { isSabado: false, bloqueado: false, motivo: '' };
+    return { isSabado: false, bloqueado: false, motivo: '', aviso: '' };
   }
 
-  const { dataHoje, minutosTotais } = obterDataHoraAtualBrasil();
   const sextaAnteriorStr = obterSextaFeiraAnterior(dataSabadoStr);
-  const limiteMinutosSexta = 14 * 60; // 14:00 = 840 minutos
-
-  let bloqueado = false;
-  let motivo = '';
-
-  if (dataHoje > sextaAnteriorStr) {
-    bloqueado = true;
-    motivo = `A agenda para este sábado (${formatarDataBR(dataSabadoStr)}) foi encerrada às 14:00 da sexta-feira anterior (${formatarDataBR(sextaAnteriorStr)}).`;
-  } else if (dataHoje === sextaAnteriorStr) {
-    if (minutosTotais >= limiteMinutosSexta) {
-      bloqueado = true;
-      motivo = `A agenda para o sábado (${formatarDataBR(dataSabadoStr)}) foi encerrada hoje às 14:00. Não é mais possível incluir novos agendamentos para este sábado.`;
-    } else {
-      const minutosRestantes = limiteMinutosSexta - minutosTotais;
-      const horasRest = Math.floor(minutosRestantes / 60);
-      const minsRest = minutosRestantes % 60;
-      motivo = `Atenção: A agenda deste sábado se encerrará hoje às 14:00 (${horasRest > 0 ? `${horasRest}h ` : ''}${minsRest}min restantes para agendar).`;
-    }
-  } else {
-    motivo = `Agendamentos para este sábado são aceitos até as 14:00 da sexta-feira (${formatarDataBR(sextaAnteriorStr)}).`;
-  }
+  const motivo = `Aviso Operacional: O horário limite para agendamento dos sábados é até sexta-feira às 14:00.`;
 
   return {
     isSabado: true,
-    bloqueado,
+    bloqueado: false,
     motivo,
+    aviso: motivo,
     dataSabado: dataSabadoStr,
     sextaAnterior: sextaAnteriorStr
   };
@@ -2880,10 +2843,6 @@ export async function salvarAgendamento(dados) {
         throw new Error('Aos sábados, o carregamento está disponível exclusivamente para a pedreira de Uruoca - CE (Taj Mahal). Nas demais pedreiras, os carregamentos ocorrem de segunda a sexta-feira.');
       }
 
-      if (isAgendamentoSabadoBloqueado(dados.data_agendamento)) {
-        throw new Error(`A agenda para o sábado (${formatarDataBR(dados.data_agendamento)}) foi encerrada. Conforme regra operacional, as solicitações para carregamento no sábado devem ser realizadas impreterivelmente até as 14:00 da sexta-feira anterior.`);
-      }
-
       const { lotado } = await obterOcupacaoSabado(dados.data_agendamento, dados.pedreira);
       if (lotado) {
         throw new Error(`Limite máximo de 12 veículos para o sábado (${formatarDataBR(dados.data_agendamento)}) na pedreira de Uruoca já foi atingido. Escolha outra data.`);
@@ -3043,9 +3002,6 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
       if (p.tipo_dia === 'sabado' || isDataSabado(p.data_agendamento)) {
         if (!isPedreiraUruoca(p.pedreira)) {
           throw new Error(`[${numPonto}º Carregamento] Aos sábados, o carregamento está disponível exclusivamente para a pedreira de Uruoca - CE (Taj Mahal).`);
-        }
-        if (isAgendamentoSabadoBloqueado(p.data_agendamento)) {
-          throw new Error(`[${numPonto}º Carregamento] A agenda para o sábado (${formatarDataBR(p.data_agendamento)}) foi encerrada. As solicitações para carregamento no sábado devem ser realizadas até as 14:00 da sexta-feira anterior.`);
         }
         const { lotado } = await obterOcupacaoSabado(p.data_agendamento, p.pedreira);
         if (lotado) {

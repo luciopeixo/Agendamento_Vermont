@@ -105,10 +105,10 @@ export function RegrasModal({ aberto, onFechar }) {
               <span className="badge badge-warning" style={{ marginBottom: 6 }}>Sábados (Exclusivo Uruoca)</span>
               <p style={{ fontSize: '0.88rem', margin: '6px 0', color: 'var(--slate-200)' }}>
                 <strong>Capacidade Máxima:</strong> 12 Veículos no total do dia.<br />
-                <strong>Prazo Limite:</strong> Agendamentos para o sábado encerram impreterivelmente às <strong>14:00 da sexta-feira anterior</strong>.
+                <strong>Horário Limite:</strong> Agendamentos para o sábado devem ser realizados até <strong>sexta-feira às 14:00</strong>.
               </p>
               <p style={{ fontSize: '0.78rem', color: 'var(--slate-400)', margin: 0 }}>
-                Apenas a pedreira <strong>Uruoca - CE (Taj Mahal)</strong> opera aos sábados. A partir das 14h00 da sexta-feira, o sistema bloqueia automaticamente novas inclusões para o sábado seguinte.
+                Apenas a pedreira <strong>Uruoca - CE (Taj Mahal)</strong> opera aos sábados. As demais unidades operam de segunda a sexta-feira.
               </p>
             </div>
           </div>
