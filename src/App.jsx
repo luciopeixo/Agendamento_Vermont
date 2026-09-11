@@ -5,6 +5,7 @@ import { PainelGestao } from './components/PainelGestao';
 import { AdminLogin } from './components/AdminLogin';
 import { ComprovanteModal } from './components/ComprovanteModal';
 import { RegrasModal } from './components/RegrasModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { ShieldCheck, Mail, MapPin } from 'lucide-react';
 import { EMAIL_NOTIFICACAO_DESTINO, isSupabaseConfigurado } from './services/agendamentoService';
 import { supabase } from './lib/supabase';
@@ -145,21 +146,23 @@ export function App() {
 
       {/* Conteúdo Principal */}
       <main style={{ flex: 1, padding: '24px 16px' }}>
-        {abaAtiva === 'agendar' ? (
-          <AgendamentoForm onAgendamentoSucesso={handleAgendamentoSucesso} />
-        ) : isAutenticado ? (
-          <PainelGestao 
-            onVisualizarComprovante={handleVisualizarComprovante} 
-            usuario={usuarioAuth}
-            isAdmin={isAdmin}
-            pedreiraOperador={pedreiraOperador}
-          />
-        ) : (
-          <AdminLogin 
-            onLoginSucesso={handleLoginSucesso}
-            onVoltar={() => setAbaAtiva('agendar')}
-          />
-        )}
+        <ErrorBoundary onReset={() => setAbaAtiva('agendar')}>
+          {abaAtiva === 'agendar' ? (
+            <AgendamentoForm onAgendamentoSucesso={handleAgendamentoSucesso} />
+          ) : isAutenticado ? (
+            <PainelGestao 
+              onVisualizarComprovante={handleVisualizarComprovante} 
+              usuario={usuarioAuth}
+              isAdmin={isAdmin}
+              pedreiraOperador={pedreiraOperador}
+            />
+          ) : (
+            <AdminLogin 
+              onLoginSucesso={handleLoginSucesso}
+              onVoltar={() => setAbaAtiva('agendar')}
+            />
+          )}
+        </ErrorBoundary>
       </main>
 
       {/* Modal de Comprovante Oficial */}

@@ -112,9 +112,10 @@ export function Navbar({
             type="button"
             onClick={() => setAbaAtiva('painel')}
             className={`btn navbar-btn ${abaAtiva === 'painel' ? 'btn-vermont' : 'btn-secondary'}`}
+            title="Acessar o Painel de Carregamento"
           >
             {isAdmin ? <ListChecks size={17} /> : <Lock size={15} color="#4ade80" />}
-            <span>{isAdmin ? 'Painel de Carregamento' : 'Painel Admin'}</span>
+            <span>Painel de Carregamento</span>
           </button>
 
           {isAdmin && (
