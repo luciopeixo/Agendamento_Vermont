@@ -13,23 +13,35 @@ import {
 
 /**
  * Componente do Logotipo Oficial da Vermont Mineração para cabeçalho
+ * Usa a mesma logo oficial da página com alto contraste para impressão física
  */
 function LogoVermontHeader() {
   const [imgErro, setImgErro] = useState(false);
 
   return (
-    <div style={{ textAlign: 'center', marginBottom: 12 }}>
+    <div style={{ textAlign: 'center', marginBottom: 10 }}>
       {!imgErro ? (
         <img 
-          src="https://vermontmineracao.com/wp-content/uploads/2022/07/logo-vermont-site-1.png" 
+          src="/assets/logo-vermont.png" 
           alt="Vermont Mineração" 
           style={{ 
-            height: '48px', 
-            maxWidth: '220px', 
+            maxHeight: '52px', 
+            maxWidth: '240px', 
             objectFit: 'contain',
-            display: 'inline-block'
+            display: 'inline-block',
+            filter: 'brightness(0)',
+            WebkitPrintColorAdjust: 'exact',
+            printColorAdjust: 'exact'
           }}
-          onError={() => setImgErro(true)}
+          onError={(e) => {
+            // Fallback para URL externa se necessário
+            if (!e.target.dataset.triedFallback) {
+              e.target.dataset.triedFallback = 'true';
+              e.target.src = 'https://vermontmineracao.com/wp-content/uploads/2022/07/logo-vermont-site-1.png';
+            } else {
+              setImgErro(true);
+            }
+          }}
         />
       ) : (
         <div style={{
@@ -37,13 +49,13 @@ function LogoVermontHeader() {
           alignItems: 'center',
           gap: 10,
           padding: '4px 12px',
-          border: '2px solid #00762c',
+          border: '2px solid #000000',
           borderRadius: 8
         }}>
           <div style={{
             width: 32,
             height: 32,
-            background: '#00762c',
+            background: '#000000',
             color: '#ffffff',
             borderRadius: 6,
             display: 'flex',
@@ -56,10 +68,10 @@ function LogoVermontHeader() {
             V
           </div>
           <div style={{ textAlign: 'left' }}>
-            <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 900, letterSpacing: '0.08em', color: '#00762c', lineHeight: 1.1 }}>
+            <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 900, letterSpacing: '0.08em', color: '#000000', lineHeight: 1.1 }}>
               VERMONT
             </span>
-            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.22em', color: '#16a34a', lineHeight: 1 }}>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.22em', color: '#333333', lineHeight: 1 }}>
               MINERAÇÃO
             </span>
           </div>
