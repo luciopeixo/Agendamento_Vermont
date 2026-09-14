@@ -3,7 +3,7 @@ import {
   Search, RefreshCw, Printer, CheckCircle, CheckCircle2, Clock, Truck, Mail, FileText, 
   AlertCircle, AlertTriangle, Trash2, ShieldCheck, ShieldAlert, RotateCcw, Edit3, CheckCheck, PlayCircle,
   FileSpreadsheet, Download, History, Bell, BellRing, Volume2, VolumeX, Eye, Check, X, BarChart3, TrendingUp,
-  Filter, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
+  Filter, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileCheck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -32,6 +32,7 @@ import { ModalHistoricoStatus } from './ModalHistoricoStatus';
 import { ModalConfirmarStatus } from './ModalConfirmarStatus';
 import { ModalLimpezaTestes } from './ModalLimpezaTestes';
 import { GraficosBlocosAdmin } from './GraficosBlocosAdmin';
+import { AutorizacaoCarregamentoModal } from './AutorizacaoCarregamentoModal';
 
 /**
  * Emite som harmônico suave usando a Web Audio API (sem arquivos externos)
@@ -206,6 +207,7 @@ export function PainelGestao({
   // Estado para o modal de edição de agendamento e modal de histórico
   const [agendamentoParaEditar, setAgendamentoParaEditar] = useState(null);
   const [agendamentoParaHistorico, setAgendamentoParaHistorico] = useState(null);
+  const [agendamentoParaAutorizacao, setAgendamentoParaAutorizacao] = useState(null);
 
   // Estado para a tela de atenção e confirmação de mudança de status
   const [mudancaStatusPendente, setMudancaStatusPendente] = useState(null); // { agendamento, novoStatus }
@@ -2255,6 +2257,25 @@ export function PainelGestao({
                             Ver
                           </button>
 
+                          {/* BOTÃO AUTORIZAÇÃO DE CARREGAMENTO (Com suporte a Cargas Mistas) */}
+                          <button
+                            type="button"
+                            onClick={() => setAgendamentoParaAutorizacao(ag)}
+                            className="btn btn-secondary"
+                            style={{ 
+                              padding: '6px 10px', 
+                              fontSize: '0.78rem',
+                              gap: 4,
+                              background: 'rgba(217, 119, 6, 0.15)',
+                              borderColor: 'rgba(217, 119, 6, 0.4)',
+                              color: '#fbbf24'
+                            }}
+                            title="Gerar Autorização de Carregamento oficial da pedreira (Cargas mistas isoladas por pedreira)"
+                          >
+                            <FileCheck size={14} />
+                            Aut.
+                          </button>
+
                           {/* BOTÃO EXCLUIR AGENDAMENTO (Exclusivo para ADMIN GERAL) */}
                           {isAdmin && (
                             <button
@@ -2279,6 +2300,16 @@ export function PainelGestao({
         </div>
       </div>
       </>
+      )}
+
+      {/* Modal de Autorização de Carregamento Oficial da Pedreira */}
+      {agendamentoParaAutorizacao && (
+        <AutorizacaoCarregamentoModal
+          agendamento={agendamentoParaAutorizacao}
+          todosAgendamentos={todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos}
+          pedreiraOperador={pedreiraOperador}
+          onFechar={() => setAgendamentoParaAutorizacao(null)}
+        />
       )}
 
       {/* Modal de Edição de Agendamento */}
