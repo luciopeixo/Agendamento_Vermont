@@ -197,6 +197,14 @@ export function AutorizacaoCarregamentoModal({
     return formatarDataBR(agendamento.data_agendamento);
   }, [agendamento.data_agendamento]);
 
+  // Controla classe no body durante exibição do modal
+  useEffect(() => {
+    document.body.classList.add('modal-autorizacao-aberto');
+    return () => {
+      document.body.classList.remove('modal-autorizacao-aberto', 'imprimindo-autorizacao');
+    };
+  }, []);
+
   // Validação e Execução de Impressão
   const handleImprimir = () => {
     const destinoLimpo = (destinoEditavel || '').trim();
@@ -215,7 +223,7 @@ export function AutorizacaoCarregamentoModal({
     styleEl.innerHTML = `
       @page { 
         size: A4 portrait !important; 
-        margin: 5mm 8mm !important; 
+        margin: 4mm 8mm !important; 
       }
       @media print {
         *, *:before, *:after {
@@ -230,11 +238,43 @@ export function AutorizacaoCarregamentoModal({
           padding: 0 !important;
           background: #ffffff !important;
         }
-        body * {
+        /* Oculta completamente toda a aplicação de fundo */
+        #relatorio-imprimir,
+        .painel-gestao-container,
+        .navbar-container,
+        header,
+        nav,
+        footer,
+        main > *:not(.modal-autorizacao-overlay),
+        .no-print {
+          display: none !important;
           visibility: hidden !important;
+          height: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
         }
-        #area-impressao-autorizacao, #area-impressao-autorizacao * {
-          visibility: visible !important;
+        .modal-autorizacao-overlay {
+          position: static !important;
+          display: block !important;
+          background: transparent !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          width: 100% !important;
+          height: auto !important;
+          overflow: visible !important;
+        }
+        .modal-autorizacao-box {
+          position: static !important;
+          display: block !important;
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          max-width: 100% !important;
+          max-height: none !important;
+          overflow: visible !important;
         }
         #area-impressao-autorizacao {
           position: static !important;
@@ -266,12 +306,9 @@ export function AutorizacaoCarregamentoModal({
           justify-content: center !important;
           width: 100% !important;
           max-width: 580px !important;
-          margin: 6px auto !important;
+          margin: 5px auto !important;
           page-break-inside: avoid !important;
           break-inside: avoid !important;
-        }
-        .no-print {
-          display: none !important;
         }
       }
     `;
@@ -462,32 +499,38 @@ export function AutorizacaoCarregamentoModal({
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(5, 8, 15, 0.88)',
-      backdropFilter: 'blur(8px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 99999,
-      padding: '16px'
-    }}>
-      <div style={{
-        background: '#0f172a',
-        border: '1px solid rgba(0, 118, 44, 0.4)',
-        borderRadius: 16,
-        width: '100%',
-        maxWidth: '820px',
-        maxHeight: '94vh',
+    <div 
+      className="modal-autorizacao-overlay"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(5, 8, 15, 0.88)',
+        backdropFilter: 'blur(8px)',
         display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 35px rgba(0, 118, 44, 0.2)',
-        overflow: 'hidden'
-      }}>
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 99999,
+        padding: '16px'
+      }}
+    >
+      <div 
+        className="modal-autorizacao-box"
+        style={{
+          background: '#0f172a',
+          border: '1px solid rgba(0, 118, 44, 0.4)',
+          borderRadius: 16,
+          width: '100%',
+          maxWidth: '820px',
+          maxHeight: '94vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 35px rgba(0, 118, 44, 0.2)',
+          overflow: 'hidden'
+        }}
+      >
         {/* Cabeçalho do Modal */}
         <div className="no-print" style={{
           padding: '16px 20px',

@@ -640,15 +640,23 @@ h1, h2, h3, h4, h5, h6 {
      1. IMPRESSÃO DO COMPROVANTE DE AGENDAMENTO (VOUCHER)
      =================================================== */
   body.modal-comprovante-aberto,
-  body.imprimindo-comprovante {
+  body.imprimindo-comprovante,
+  body.imprimindo-autorizacao {
     background: #ffffff !important;
   }
 
-  /* Quando o modal de comprovante estiver ativo, esconde TODO o resto da página (evita sobreposição e duplicação) */
+  /* Quando o modal de comprovante ou autorização estiver ativo, esconde TODO o resto da página (evita páginas extras) */
   body.modal-comprovante-aberto main,
   body.imprimindo-comprovante main,
+  body.imprimindo-autorizacao main,
   body.modal-comprovante-aberto #relatorio-imprimir,
-  body.imprimindo-comprovante #relatorio-imprimir {
+  body.imprimindo-comprovante #relatorio-imprimir,
+  body.imprimindo-autorizacao #relatorio-imprimir,
+  body.imprimindo-autorizacao .painel-gestao-container,
+  body.imprimindo-autorizacao .navbar-container,
+  body.imprimindo-autorizacao header,
+  body.imprimindo-autorizacao nav,
+  body.imprimindo-autorizacao footer {
     display: none !important;
   }
 
