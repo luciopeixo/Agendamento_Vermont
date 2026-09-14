@@ -717,6 +717,154 @@ export function calcularVencimentoUmAno(dataStr) {
 }
 
 /**
+ * Avalia o status de conformidade do CRLV baseado na Data do Último Registro e o calendário do Detran para o final da placa.
+ * @param {string} dataUltimoRegistro YYYY-MM-DD
+ * @param {string} placa Placa do veículo
+ * @param {string} dataReferenciaStr Data de referência (hoje ou data do agendamento)
+ */
+export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferenciaStr = '') {
+  if (!dataUltimoRegistro) {
+    return { status: 'vazio', label: 'Não informado', cor: '#94a3b8' };
+  }
+
+  try {
+    const [anoReg, mesReg, diaReg] = dataUltimoRegistro.split('-').map(Number);
+    if (!anoReg || !mesReg || !diaReg) {
+      return { status: 'vazio', label: 'Data inválida', cor: '#94a3b8' };
+    }
+
+    const dataRef = dataReferenciaStr ? new Date(`${dataReferenciaStr}T00:00:00`) : new Date();
+    dataRef.setHours(0, 0, 0, 0);
+    const anoRef = dataRef.getFullYear();
+
+    const info = obterInfoLicenciamentoPorPlaca(placa);
+    const dataRegFormatada = `${String(diaReg).padStart(2, '0')}/${String(mesReg).padStart(2, '0')}/${anoReg}`;
+
+    // Sem regra de placa específica -> utiliza regra padrão de 1 ano
+    if (!info) {
+      const dataVenc = new Date(anoReg + 1, mesReg - 1, diaReg);
+      const diffMs = dataVenc.getTime() - dataRef.getTime();
+      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      const labelVenc = `${String(diaReg).padStart(2, '0')}/${String(mesReg).padStart(2, '0')}/${anoReg + 1}`;
+      const dataVencStr = `${anoReg + 1}-${String(mesReg).padStart(2, '0')}-${String(diaReg).padStart(2, '0')}`;
+
+      if (diffDias < 0) {
+        return {
+          status: 'vencido',
+          label: `Último registro: ${dataRegFormatada} → Vencido há ${Math.abs(diffDias)} dias (Expirou em ${labelVenc})`,
+          cor: '#ef4444',
+          dataVencimento: dataVencStr,
+          labelDataVencimento: labelVenc,
+          dias: Math.abs(diffDias)
+        };
+      } else if (diffDias <= 30) {
+        return {
+          status: 'avencer',
+          label: `Último registro: ${dataRegFormatada} → Vence em ${diffDias} dias (${labelVenc})`,
+          cor: '#f59e0b',
+          dataVencimento: dataVencStr,
+          labelDataVencimento: labelVenc,
+          dias: diffDias
+        };
+      } else {
+        return {
+          status: 'valido',
+          label: `Último registro: ${dataRegFormatada} → Válido até ${labelVenc}`,
+          cor: '#22c55e',
+          dataVencimento: dataVencStr,
+          labelDataVencimento: labelVenc,
+          dias: diffDias
+        };
+      }
+    }
+
+    // Com regra do Detran pelo final da placa
+    const limiteDetranEsteAno = new Date(anoRef, info.mesNumero - 1, info.diaLimite, 23, 59, 59);
+    const dataLimiteEsteAnoStr = `${anoRef}-${String(info.mesNumero).padStart(2, '0')}-${String(info.diaLimite).padStart(2, '0')}`;
+    const labelLimiteEsteAno = `${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}/${anoRef}`;
+
+    // Estamos antes da data limite do Detran deste ano?
+    if (dataRef.getTime() <= limiteDetranEsteAno.getTime()) {
+      // Se o registro é de pelo menos o ano anterior (anoRef - 1) ou ano atual (anoRef), é válido até a data limite deste ano
+      if (anoReg >= anoRef - 1) {
+        const diffMs = limiteDetranEsteAno.getTime() - dataRef.getTime();
+        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffDias <= 30) {
+          return {
+            status: 'avencer',
+            label: `Último registro: ${dataRegFormatada} → Vence em ${diffDias} dias (Detran: ${labelLimiteEsteAno})`,
+            cor: '#f59e0b',
+            dataVencimento: dataLimiteEsteAnoStr,
+            labelDataVencimento: labelLimiteEsteAno,
+            dias: diffDias,
+            infoDetran: info
+          };
+        } else {
+          return {
+            status: 'valido',
+            label: `Último registro: ${dataRegFormatada} → Válido até ${labelLimiteEsteAno} (Detran Final ${info.finalDigito})`,
+            cor: '#22c55e',
+            dataVencimento: dataLimiteEsteAnoStr,
+            labelDataVencimento: labelLimiteEsteAno,
+            dias: diffDias,
+            infoDetran: info
+          };
+        }
+      } else {
+        // Registro muito antigo
+        const diffMs = dataRef.getTime() - limiteDetranEsteAno.getTime();
+        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        return {
+          status: 'vencido',
+          label: `Último registro: ${dataRegFormatada} → Vencido (Exige registro ${anoRef - 1}/${anoRef})`,
+          cor: '#ef4444',
+          dataVencimento: dataLimiteEsteAnoStr,
+          labelDataVencimento: labelLimiteEsteAno,
+          dias: Math.abs(diffDias),
+          infoDetran: info
+        };
+      }
+    } else {
+      // Já passou a data limite do Detran deste ano
+      if (anoReg >= anoRef) {
+        // Já renovou no ano corrente! Válido até o limite do ano seguinte
+        const limiteDetranProxAno = new Date(anoRef + 1, info.mesNumero - 1, info.diaLimite, 23, 59, 59);
+        const dataLimiteProxAnoStr = `${anoRef + 1}-${String(info.mesNumero).padStart(2, '0')}-${String(info.diaLimite).padStart(2, '0')}`;
+        const labelLimiteProxAno = `${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}/${anoRef + 1}`;
+        const diffMs = limiteDetranProxAno.getTime() - dataRef.getTime();
+        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        return {
+          status: 'valido',
+          label: `Último registro: ${dataRegFormatada} → Válido até ${labelLimiteProxAno} (Detran Final ${info.finalDigito})`,
+          cor: '#22c55e',
+          dataVencimento: dataLimiteProxAnoStr,
+          labelDataVencimento: labelLimiteProxAno,
+          dias: diffDias,
+          infoDetran: info
+        };
+      } else {
+        // Não renovou e a data do Detran já passou -> Vencido
+        const diffMs = dataRef.getTime() - limiteDetranEsteAno.getTime();
+        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        return {
+          status: 'vencido',
+          label: `Último registro: ${dataRegFormatada} → Vencido em ${labelLimiteEsteAno} há ${diffDias} dias (Detran Final ${info.finalDigito})`,
+          cor: '#ef4444',
+          dataVencimento: dataLimiteEsteAnoStr,
+          labelDataVencimento: labelLimiteEsteAno,
+          dias: diffDias,
+          infoDetran: info
+        };
+      }
+    }
+  } catch (_e) {
+    return { status: 'vazio', label: 'Data inválida', cor: '#94a3b8' };
+  }
+}
+
+/**
  * Verifica a conformidade documental completa de um motorista e veículos em relação a uma data
  * @returns {{ cadastrado: boolean, statusGeral: 'REGULAR' | 'AVENCER' | 'VENCIDO' | 'NAO_CADASTRADO', itensVencidos: Array, itensAVencer: Array, alertas: Array, motorista: Object }}
  */
@@ -827,38 +975,29 @@ export function verificarConformidadeDocumental({
     } catch (_e) {}
   };
 
-  // Checagem de CRLV (Data do Último Documento Emitido + 1 Ano de Validade)
-  const checarDataCRLV = (campoNome, label, dataUltimoDoc) => {
-    if (!dataUltimoDoc) return;
-    try {
-      const dataVenc = calcularVencimentoUmAno(dataUltimoDoc);
-      if (!dataVenc) return;
-      const docDate = new Date(`${dataVenc}T00:00:00`);
-      const diffMs = docDate.getTime() - dataReferencia.getTime();
-      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      const [ano, mes, dia] = dataUltimoDoc.split('-');
-      const dataEmissaoBR = `${dia}/${mes}/${ano}`;
-      const [anoV, mesV, diaV] = dataVenc.split('-');
-      const dataVencBR = `${diaV}/${mesV}/${anoV}`;
-
-      if (diffDias < 0) {
-        itensVencidos.push({
-          campo: campoNome,
-          titulo: `${label} (Último doc: ${dataEmissaoBR})`,
-          data: dataVenc,
-          labelData: dataVencBR,
-          diasVencido: Math.abs(diffDias)
-        });
-      } else if (diffDias <= 30) {
-        itensAVencer.push({
-          campo: campoNome,
-          titulo: `${label} (Último doc: ${dataEmissaoBR})`,
-          data: dataVenc,
-          labelData: dataVencBR,
-          diasRestantes: diffDias
-        });
-      }
-    } catch (_e) {}
+  // Checagem de CRLV (Data do Último Registro comparada com o calendário do Detran)
+  const checarCRLVComDetran = (campoNome, label, dataUltimoReg, placa) => {
+    if (!dataUltimoReg) return;
+    const res = avaliarCRLVComDetran(dataUltimoReg, placa, refDataStr);
+    if (res.status === 'vencido') {
+      itensVencidos.push({
+        campo: campoNome,
+        titulo: label,
+        data: res.dataVencimento,
+        labelData: res.labelDataVencimento,
+        diasVencido: res.dias,
+        detalhes: res.label
+      });
+    } else if (res.status === 'avencer') {
+      itensAVencer.push({
+        campo: campoNome,
+        titulo: label,
+        data: res.dataVencimento,
+        labelData: res.labelDataVencimento,
+        diasRestantes: res.dias,
+        detalhes: res.label
+      });
+    }
   };
 
   // Valores obtidos individualmente (permite troca de veículos entre motoristas)
@@ -885,29 +1024,29 @@ export function verificarConformidadeDocumental({
     }
   }
 
-  // 3. CRLV Cavalo (Validade/Vencimento do CRLV do Cavalo Mecânico)
-  checarDataValidade('crlv_validade_cavalo', `CRLV do Cavalo Mecânico${limpaCavalo ? ` (${limpaCavalo})` : ''}`, crlvCavalo);
+  // 3. CRLV Cavalo (Último Registro vs Detran)
+  checarCRLVComDetran('crlv_validade_cavalo', `Último Registro CRLV Cavalo${limpaCavalo ? ` (${limpaCavalo})` : ''}`, crlvCavalo, limpaCavalo);
 
-  // 4. CRLV Carreta (Validade/Vencimento do CRLV da Carreta 1)
-  checarDataValidade('crlv_validade_carreta', `CRLV da Carreta 1${limpaCarreta ? ` (${limpaCarreta})` : ''}`, crlvCarreta);
+  // 4. CRLV Carreta (Último Registro vs Detran)
+  checarCRLVComDetran('crlv_validade_carreta', `Último Registro CRLV Carreta 1${limpaCarreta ? ` (${limpaCarreta})` : ''}`, crlvCarreta, limpaCarreta);
 
   // 5. Laudo de Inspeção de Rocha / CSV (Carreta - Validade do Laudo)
   checarDataValidade('validade_laudo_rocha', `Laudo de Rocha / CSV (Carreta ${limpaCarreta || '1'})`, laudoRocha);
 
   // 6. Carreta 2 (se houver)
   if (limpaCarreta2) {
-    checarDataValidade('crlv_validade_carreta_2', `CRLV da Carreta 2 (${limpaCarreta2})`, crlvCarreta2);
+    checarCRLVComDetran('crlv_validade_carreta_2', `Último Registro CRLV Carreta 2 (${limpaCarreta2})`, crlvCarreta2, limpaCarreta2);
     checarDataValidade('validade_laudo_rocha_2', `Laudo de Rocha / CSV (Carreta 2 - ${limpaCarreta2})`, laudoRocha2);
   }
 
   // Identifica campos essenciais não preenchidos
   const camposFaltando = [];
   if (!cnhValidade) camposFaltando.push('Validade CNH');
-  if (!crlvCavalo) camposFaltando.push(`CRLV Cavalo${limpaCavalo ? ` (${limpaCavalo})` : ''}`);
-  if (!crlvCarreta) camposFaltando.push(`CRLV Carreta${limpaCarreta ? ` (${limpaCarreta})` : ''}`);
+  if (!crlvCavalo) camposFaltando.push(`Último Registro CRLV Cavalo${limpaCavalo ? ` (${limpaCavalo})` : ''}`);
+  if (!crlvCarreta) camposFaltando.push(`Último Registro CRLV Carreta${limpaCarreta ? ` (${limpaCarreta})` : ''}`);
   if (!laudoRocha) camposFaltando.push(`Laudo de Rocha / CSV${limpaCarreta ? ` (${limpaCarreta})` : ''}`);
   if (limpaCarreta2) {
-    if (!crlvCarreta2) camposFaltando.push(`CRLV Carreta 2 (${limpaCarreta2})`);
+    if (!crlvCarreta2) camposFaltando.push(`Último Registro CRLV Carreta 2 (${limpaCarreta2})`);
     if (!laudoRocha2) camposFaltando.push(`Laudo Rocha Carreta 2 (${limpaCarreta2})`);
   }
 

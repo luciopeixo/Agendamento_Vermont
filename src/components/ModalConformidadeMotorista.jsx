@@ -11,7 +11,8 @@ import {
   validarCPF,
   obterBaseMotoristas,
   obterInfoLicenciamentoPorPlaca,
-  calcularVencimentoCRLVPorPlaca
+  calcularVencimentoCRLVPorPlaca,
+  avaliarCRLVComDetran
 } from '../services/agendamentoService';
 
 export function ModalConformidadeMotorista({ 
@@ -162,45 +163,9 @@ export function ModalConformidadeMotorista({
     }
   };
 
-  // Avalia visualmente o status do CRLV (Data do Último Documento Emitido + 1 ano de validade)
-  const calcularStatusValidadeCRLV = (dataUltimoDoc) => {
-    if (!dataUltimoDoc) return { status: 'vazio', label: 'Não informado', cor: '#94a3b8' };
-    try {
-      const dataVenc = calcularVencimentoUmAno(dataUltimoDoc);
-      if (!dataVenc) return { status: 'vazio', label: 'Data inválida', cor: '#94a3b8' };
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      const [anoV, mesV, diaV] = dataVenc.split('-');
-      const docDate = new Date(anoV, mesV - 1, diaV);
-      const diffMs = docDate.getTime() - hoje.getTime();
-      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-      const [anoE, mesE, diaE] = dataUltimoDoc.split('-');
-      const labelEmissao = `${diaE}/${mesE}/${anoE}`;
-      const labelVenc = `${diaV}/${mesV}/${anoV}`;
-
-      if (diffDias < 0) {
-        return {
-          status: 'vencido',
-          label: `Último doc: ${labelEmissao} → Vencido há ${Math.abs(diffDias)} dias (Expirou em ${labelVenc})`,
-          cor: '#ef4444'
-        };
-      } else if (diffDias <= 30) {
-        return {
-          status: 'avencer',
-          label: `Último doc: ${labelEmissao} → Vence em ${diffDias} dias (${labelVenc})`,
-          cor: '#f59e0b'
-        };
-      } else {
-        return {
-          status: 'valido',
-          label: `Último doc: ${labelEmissao} → Válido até ${labelVenc} (+1 ano)`,
-          cor: '#22c55e'
-        };
-      }
-    } catch (_e) {
-      return { status: 'vazio', label: 'Data inválida', cor: '#94a3b8' };
-    }
+  // Avalia visualmente o status do CRLV baseado na Data do Último Registro e o calendário Detran
+  const calcularStatusValidadeCRLV = (dataUltimoDoc, placa) => {
+    return avaliarCRLVComDetran(dataUltimoDoc, placa);
   };
 
   const handleSubmeter = async (e) => {
@@ -538,32 +503,30 @@ export function ModalConformidadeMotorista({
                 />
               </div>
 
-              {/* DATA DE VENCIMENTO DO CRLV CAVALO */}
+              {/* DATA DO ÚLTIMO REGISTRO DO CRLV CAVALO */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
-                    Data de Vencimento do CRLV (Cavalo) *
+                    Data do Último Registro (CRLV Cavalo) *
                   </label>
                   {(() => {
                     const info = obterInfoLicenciamentoPorPlaca(formData.placa_cavalo);
                     if (!info) return null;
                     return (
-                      <button
-                        type="button"
-                        onClick={() => handleChange('crlv_validade_cavalo', calcularVencimentoCRLVPorPlaca(formData.placa_cavalo))}
+                      <span 
                         style={{
                           background: 'rgba(56, 189, 248, 0.15)',
                           border: '1px solid rgba(56, 189, 248, 0.3)',
                           color: '#38bdf8',
                           fontSize: '0.68rem',
                           borderRadius: 4,
-                          padding: '1px 6px',
-                          cursor: 'pointer'
+                          padding: '2px 6px',
+                          fontWeight: 700
                         }}
-                        title={`Preencher automaticamente vencimento pelo Detran (${info.diaLimite}/${String(info.mesNumero).padStart(2, '0')})`}
+                        title={`Vencimento oficial pelo Detran para placa final ${info.finalDigito}: ${info.diaLimite}/${String(info.mesNumero).padStart(2, '0')}`}
                       >
-                        ⚡ Detran {info.mesNome}
-                      </button>
+                        ⚡ Detran: {info.diaLimite}/{String(info.mesNumero).padStart(2, '0')} ({info.mesNome})
+                      </span>
                     );
                   })()}
                 </div>
@@ -577,7 +540,7 @@ export function ModalConformidadeMotorista({
                 {formData.crlv_validade_cavalo && (
                   <div style={{ marginTop: 4 }}>
                     {(() => {
-                      const res = calcularStatusValidade(formData.crlv_validade_cavalo);
+                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_cavalo, formData.placa_cavalo);
                       return (
                         <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
                           ● {res.label}
@@ -638,32 +601,30 @@ export function ModalConformidadeMotorista({
                 />
               </div>
 
-              {/* DATA DE VENCIMENTO DO CRLV CARRETA */}
+              {/* DATA DO ÚLTIMO REGISTRO DO CRLV CARRETA 1 */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
-                    Data de Vencimento do CRLV (Carreta 1) *
+                    Data do Último Registro (CRLV Carreta 1) *
                   </label>
                   {(() => {
                     const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta);
                     if (!info) return null;
                     return (
-                      <button
-                        type="button"
-                        onClick={() => handleChange('crlv_validade_carreta', calcularVencimentoCRLVPorPlaca(formData.placa_carreta))}
+                      <span 
                         style={{
                           background: 'rgba(168, 85, 247, 0.15)',
                           border: '1px solid rgba(168, 85, 247, 0.3)',
                           color: '#c084fc',
                           fontSize: '0.68rem',
                           borderRadius: 4,
-                          padding: '1px 6px',
-                          cursor: 'pointer'
+                          padding: '2px 6px',
+                          fontWeight: 700
                         }}
-                        title={`Preencher automaticamente vencimento pelo Detran (${info.diaLimite}/${String(info.mesNumero).padStart(2, '0')})`}
+                        title={`Vencimento oficial pelo Detran para placa final ${info.finalDigito}: ${info.diaLimite}/${String(info.mesNumero).padStart(2, '0')}`}
                       >
-                        ⚡ Detran {info.mesNome}
-                      </button>
+                        ⚡ Detran: {info.diaLimite}/{String(info.mesNumero).padStart(2, '0')} ({info.mesNome})
+                      </span>
                     );
                   })()}
                 </div>
@@ -677,7 +638,7 @@ export function ModalConformidadeMotorista({
                 {formData.crlv_validade_carreta && (
                   <div style={{ marginTop: 4 }}>
                     {(() => {
-                      const res = calcularStatusValidade(formData.crlv_validade_carreta);
+                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta, formData.placa_carreta);
                       return (
                         <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
                           ● {res.label}
@@ -740,26 +701,26 @@ export function ModalConformidadeMotorista({
                   </div>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0 }}>Vencimento CRLV (Carreta 2)</label>
+                      <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0 }}>
+                        Data do Último Registro (CRLV Carreta 2)
+                      </label>
                       {(() => {
                         const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta_2);
                         if (!info) return null;
                         return (
-                          <button
-                            type="button"
-                            onClick={() => handleChange('crlv_validade_carreta_2', calcularVencimentoCRLVPorPlaca(formData.placa_carreta_2))}
+                          <span 
                             style={{
                               background: 'rgba(168, 85, 247, 0.15)',
                               border: '1px solid rgba(168, 85, 247, 0.3)',
                               color: '#c084fc',
                               fontSize: '0.65rem',
                               borderRadius: 4,
-                              padding: '1px 5px',
-                              cursor: 'pointer'
+                              padding: '2px 5px',
+                              fontWeight: 700
                             }}
                           >
-                            ⚡ Final {info.finalDigito} ({info.mesNome})
-                          </button>
+                            ⚡ Detran: {info.diaLimite}/{String(info.mesNumero).padStart(2, '0')} ({info.mesNome})
+                          </span>
                         );
                       })()}
                     </div>
@@ -772,7 +733,7 @@ export function ModalConformidadeMotorista({
                     {formData.crlv_validade_carreta_2 && (
                       <div style={{ marginTop: 2 }}>
                         {(() => {
-                          const res = calcularStatusValidade(formData.crlv_validade_carreta_2);
+                          const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta_2, formData.placa_carreta_2);
                           return (
                             <span style={{ fontSize: '0.68rem', color: res.cor, fontWeight: 700 }}>
                               ● {res.label}

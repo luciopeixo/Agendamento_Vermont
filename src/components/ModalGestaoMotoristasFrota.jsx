@@ -10,7 +10,9 @@ import {
   validarCPF,
   formatarCPF, 
   formatarCNPJ, 
-  verificarConformidadeDocumental
+  verificarConformidadeDocumental,
+  obterInfoLicenciamentoPorPlaca,
+  avaliarCRLVComDetran
 } from '../services/agendamentoService';
 import { ModalConformidadeMotorista } from './ModalConformidadeMotorista';
 import * as XLSX from 'xlsx';
@@ -137,9 +139,9 @@ export function ModalGestaoMotoristasFrota({
       'Categoria CNH': m.cnh_categoria || '-',
       'Validade CNH': m.cnh_validade || '-',
       'Placa Cavalo': m.placa_cavalo || '-',
-      'Vencimento CRLV Cavalo': m.crlv_validade_cavalo || '-',
+      'Último Registro CRLV Cavalo': m.crlv_validade_cavalo || '-',
       'Placa Carreta': m.placa_carreta || '-',
-      'Vencimento CRLV Carreta': m.crlv_validade_carreta || '-',
+      'Último Registro CRLV Carreta': m.crlv_validade_carreta || '-',
       'Validade Laudo Rocha / CSV': m.validade_laudo_rocha || '-',
       'Transportadora': m.transportadora || '-',
       'Status Geral': m.conformidade.statusGeral,
@@ -417,8 +419,8 @@ export function ModalGestaoMotoristasFrota({
                   <tr style={{ background: 'rgba(15, 23, 42, 0.85)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
                     <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Motorista / CPF</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>CNH & Categoria</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Cavalo (Último CRLV)</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Carreta / Laudo Rocha (CSV)</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Cavalo (Último Reg. CRLV)</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Carreta (Último Reg. CRLV / CSV)</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Transportadora</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center', color: '#cbd5e1', fontWeight: 700 }}>Status</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center', color: '#cbd5e1', fontWeight: 700 }}>Ações</th>
@@ -430,6 +432,8 @@ export function ModalGestaoMotoristasFrota({
                     const isVencido = st === 'VENCIDO';
                     const isAvencer = st === 'AVENCER';
                     const isRegular = st === 'REGULAR';
+                    const detranCavalo = item.crlv_validade_cavalo ? avaliarCRLVComDetran(item.crlv_validade_cavalo, item.placa_cavalo) : null;
+                    const detranCarreta = item.crlv_validade_carreta ? avaliarCRLVComDetran(item.crlv_validade_carreta, item.placa_carreta) : null;
 
                     return (
                       <tr 
@@ -471,8 +475,13 @@ export function ModalGestaoMotoristasFrota({
                             {item.placa_cavalo || '-'}
                           </div>
                           <div style={{ fontSize: '0.76rem', color: item.crlv_validade_cavalo ? '#cbd5e1' : '#64748b' }}>
-                            CRLV: <strong>{formatarDataBR(item.crlv_validade_cavalo)}</strong>
+                            Último Reg: <strong>{formatarDataBR(item.crlv_validade_cavalo)}</strong>
                           </div>
+                          {detranCavalo?.labelDataVencimento && (
+                            <div style={{ fontSize: '0.70rem', color: detranCavalo.cor, fontWeight: 600 }}>
+                              Detran: {detranCavalo.labelDataVencimento}
+                            </div>
+                          )}
                         </td>
 
                         {/* Carreta e Laudo de Rocha */}
@@ -482,8 +491,13 @@ export function ModalGestaoMotoristasFrota({
                             {item.placa_carreta_2 && <span style={{ color: '#94a3b8', fontSize: '0.75rem', marginLeft: 4 }}>+ {item.placa_carreta_2}</span>}
                           </div>
                           <div style={{ fontSize: '0.76rem', color: item.crlv_validade_carreta ? '#cbd5e1' : '#64748b' }}>
-                            CRLV: <strong>{formatarDataBR(item.crlv_validade_carreta)}</strong>
+                            Último Reg: <strong>{formatarDataBR(item.crlv_validade_carreta)}</strong>
                           </div>
+                          {detranCarreta?.labelDataVencimento && (
+                            <div style={{ fontSize: '0.70rem', color: detranCarreta.cor, fontWeight: 600 }}>
+                              Detran: {detranCarreta.labelDataVencimento}
+                            </div>
+                          )}
                           <div style={{ fontSize: '0.76rem', color: item.validade_laudo_rocha ? '#fbbf24' : '#64748b', fontWeight: 600 }}>
                             Laudo CSV: {formatarDataBR(item.validade_laudo_rocha)}
                           </div>
