@@ -3,7 +3,7 @@ import {
   Search, RefreshCw, Printer, CheckCircle, CheckCircle2, Clock, Truck, Mail, FileText, 
   AlertCircle, AlertTriangle, Trash2, ShieldCheck, ShieldAlert, RotateCcw, Edit3, CheckCheck, PlayCircle,
   FileSpreadsheet, Download, History, Bell, BellRing, Volume2, VolumeX, Eye, Check, X, BarChart3, TrendingUp,
-  Filter, ChevronDown
+  Filter, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { 
@@ -213,6 +213,10 @@ export function PainelGestao({
 
   // Estado para o modal de limpeza de registros de teste em lote
   const [modalLimpezaAberto, setModalLimpezaAberto] = useState(false);
+
+  // Estados de Paginação da Tabela Operacional (padrão 20 por página)
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(20);
 
   // Solicita permissão para notificações na área de trabalho do navegador
   const solicitarPermissaoDesktop = async () => {
@@ -670,6 +674,21 @@ export function PainelGestao({
       (ag.horario_agendamento && ag.horario_agendamento.toLowerCase().includes(busca))
     );
   });
+
+  // Reseta para a primeira página quando qualquer filtro ou termo de busca for alterado
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [filtroPedreira, filtroStatus, filtroData, termoBusca, exibindoPendenciasAnteriores]);
+
+  // Cálculos de Paginação
+  const totalItens = agendamentosFiltrados.length;
+  const totalPaginas = Math.max(1, Math.ceil(totalItens / itensPorPagina));
+  const indiceInicial = (paginaAtual - 1) * itensPorPagina;
+  const indiceFinal = Math.min(indiceInicial + itensPorPagina, totalItens);
+
+  const agendamentosPaginados = useMemo(() => {
+    return agendamentosFiltrados.slice(indiceInicial, indiceFinal);
+  }, [agendamentosFiltrados, indiceInicial, indiceFinal]);
 
   const agendamentosHoje = agendamentos.filter(ag => ag.data_agendamento === hojeStr);
 
@@ -1761,7 +1780,7 @@ export function PainelGestao({
                   </td>
                 </tr>
               ) : (
-                agendamentosFiltrados.map((ag) => {
+                agendamentosPaginados.map((ag) => {
                   const isSabado = ag.tipo_dia === 'sabado' || isDataSabado(ag.data_agendamento) || String(ag.horario_agendamento || '').includes('Sábado');
                   const isOutros = ag.horario_agendamento === 'outros' || String(ag.horario_agendamento).toLowerCase().startsWith('outro');
                   const listaPlacasTabela = formatarPlacasExibicao(ag);
@@ -2148,6 +2167,137 @@ export function PainelGestao({
             </tbody>
           </table>
         </div>
+
+        {/* Barra de Paginação (Visível na tela, oculta na impressão) */}
+        {totalItens > 0 && (
+          <div className="no-print" style={{
+            padding: '12px 20px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12
+          }}>
+            {/* Informação de Contagem */}
+            <div style={{ fontSize: '0.84rem', color: 'var(--slate-400)' }}>
+              Mostrando <strong>{totalItens === 0 ? 0 : indiceInicial + 1}</strong> a <strong>{indiceFinal}</strong> de <strong>{totalItens}</strong> carregamentos
+            </div>
+
+            {/* Controles de Navegação */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {/* Seletor de Itens por Página */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 10 }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>Exibir:</span>
+                <select
+                  value={itensPorPagina}
+                  onChange={(e) => {
+                    setItensPorPagina(Number(e.target.value));
+                    setPaginaAtual(1);
+                  }}
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: 6,
+                    color: '#f3f4f6',
+                    padding: '4px 8px',
+                    fontSize: '0.8rem',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value={20}>20 por página</option>
+                  <option value={50}>50 por página</option>
+                  <option value={100}>100 por página</option>
+                </select>
+              </div>
+
+              {/* Botão Primeira Página */}
+              <button
+                type="button"
+                onClick={() => setPaginaAtual(1)}
+                disabled={paginaAtual === 1}
+                className="btn btn-secondary"
+                style={{
+                  padding: '6px 8px',
+                  opacity: paginaAtual === 1 ? 0.35 : 1,
+                  cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer'
+                }}
+                title="Primeira página"
+              >
+                <ChevronsLeft size={16} />
+              </button>
+
+              {/* Botão Página Anterior */}
+              <button
+                type="button"
+                onClick={() => setPaginaAtual(prev => Math.max(1, prev - 1))}
+                disabled={paginaAtual === 1}
+                className="btn btn-secondary"
+                style={{
+                  padding: '6px 10px',
+                  fontSize: '0.82rem',
+                  gap: 4,
+                  opacity: paginaAtual === 1 ? 0.35 : 1,
+                  cursor: paginaAtual === 1 ? 'not-allowed' : 'pointer'
+                }}
+                title="Página anterior"
+              >
+                <ChevronLeft size={16} />
+                Anterior
+              </button>
+
+              {/* Indicador de Página Atual / Total */}
+              <div style={{
+                background: 'rgba(0, 118, 44, 0.15)',
+                border: '1px solid var(--vermont-green-border)',
+                borderRadius: 6,
+                padding: '5px 12px',
+                fontSize: '0.82rem',
+                color: '#4ade80',
+                fontWeight: 700
+              }}>
+                Página {paginaAtual} de {totalPaginas}
+              </div>
+
+              {/* Botão Próxima Página */}
+              <button
+                type="button"
+                onClick={() => setPaginaAtual(prev => Math.min(totalPaginas, prev + 1))}
+                disabled={paginaAtual === totalPaginas}
+                className="btn btn-secondary"
+                style={{
+                  padding: '6px 10px',
+                  fontSize: '0.82rem',
+                  gap: 4,
+                  opacity: paginaAtual === totalPaginas ? 0.35 : 1,
+                  cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer'
+                }}
+                title="Próxima página"
+              >
+                Próxima
+                <ChevronRight size={16} />
+              </button>
+
+              {/* Botão Última Página */}
+              <button
+                type="button"
+                onClick={() => setPaginaAtual(totalPaginas)}
+                disabled={paginaAtual === totalPaginas}
+                className="btn btn-secondary"
+                style={{
+                  padding: '6px 8px',
+                  opacity: paginaAtual === totalPaginas ? 0.35 : 1,
+                  cursor: paginaAtual === totalPaginas ? 'not-allowed' : 'pointer'
+                }}
+                title="Última página"
+              >
+                <ChevronsRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       </>
       )}
