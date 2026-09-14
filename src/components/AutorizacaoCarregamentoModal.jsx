@@ -15,18 +15,18 @@ import {
  * Componente do Logotipo Oficial da Vermont Mineração para cabeçalho
  * Usa a mesma logo oficial da página com alto contraste para impressão física
  */
-function LogoVermontHeader() {
+function LogoVermontHeader({ isCompact = false }) {
   const [imgErro, setImgErro] = useState(false);
 
   return (
-    <div style={{ textAlign: 'center', marginBottom: 10 }}>
+    <div style={{ textAlign: 'center', marginBottom: isCompact ? 4 : 10 }}>
       {!imgErro ? (
         <img 
           src="/assets/logo-vermont.png" 
           alt="Vermont Mineração" 
           style={{ 
-            maxHeight: '52px', 
-            maxWidth: '240px', 
+            maxHeight: isCompact ? '34px' : '48px', 
+            maxWidth: isCompact ? '160px' : '220px', 
             objectFit: 'contain',
             display: 'inline-block',
             filter: 'brightness(0)',
@@ -47,31 +47,31 @@ function LogoVermontHeader() {
         <div style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '4px 12px',
-          border: '2px solid #000000',
-          borderRadius: 8
+          gap: isCompact ? 6 : 10,
+          padding: isCompact ? '2px 8px' : '4px 12px',
+          border: '1.5px solid #000000',
+          borderRadius: 6
         }}>
           <div style={{
-            width: 32,
-            height: 32,
+            width: isCompact ? 24 : 32,
+            height: isCompact ? 24 : 32,
             background: '#000000',
             color: '#ffffff',
-            borderRadius: 6,
+            borderRadius: 4,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontWeight: 900,
-            fontSize: '1.2rem',
+            fontSize: isCompact ? '0.95rem' : '1.2rem',
             fontFamily: 'sans-serif'
           }}>
             V
           </div>
           <div style={{ textAlign: 'left' }}>
-            <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 900, letterSpacing: '0.08em', color: '#000000', lineHeight: 1.1 }}>
+            <span style={{ display: 'block', fontSize: isCompact ? '0.90rem' : '1.1rem', fontWeight: 900, letterSpacing: '0.08em', color: '#000000', lineHeight: 1.1 }}>
               VERMONT
             </span>
-            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.22em', color: '#333333', lineHeight: 1 }}>
+            <span style={{ display: 'block', fontSize: isCompact ? '0.55rem' : '0.65rem', fontWeight: 700, letterSpacing: '0.22em', color: '#333333', lineHeight: 1 }}>
               MINERAÇÃO
             </span>
           </div>
@@ -213,9 +213,21 @@ export function AutorizacaoCarregamentoModal({
     styleEl.innerHTML = `
       @page { 
         size: A4 portrait !important; 
-        margin: 8mm 10mm !important; 
+        margin: 5mm 8mm !important; 
       }
       @media print {
+        *, *:before, *:after {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          box-sizing: border-box !important;
+        }
+        html, body {
+          width: 100% !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+        }
         body * {
           visibility: hidden !important;
         }
@@ -223,16 +235,38 @@ export function AutorizacaoCarregamentoModal({
           visibility: visible !important;
         }
         #area-impressao-autorizacao {
-          position: absolute !important;
-          left: 0 !important;
-          top: 0 !important;
+          position: static !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
           width: 100% !important;
-          margin: 0 !important;
+          max-width: 580px !important;
+          margin: 0 auto !important;
           padding: 0 !important;
           background: #ffffff !important;
           color: #000000 !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
+          page-break-after: avoid !important;
+          page-break-inside: avoid !important;
+          break-after: avoid !important;
+          break-inside: avoid !important;
+        }
+        .via-card-print {
+          width: 100% !important;
+          max-width: 580px !important;
+          margin: 0 auto !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+        .via-divisor-corte {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 100% !important;
+          max-width: 580px !important;
+          margin: 6px auto !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
         }
         .no-print {
           display: none !important;
@@ -251,40 +285,45 @@ export function AutorizacaoCarregamentoModal({
   };
 
   /**
-   * Renderiza uma via única do documento físico de Autorização de Carregamento
+   * Renderiza uma via do documento físico de Autorização de Carregamento
    */
   const renderizarViaDocumento = (numeroVia = 1) => {
+    const isCompact = viasPorFolha === 'dupla';
     const bloco1 = blocosPedreira[0] || '';
     const bloco2 = blocosPedreira[1] || '';
     const bloco3 = blocosPedreira[2] || '';
 
     return (
-      <div style={{
-        background: '#ffffff',
-        color: '#000000',
-        padding: '18px 24px',
-        borderRadius: 8,
-        border: '1px solid #94a3b8',
-        fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif",
-        maxWidth: '560px',
-        margin: '0 auto',
-        boxSizing: 'border-box',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
-      }}>
+      <div 
+        className="via-card-print"
+        style={{
+          background: '#ffffff',
+          color: '#000000',
+          padding: isCompact ? '10px 14px' : '22px 26px',
+          borderRadius: isCompact ? 4 : 8,
+          border: '1.5px solid #000000',
+          fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif",
+          maxWidth: isCompact ? '560px' : '600px',
+          width: '100%',
+          margin: '0 auto',
+          boxSizing: 'border-box',
+          boxShadow: isCompact ? 'none' : '0 2px 6px rgba(0,0,0,0.05)'
+        }}
+      >
         {/* Topo com Logomarca Oficial da Vermont Mineração */}
-        <LogoVermontHeader />
+        <LogoVermontHeader isCompact={isCompact} />
 
         {/* Título Oficial Exclusivo: AUTORIZAÇÃO DE CARREGAMENTO */}
         <div style={{
           textAlign: 'center',
-          fontSize: '1.12rem',
+          fontSize: isCompact ? '0.90rem' : '1.15rem',
           fontWeight: 900,
           letterSpacing: '0.8px',
           color: '#000000',
-          marginBottom: 14,
+          marginBottom: isCompact ? 6 : 12,
           textTransform: 'uppercase',
           borderBottom: '2px solid #000000',
-          paddingBottom: 6
+          paddingBottom: isCompact ? 2 : 5
         }}>
           AUTORIZAÇÃO DE CARREGAMENTO
         </div>
@@ -293,41 +332,41 @@ export function AutorizacaoCarregamentoModal({
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
-          fontSize: '0.90rem',
+          fontSize: isCompact ? '0.78rem' : '0.90rem',
           border: '1.5px solid #000000',
           tableLayout: 'fixed'
         }}>
           <tbody>
             {/* DATA */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ width: '38%', padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 DATA:
               </td>
-              <td style={{ padding: '7px 12px', fontWeight: 700, color: '#000000' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000' }}>
                 {dataFormatada}
               </td>
             </tr>
 
             {/* CLIENTE */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 CLIENTE:
               </td>
-              <td style={{ padding: '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word', lineHeight: 1.15 }}>
                 {clienteFormatado}
               </td>
             </tr>
 
             {/* DESTINO */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 DESTINO:
               </td>
-              <td style={{ padding: '7px 12px', fontWeight: 800, color: destinoEditavel ? '#000000' : '#ef4444' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, color: destinoEditavel ? '#000000' : '#ef4444' }}>
                 {destinoEditavel.trim() ? (
                   destinoEditavel.toUpperCase()
                 ) : (
-                  <span style={{ fontSize: '0.82rem', fontStyle: 'italic', color: '#ef4444' }}>
+                  <span style={{ fontSize: isCompact ? '0.72rem' : '0.82rem', fontStyle: 'italic', color: '#ef4444' }}>
                     * Destino Obrigatório (Preencha acima)
                   </span>
                 )}
@@ -336,74 +375,74 @@ export function AutorizacaoCarregamentoModal({
 
             {/* MEDIDAS / Nº DE SÉRIE (Campo aberto antes das numerações dos blocos) */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 MEDIDAS / SÉRIE:
               </td>
-              <td style={{ padding: '7px 12px', fontWeight: 700, color: '#000000', minHeight: '26px' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', minHeight: isCompact ? '20px' : '26px' }}>
                 {medidasSerieEditavel.trim() ? (
                   medidasSerieEditavel.toUpperCase()
                 ) : (
-                  <span style={{ color: 'transparent', display: 'inline-block', minHeight: '16px' }}>&nbsp;</span>
+                  <span style={{ color: 'transparent', display: 'inline-block', minHeight: isCompact ? '13px' : '16px' }}>&nbsp;</span>
                 )}
               </td>
             </tr>
 
             {/* BLOCO 01 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 BLOCO 01:
               </td>
-              <td style={{ padding: '7px 12px', fontWeight: 900, color: '#000000', fontSize: '0.94rem' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 900, color: '#000000', fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
                 {bloco1 || '-'}
               </td>
             </tr>
 
             {/* BLOCO 02 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 BLOCO 02:
               </td>
-              <td style={{ padding: '7px 12px', fontWeight: 900, color: '#000000', fontSize: '0.94rem' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 900, color: '#000000', fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
                 {bloco2}
               </td>
             </tr>
 
             {/* BLOCO 03 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 BLOCO 03:
               </td>
-              <td style={{ padding: '7px 12px', fontWeight: 900, color: '#000000', fontSize: '0.94rem' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 900, color: '#000000', fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
                 {bloco3}
               </td>
             </tr>
 
             {/* TRANSPORTADORA */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 TRANSPORTADORA:
               </td>
-              <td style={{ padding: '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word', lineHeight: 1.15 }}>
                 {transportadoraFormatada}
               </td>
             </tr>
 
             {/* MOTORISTA */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 MOTORISTA:
               </td>
-              <td style={{ padding: '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word', lineHeight: 1.15 }}>
                 {motoristaFormatado}
               </td>
             </tr>
 
             {/* PLACA */}
             <tr>
-              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 PLACA:
               </td>
-              <td style={{ padding: '7px 12px', fontWeight: 900, color: '#000000', fontSize: '0.94rem' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 900, color: '#000000', fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
                 {placasFormatadas}
               </td>
             </tr>
@@ -738,18 +777,43 @@ export function AutorizacaoCarregamentoModal({
           <div id="area-impressao-autorizacao" style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: viasPorFolha === 'dupla' ? '28px' : '0px',
-            maxWidth: '560px',
+            gap: viasPorFolha === 'dupla' ? '6px' : '0px',
+            maxWidth: viasPorFolha === 'dupla' ? '560px' : '600px',
+            width: '100%',
             margin: '0 auto'
           }}>
             {/* 1ª Via */}
-            <div>
+            <div style={{ width: '100%' }}>
               {renderizarViaDocumento(1)}
             </div>
 
+            {/* Linha de Picote e Corte para 2ª Via */}
+            {viasPorFolha === 'dupla' && (
+              <div 
+                className="via-divisor-corte"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  margin: '6px 0',
+                  color: '#64748b',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  width: '100%'
+                }}
+              >
+                <span style={{ flex: 1, borderTop: '1px dashed #94a3b8' }}></span>
+                <span>✂ CORTE AQUI (2ª VIA) ✂</span>
+                <span style={{ flex: 1, borderTop: '1px dashed #94a3b8' }}></span>
+              </div>
+            )}
+
             {/* 2ª Via (se modo folha dupla estiver ativado) */}
             {viasPorFolha === 'dupla' && (
-              <div style={{ borderTop: '1.5px dashed #94a3b8', paddingTop: '24px' }}>
+              <div style={{ width: '100%' }}>
                 {renderizarViaDocumento(2)}
               </div>
             )}
