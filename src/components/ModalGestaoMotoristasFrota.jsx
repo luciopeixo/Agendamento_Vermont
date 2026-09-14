@@ -178,11 +178,13 @@ export function ModalGestaoMotoristasFrota({
         padding: '16px'
       }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) aoFechar();
+        e.stopPropagation();
+        if (e.target === e.currentTarget && !modalEdicaoAberto) aoFechar();
       }}
     >
       <div 
         className="glass-panel" 
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '1150px',
@@ -553,18 +555,19 @@ export function ModalGestaoMotoristasFrota({
           )}
         </div>
 
-        {/* Modal de Edição/Cadastro */}
-        {modalEdicaoAberto && (
-          <ModalConformidadeMotorista
-            motoristaInicial={motoristaEditando}
-            usuarioNome={usuarioNome}
-            aoFechar={() => setModalEdicaoAberto(false)}
-            aoSalvar={() => {
-              carregarDados();
-            }}
-          />
-        )}
       </div>
+
+      {/* Modal de Edição/Cadastro */}
+      {modalEdicaoAberto && (
+        <ModalConformidadeMotorista
+          motoristaInicial={motoristaEditando}
+          usuarioNome={usuarioNome}
+          aoFechar={() => setModalEdicaoAberto(false)}
+          aoSalvar={() => {
+            carregarDados();
+          }}
+        />
+      )}
     </div>
   );
 }

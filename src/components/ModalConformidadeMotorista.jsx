@@ -238,11 +238,13 @@ export function ModalConformidadeMotorista({
         padding: '16px'
       }}
       onClick={(e) => {
+        e.stopPropagation();
         if (e.target === e.currentTarget) aoFechar();
       }}
     >
       <div 
         className="glass-panel" 
+        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '780px',
