@@ -654,29 +654,61 @@ export function verificarConformidadeDocumental({
   const dataReferencia = new Date(`${refDataStr}T23:59:59`);
 
   const base = obterBaseMotoristas();
-  let motorista = null;
 
+  // 1. Busca os dados pessoais do motorista (atrelados ao CPF)
+  let motorista = null;
   if (cpfLimpo) {
     motorista = base.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
   }
 
-  // Se não encontrou por CPF, tenta encontrar pela placa do cavalo ou carreta
-  if (!motorista && placaCavalo) {
-    const limpaCavalo = String(placaCavalo).replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    motorista = base.find(m => String(m.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCavalo);
+  // 2. Busca dados do Cavalo Mecânico (busca pela placa informada no agendamento na base inteira)
+  const limpaCavalo = String(placaCavalo || motorista?.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  let veiculoCavalo = null;
+  if (limpaCavalo) {
+    // Procura primeiro no próprio motorista; se não tiver CRLV preenchido, busca em qualquer cadastro da frota com essa placa
+    if (motorista && String(motorista.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCavalo && motorista.crlv_validade_cavalo) {
+      veiculoCavalo = motorista;
+    } else {
+      veiculoCavalo = base.find(m => String(m.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCavalo && m.crlv_validade_cavalo);
+    }
   }
 
-  if (!motorista && placaCarreta) {
-    const limpaCarreta = String(placaCarreta).replace(/[^A-Z0-9]/gi, '').toUpperCase();
-    motorista = base.find(m => String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarreta);
+  // 3. Busca dados da Carreta 1 (busca pela placa da carreta na base inteira)
+  const limpaCarreta = String(placaCarreta || motorista?.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  let veiculoCarreta = null;
+  if (limpaCarreta) {
+    if (motorista && String(motorista.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarreta && (motorista.crlv_validade_carreta || motorista.validade_laudo_rocha)) {
+      veiculoCarreta = motorista;
+    } else {
+      veiculoCarreta = base.find(m => (
+        String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarreta ||
+        String(m.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarreta
+      ) && (m.crlv_validade_carreta || m.validade_laudo_rocha));
+    }
   }
 
-  if (!motorista) {
+  // 4. Busca dados da Carreta 2 (se houver)
+  const limpaCarreta2 = String(placaCarreta2 || motorista?.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  let veiculoCarreta2 = null;
+  if (limpaCarreta2) {
+    if (motorista && String(motorista.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarreta2 && (motorista.crlv_validade_carreta_2 || motorista.validade_laudo_rocha_2)) {
+      veiculoCarreta2 = motorista;
+    } else {
+      veiculoCarreta2 = base.find(m => (
+        String(m.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarreta2 ||
+        String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarreta2
+      ) && (m.crlv_validade_carreta_2 || m.crlv_validade_carreta));
+    }
+  }
+
+  // Se não encontrou motorista nem nenhum dos veículos
+  if (!motorista && !veiculoCavalo && !veiculoCarreta) {
     return {
       cadastrado: false,
       statusGeral: 'NAO_CADASTRADO',
       itensVencidos: [],
       itensAVencer: [],
+      camposFaltando: ['Cadastro de Motorista / Veículo'],
       alertas: [],
       motorista: null
     };
@@ -750,54 +782,64 @@ export function verificarConformidadeDocumental({
     } catch (_e) {}
   };
 
-  // 1. CNH Validade (Validade impressa na CNH)
-  checarDataValidade('cnh_validade', 'CNH do Motorista', motorista.cnh_validade);
+  // Valores obtidos individualmente (permite troca de veículos entre motoristas)
+  const cnhValidade = motorista?.cnh_validade;
+  const cnhCategoria = motorista?.cnh_categoria;
+  const crlvCavalo = veiculoCavalo?.crlv_validade_cavalo || motorista?.crlv_validade_cavalo;
+  const crlvCarreta = veiculoCarreta?.crlv_validade_carreta || motorista?.crlv_validade_carreta;
+  const laudoRocha = veiculoCarreta?.validade_laudo_rocha || motorista?.validade_laudo_rocha;
+  const crlvCarreta2 = veiculoCarreta2?.crlv_validade_carreta_2 || veiculoCarreta2?.crlv_validade_carreta || motorista?.crlv_validade_carreta_2;
+  const laudoRocha2 = veiculoCarreta2?.validade_laudo_rocha_2 || veiculoCarreta2?.validade_laudo_rocha || motorista?.validade_laudo_rocha_2;
+
+  // 1. CNH Validade (Validade impressa na CNH do Motorista)
+  checarDataValidade('cnh_validade', 'CNH do Motorista', cnhValidade);
 
   // 2. Categoria CNH (Verifica compatibilidade com carreta/pesados)
-  const isCarretaOuPesado = String(tipoVeiculo || motorista.tipo_veiculo || '').toLowerCase().includes('carreta') || 
-                            String(tipoVeiculo || motorista.tipo_veiculo || '').toLowerCase().includes('bitrem') ||
-                            Boolean(placaCarreta || motorista.placa_carreta);
+  const isCarretaOuPesado = String(tipoVeiculo || motorista?.tipo_veiculo || '').toLowerCase().includes('carreta') || 
+                            String(tipoVeiculo || motorista?.tipo_veiculo || '').toLowerCase().includes('bitrem') ||
+                            Boolean(limpaCarreta);
   
-  if (isCarretaOuPesado && motorista.cnh_categoria) {
-    const cat = String(motorista.cnh_categoria).toUpperCase().trim();
+  if (isCarretaOuPesado && cnhCategoria) {
+    const cat = String(cnhCategoria).toUpperCase().trim();
     if (cat === 'B' || cat === 'C') {
       alertas.push(`CNH Categoria '${cat}' pode ser incompatível com conjunto articulado/carreta (exige categoria 'E').`);
     }
   }
 
   // 3. CRLV Cavalo (Data do último documento + 1 ano)
-  checarDataCRLV('crlv_validade_cavalo', 'CRLV do Cavalo Mecânico', motorista.crlv_validade_cavalo);
+  checarDataCRLV('crlv_validade_cavalo', `CRLV do Cavalo Mecânico${limpaCavalo ? ` (${limpaCavalo})` : ''}`, crlvCavalo);
 
   // 4. CRLV Carreta (Data do último documento + 1 ano)
-  checarDataCRLV('crlv_validade_carreta', 'CRLV da Carreta 1', motorista.crlv_validade_carreta);
+  checarDataCRLV('crlv_validade_carreta', `CRLV da Carreta 1${limpaCarreta ? ` (${limpaCarreta})` : ''}`, crlvCarreta);
 
   // 5. Laudo de Inspeção de Rocha / CSV (Carreta - Validade do Laudo)
-  checarDataValidade('validade_laudo_rocha', 'Laudo de Inspeção de Rocha / CSV (Carreta)', motorista.validade_laudo_rocha);
+  checarDataValidade('validade_laudo_rocha', `Laudo de Rocha / CSV (Carreta ${limpaCarreta || '1'})`, laudoRocha);
 
   // 6. Carreta 2 (se houver)
-  if (motorista.placa_carreta_2 || placaCarreta2) {
-    checarDataCRLV('crlv_validade_carreta_2', 'CRLV da Carreta 2', motorista.crlv_validade_carreta_2);
-    checarDataValidade('validade_laudo_rocha_2', 'Laudo de Inspeção de Rocha / CSV (Carreta 2)', motorista.validade_laudo_rocha_2);
+  if (limpaCarreta2) {
+    checarDataCRLV('crlv_validade_carreta_2', `CRLV da Carreta 2 (${limpaCarreta2})`, crlvCarreta2);
+    checarDataValidade('validade_laudo_rocha_2', `Laudo de Rocha / CSV (Carreta 2 - ${limpaCarreta2})`, laudoRocha2);
   }
 
   // Identifica campos essenciais não preenchidos
   const camposFaltando = [];
-  if (!motorista.cnh_validade) camposFaltando.push('Validade CNH');
-  if (!motorista.crlv_validade_cavalo) camposFaltando.push('CRLV Cavalo');
-  if (!motorista.crlv_validade_carreta) camposFaltando.push('CRLV Carreta');
-  if (!motorista.validade_laudo_rocha) camposFaltando.push('Laudo de Rocha / CSV');
-  if (motorista.placa_carreta_2 || placaCarreta2) {
-    if (!motorista.crlv_validade_carreta_2) camposFaltando.push('CRLV Carreta 2');
-    if (!motorista.validade_laudo_rocha_2) camposFaltando.push('Laudo Rocha Carreta 2');
+  if (!cnhValidade) camposFaltando.push('Validade CNH');
+  if (!crlvCavalo) camposFaltando.push(`CRLV Cavalo${limpaCavalo ? ` (${limpaCavalo})` : ''}`);
+  if (!crlvCarreta) camposFaltando.push(`CRLV Carreta${limpaCarreta ? ` (${limpaCarreta})` : ''}`);
+  if (!laudoRocha) camposFaltando.push(`Laudo de Rocha / CSV${limpaCarreta ? ` (${limpaCarreta})` : ''}`);
+  if (limpaCarreta2) {
+    if (!crlvCarreta2) camposFaltando.push(`CRLV Carreta 2 (${limpaCarreta2})`);
+    if (!laudoRocha2) camposFaltando.push(`Laudo Rocha Carreta 2 (${limpaCarreta2})`);
   }
 
   let statusGeral = 'REGULAR';
-  if (itensVencidos.length > 0 || motorista.status_documental === 'BLOQUEADO' || motorista.status_documental === 'VENCIDO') {
+  const statusBloqueado = motorista?.status_documental === 'BLOQUEADO' || motorista?.status_documental === 'VENCIDO';
+  if (itensVencidos.length > 0 || statusBloqueado) {
     statusGeral = 'VENCIDO';
   } else if (camposFaltando.length > 0) {
     // Se faltam dados/documentos na base, fica como Não Cadastrado / Pendente
     statusGeral = 'NAO_CADASTRADO';
-  } else if (itensAVencer.length > 0 || motorista.status_documental === 'PENDENTE') {
+  } else if (itensAVencer.length > 0 || motorista?.status_documental === 'PENDENTE') {
     statusGeral = 'AVENCER';
   } else {
     statusGeral = 'REGULAR';
@@ -810,7 +852,7 @@ export function verificarConformidadeDocumental({
     itensAVencer,
     camposFaltando,
     alertas,
-    motorista
+    motorista: motorista || veiculoCavalo || veiculoCarreta
   };
 }
 
