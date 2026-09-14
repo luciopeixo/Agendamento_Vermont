@@ -147,7 +147,7 @@ export function ModalGestaoMotoristasFrota({
         'Último Registro CRLV Cavalo': m.crlv_validade_cavalo || '-',
         'Placa Carreta': m.placa_carreta ? `${m.placa_carreta} (${ufCarr})` : '-',
         'Último Registro CRLV Carreta': m.crlv_validade_carreta || '-',
-        'Último Registro Laudo Rocha / CSV': m.validade_laudo_rocha || '-',
+        'Vencimento Laudo Rocha / CSV': m.validade_laudo_rocha || '-',
         'Transportadora': m.transportadora || '-',
         'Status Geral': m.conformidade.statusGeral,
         'Pendências / Vencidos': m.conformidade.itensVencidos.map(i => i.titulo).join(', ') || 'Nenhuma'
@@ -520,11 +520,11 @@ export function ModalGestaoMotoristasFrota({
                             </div>
                           )}
                           <div style={{ fontSize: '0.76rem', color: item.validade_laudo_rocha ? '#cbd5e1' : '#64748b', marginTop: 4 }}>
-                            Último Laudo: <strong>{formatarDataBR(item.validade_laudo_rocha)}</strong>
+                            Venc. Laudo: <strong>{formatarDataBR(item.validade_laudo_rocha)}</strong>
                           </div>
-                          {laudoEval?.labelDataVencimento && (
+                          {laudoEval?.label && item.validade_laudo_rocha && (
                             <div style={{ fontSize: '0.70rem', color: laudoEval.cor, fontWeight: 600 }}>
-                              Validade (+1 ano): {laudoEval.labelDataVencimento}
+                              {laudoEval.label}
                             </div>
                           )}
                         </td>

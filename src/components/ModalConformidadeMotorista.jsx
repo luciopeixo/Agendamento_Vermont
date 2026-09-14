@@ -724,10 +724,10 @@ export function ModalConformidadeMotorista({
                 )}
               </div>
 
-              {/* DATA DO ÚLTIMO LAUDO ROCHA / CSV */}
+              {/* DATA DE VENCIMENTO DO LAUDO ROCHA / CSV */}
               <div>
                 <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                  Data do Último Laudo de Rocha / CSV *
+                  Data de Vencimento do Laudo de Rocha / CSV *
                 </label>
                 <input
                   type="date"
@@ -835,7 +835,7 @@ export function ModalConformidadeMotorista({
                   </div>
                   <div>
                     <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                      Data do Último Laudo de Rocha (Carreta 2)
+                      Data de Vencimento do Laudo de Rocha (Carreta 2)
                     </label>
                     <input
                       type="date"
