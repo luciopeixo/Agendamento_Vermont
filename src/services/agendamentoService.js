@@ -2288,145 +2288,18 @@ export async function listarAgendamentos(filtros = {}) {
             };
           });
 
-          // Identifica registros que existem localmente mas ainda não subiram para o Supabase
-          const supabaseIds = new Set(data.map(d => String(d.id).trim()));
-          const locaisNaoNoSupabase = locais.filter(l => {
-            const idStr = String(l.id).trim();
-            if (idsExcluidos.has(idStr)) return false;
-            if (l.status === 'Cancelado') return false;
-            if (supabaseIds.has(idStr)) return false;
-            // Se filtro de data estiver ativo, checa se o agendamento local bate com a data
-            if (filtros.data && l.data_agendamento !== filtros.data) return false;
-            // Se filtro de status estiver ativo, checa status
-            if (statusArray && statusArray.length > 0) {
-              if (!statusArray.includes(l.status)) return false;
-            }
-            return true;
-          }).map(l => ({
-            ...l,
-            cliente: limparNomeEmpresa(l.cliente),
-            cliente_cnpj: l.cliente_cnpj || resolverCnpjCliente(l) || null,
-            transportadora: limparNomeEmpresa(l.transportadora),
-            transportadora_cnpj: l.transportadora_cnpj || resolverCnpjTransportadora(l) || null
-          }));
-
-          // Une registros do Supabase com registros pendentes locais para NUNCA perder nenhum agendamento
-          let listaUnificada = [...listaSup, ...locaisNaoNoSupabase];
-
-          if (filtros.pedreira && filtros.pedreira !== 'todas') {
-            listaUnificada = listaUnificada.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
-          }
-
-          // Mantém localStorage sempre sincronizado sem readicionar itens excluídos
+          // Mantém localStorage sincronizado como cache de leitura rápida
           try {
-            const mapaAtualizado = new Map(locais.filter(l => !idsExcluidos.has(String(l.id).trim())).map(l => [String(l.id).trim(), l]));
-            listaSup.forEach(item => {
-              const idItemStr = String(item.id).trim();
-              if (idsExcluidos.has(idItemStr)) return;
-              const anterior = mapaAtualizado.get(idItemStr) || {};
-              const histMesclado = fundirHistoricosStatus(item.historico_status, anterior.historico_status);
-              const cCnpj = item.cliente_cnpj || anterior.cliente_cnpj || resolverCnpjCliente(item, anterior) || null;
-              const tCnpj = item.transportadora_cnpj || anterior.transportadora_cnpj || resolverCnpjTransportadora(item, anterior) || null;
-              mapaAtualizado.set(idItemStr, {
-                ...anterior,
-                ...item,
-                cliente: item.cliente || anterior.cliente,
-                cliente_cnpj: cCnpj,
-                transportadora: item.transportadora || anterior.transportadora,
-                transportadora_cnpj: tCnpj,
-                historico_status: histMesclado
-              });
-            });
+            const mapaAtualizado = new Map(dataFiltrada.map(l => [String(l.id).trim(), l]));
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(Array.from(mapaAtualizado.values())));
           } catch (e) {}
 
-          // Tenta subir registros pendentes para o Supabase em segundo plano (NUNCA re-insere excluídos)
-          if (locaisNaoNoSupabase.length > 0) {
-            locaisNaoNoSupabase.forEach(async (pendente) => {
-              const idPendenteStr = String(pendente.id).trim();
-              if (idsExcluidos.has(idPendenteStr) || pendente.status === 'Cancelado') return;
-              try {
-                const payloadSync = {
-                  pedreira: pendente.pedreira,
-                  material: pendente.material,
-                  numero_bloco: pendente.numero_bloco,
-                  cliente: pendente.cliente,
-                  cliente_cnpj: pendente.cliente_cnpj || null,
-                  transportadora: pendente.transportadora,
-                  transportadora_cnpj: pendente.transportadora_cnpj || null,
-                  motorista_nome: pendente.motorista_nome,
-                  motorista_cpf: pendente.motorista_cpf,
-                  motorista_telefone: pendente.motorista_telefone || null,
-                  placa_cavalo: pendente.placa_cavalo,
-                  placa_carreta: pendente.placa_carreta || null,
-                  placa_carreta_2: pendente.placa_carreta_2 || null,
-                  tipo_veiculo: pendente.tipo_veiculo,
-                  data_agendamento: pendente.data_agendamento,
-                  tipo_dia: pendente.tipo_dia || (isDataSabado(pendente.data_agendamento) ? 'sabado' : 'dia_util'),
-                  horario_agendamento: pendente.horario_agendamento,
-                  justificativa_outros: pendente.justificativa_outros || null,
-                  observacoes: pendente.observacoes || null,
-                  status: pendente.status || STATUS_AGENDAMENTO.AGUARDANDO
-                };
-
-                const { data: dataInsert, error: errInsert } = await supabase
-                  .from('agendamentos_pedreira')
-                  .insert([payloadSync])
-                  .select()
-                  .single();
-
-                if (!errInsert && dataInsert) {
-                  console.info('[Sync] Agendamento local sincronizado com Supabase:', pendente.numero_bloco);
-                  if (pendente.id && String(pendente.id).startsWith('VT-')) {
-                    const listaLocais = obterAgendamentosLocais();
-                    const idx = listaLocais.findIndex(item => String(item.id) === String(pendente.id));
-                    if (idx !== -1) {
-                      listaLocais[idx] = { ...listaLocais[idx], ...dataInsert, id: dataInsert.id };
-                      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(listaLocais));
-                    }
-                  }
-                } else if (errInsert) {
-                  // Fallback com colunas essenciais
-                  const essencialSync = {
-                    pedreira: pendente.pedreira,
-                    material: pendente.material,
-                    numero_bloco: pendente.numero_bloco,
-                    cliente: pendente.cliente,
-                    transportadora: pendente.transportadora,
-                    motorista_nome: pendente.motorista_nome,
-                    motorista_cpf: pendente.motorista_cpf,
-                    motorista_telefone: pendente.motorista_telefone || null,
-                    placa_cavalo: pendente.placa_cavalo,
-                    placa_carreta: pendente.placa_carreta || null,
-                    tipo_veiculo: pendente.tipo_veiculo,
-                    data_agendamento: pendente.data_agendamento,
-                    horario_agendamento: pendente.horario_agendamento,
-                    observacoes: pendente.observacoes ? limparObservacoesDuplicadas(pendente.observacoes) : null,
-                    status: pendente.status || STATUS_AGENDAMENTO.AGUARDANDO
-                  };
-                  const { data: dataEssencial, error: errEssencial } = await supabase
-                    .from('agendamentos_pedreira')
-                    .insert([essencialSync])
-                    .select()
-                    .single();
-
-                  if (!errEssencial && dataEssencial) {
-                    console.info('[Sync] Agendamento local sincronizado via fallback essencial:', pendente.numero_bloco);
-                    if (pendente.id && String(pendente.id).startsWith('VT-')) {
-                      const listaLocais = obterAgendamentosLocais();
-                      const idx = listaLocais.findIndex(item => String(item.id) === String(pendente.id));
-                      if (idx !== -1) {
-                        listaLocais[idx] = { ...listaLocais[idx], ...dataEssencial, id: dataEssencial.id };
-                        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(listaLocais));
-                      }
-                    }
-                  }
-                }
-              } catch (eSync) {}
-            });
+          let listaFinal = listaSup;
+          if (filtros.pedreira && filtros.pedreira !== 'todas') {
+            listaFinal = listaFinal.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
           }
 
-          return listaUnificada;
+          return listaFinal;
         }
       } catch (e) {
         console.warn('Erro ao listar do Supabase, buscando locais:', e);
@@ -3239,5 +3112,127 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
   } catch (err) {
     console.error('Erro ao gravar agendamento combinado:', err);
     return { success: false, error: err.message };
+  }
+}
+
+// ==========================================
+// DETECÇÃO & LIMPEZA EM LOTE DE REGISTROS DE TESTE
+// ==========================================
+
+const PADROES_TESTE = [
+  'teste', 'test', 'mock', 'demo', 'exemplo', 'dummy', 'temp', 'teste1', 'teste2', 'teste3',
+  '123456', '0000', '1111', '9999', 'asdf', 'qwerty', 'fulano'
+];
+
+/**
+ * Verifica se um agendamento possui indícios claros de ser registro de teste
+ */
+export function isRegistroTeste(agendamento) {
+  if (!agendamento) return false;
+  
+  const camposParaVerificar = [
+    agendamento.numero_bloco,
+    agendamento.cliente,
+    agendamento.transportadora,
+    agendamento.motorista_nome,
+    agendamento.motorista_cpf,
+    agendamento.observacoes,
+    agendamento.justificativa_outros
+  ].map(v => String(v || '').toLowerCase().trim());
+
+  return camposParaVerificar.some(texto => {
+    if (!texto) return false;
+    return PADROES_TESTE.some(padrao => texto.includes(padrao));
+  });
+}
+
+/**
+ * Varre uma lista de agendamentos e retorna apenas os que correspondem a padrões de teste
+ */
+export function identificarRegistrosTeste(lista = []) {
+  if (!Array.isArray(lista)) return [];
+  return lista.filter(item => isRegistroTeste(item));
+}
+
+/**
+ * Exclui múltiplos agendamentos em lote (do Supabase, do LocalStorage e registra no tombstone)
+ */
+export async function excluirAgendamentosEmLote(agendamentosOuIds = []) {
+  if (!Array.isArray(agendamentosOuIds) || agendamentosOuIds.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  const ids = agendamentosOuIds.map(item => {
+    const rawId = typeof item === 'object' && item !== null ? item.id : item;
+    return String(rawId).trim();
+  }).filter(Boolean);
+
+  if (ids.length === 0) return { success: true, count: 0 };
+
+  // 1. Registra no tombstone e remove do LocalStorage
+  ids.forEach(id => {
+    registrarIdExcluido(id);
+    excluirAgendamentoLocal(id);
+  });
+
+  // 2. Se o Supabase estiver configurado, executa exclusão remota
+  if (isSupabaseConfigurado()) {
+    try {
+      const idsNumericos = ids.filter(id => /^\d+$/.test(id)).map(Number);
+      const idsStrings = ids.filter(id => !/^\d+$/.test(id));
+
+      if (idsNumericos.length > 0) {
+        const { error: errNum } = await supabase
+          .from('agendamentos_pedreira')
+          .delete()
+          .in('id', idsNumericos);
+
+        if (errNum) {
+          console.warn('DELETE em lote numérico no Supabase falhou, aplicando soft-delete:', errNum.message);
+          await supabase
+            .from('agendamentos_pedreira')
+            .update({ 
+              status: 'Cancelado',
+              observacoes: '[EXCLUÍDO DEFINITIVAMENTE PELO ADMINISTRADOR]'
+            })
+            .in('id', idsNumericos);
+        }
+      }
+
+      if (idsStrings.length > 0) {
+        const { error: errStr } = await supabase
+          .from('agendamentos_pedreira')
+          .delete()
+          .in('id', idsStrings);
+
+        if (errStr) {
+          console.warn('DELETE em lote texto no Supabase falhou, aplicando soft-delete:', errStr.message);
+          await supabase
+            .from('agendamentos_pedreira')
+            .update({ 
+              status: 'Cancelado',
+              observacoes: '[EXCLUÍDO DEFINITIVAMENTE PELO ADMINISTRADOR]'
+            })
+            .in('id', idsStrings);
+        }
+      }
+    } catch (eSup) {
+      console.warn('Erro ao processar exclusão em lote no Supabase:', eSup);
+    }
+  }
+
+  return { success: true, count: ids.length };
+}
+
+/**
+ * Limpa completamente o armazenamento local de agendamentos no navegador
+ */
+export function limparCacheLocalAgendamentos() {
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    return true;
+  } catch (e) {
+    console.warn('Erro ao limpar cache local de agendamentos:', e);
+    return false;
   }
 }

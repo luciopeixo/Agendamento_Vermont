@@ -30,6 +30,7 @@ import {
 import { ModalEditarAgendamento } from './ModalEditarAgendamento';
 import { ModalHistoricoStatus } from './ModalHistoricoStatus';
 import { ModalConfirmarStatus } from './ModalConfirmarStatus';
+import { ModalLimpezaTestes } from './ModalLimpezaTestes';
 import { GraficosBlocosAdmin } from './GraficosBlocosAdmin';
 
 /**
@@ -209,6 +210,9 @@ export function PainelGestao({
   // Estado para a tela de atenção e confirmação de mudança de status
   const [mudancaStatusPendente, setMudancaStatusPendente] = useState(null); // { agendamento, novoStatus }
   const [processandoMudancaStatus, setProcessandoMudancaStatus] = useState(false);
+
+  // Estado para o modal de limpeza de registros de teste em lote
+  const [modalLimpezaAberto, setModalLimpezaAberto] = useState(false);
 
   // Solicita permissão para notificações na área de trabalho do navegador
   const solicitarPermissaoDesktop = async () => {
@@ -969,6 +973,29 @@ export function PainelGestao({
             <Printer size={18} />
             Imprimir Relatório
           </button>
+
+          {/* Botão de Limpeza em Lote de Testes (Exclusivo Admin) */}
+          {isAdmin && (
+            <button
+              onClick={() => setModalLimpezaAberto(true)}
+              className="btn"
+              style={{
+                padding: '9px 16px',
+                fontWeight: 700,
+                gap: 8,
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                color: '#f87171',
+                borderRadius: 8,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              title="Gerenciar e excluir registros de teste do Supabase e do cache"
+            >
+              <Trash2 size={18} />
+              Limpeza de Testes
+            </button>
+          )}
 
           {/* Indicador de Auto-Atualização a cada 1 minuto */}
           <div style={{
@@ -2153,6 +2180,19 @@ export function PainelGestao({
           processando={processandoMudancaStatus}
           onConfirmar={handleConfirmarMudancaStatus}
           onCancelar={handleCancelarMudancaStatus}
+        />
+      )}
+
+      {/* Modal de Limpeza em Lote de Testes e Cache */}
+      {modalLimpezaAberto && (
+        <ModalLimpezaTestes
+          agendamentos={todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos}
+          usuarioInfo={usuarioInfo}
+          onFechar={() => setModalLimpezaAberto(false)}
+          onConcluido={() => {
+            setModalLimpezaAberto(false);
+            carregarDados(true);
+          }}
         />
       )}
     </div>
