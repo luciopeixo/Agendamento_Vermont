@@ -214,8 +214,10 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   // Verificação automática de conformidade documental com a base interna da pedreira
   useEffect(() => {
     const cpfLimpo = String(formData.motorista_cpf || '').replace(/\D/g, '');
-    const temCavalo = Boolean(formData.placa_cavalo && formData.placa_cavalo.trim().length >= 4);
-    const temCarreta = Boolean(formData.placa_carreta && formData.placa_carreta.trim().length >= 4);
+    const cavaloLimpo = String(formData.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '');
+    const carretaLimpa = String(formData.placa_carreta || '').replace(/[^A-Z0-9]/gi, '');
+    const temCavalo = cavaloLimpo.length >= 7;
+    const temCarreta = carretaLimpa.length >= 7;
 
     if (cpfLimpo.length === 11 || temCavalo || temCarreta) {
       const res = verificarConformidadeDocumental({
