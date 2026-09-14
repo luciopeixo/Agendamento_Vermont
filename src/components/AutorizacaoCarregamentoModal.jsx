@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Printer, X, FileText, CheckCircle2, Shield, Truck, Edit3, 
-  Eye, Check, AlertCircle, Layers, Sparkles, MapPin
+  Eye, Check, AlertCircle, Layers, Sparkles, MapPin, Ruler
 } from 'lucide-react';
 import { 
   formatarDataBR, 
@@ -92,6 +92,8 @@ export function AutorizacaoCarregamentoModal({
   // Campo de destino: por padrão em branco, obrigatório antes de imprimir
   const [destinoEditavel, setDestinoEditavel] = useState('');
   const [erroDestino, setErroDestino] = useState(false);
+  // Campo aberto de medidas e série dos blocos
+  const [medidasSerieEditavel, setMedidasSerieEditavel] = useState('');
   const [viasPorFolha, setViasPorFolha] = useState('dupla'); // 'dupla' (2 por página A4) ou 'unica' (1 por página)
   
   const inputDestinoRef = useRef(null);
@@ -332,6 +334,20 @@ export function AutorizacaoCarregamentoModal({
               </td>
             </tr>
 
+            {/* MEDIDAS / Nº DE SÉRIE (Campo aberto antes das numerações dos blocos) */}
+            <tr style={{ borderBottom: '1px solid #000000' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+                MEDIDAS / SÉRIE:
+              </td>
+              <td style={{ padding: '7px 12px', fontWeight: 700, color: '#000000', minHeight: '26px' }}>
+                {medidasSerieEditavel.trim() ? (
+                  medidasSerieEditavel.toUpperCase()
+                ) : (
+                  <span style={{ color: 'transparent', display: 'inline-block', minHeight: '16px' }}>&nbsp;</span>
+                )}
+              </td>
+            </tr>
+
             {/* BLOCO 01 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
               <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
@@ -551,6 +567,80 @@ export function AutorizacaoCarregamentoModal({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Campo Aberto: Medidas e Número de Série do Bloco */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Ruler size={16} color="#38bdf8" />
+              <label 
+                htmlFor="input-medidas-autorizacao"
+                style={{ 
+                  fontSize: '0.85rem', 
+                  color: '#f1f5f9', 
+                  fontWeight: 700 
+                }}
+              >
+                Medidas / Nº de Série:
+              </label>
+            </div>
+
+            <input
+              id="input-medidas-autorizacao"
+              type="text"
+              value={medidasSerieEditavel}
+              onChange={(e) => setMedidasSerieEditavel(e.target.value)}
+              placeholder="Ex: 2.90 x 1.85 x 1.40 | Série #8842 (ou deixe em branco p/ preencher à mão)"
+              style={{
+                minWidth: '280px',
+                padding: '7px 12px',
+                background: 'rgba(15, 23, 42, 0.9)',
+                border: '1px solid rgba(56, 189, 248, 0.4)',
+                borderRadius: 6,
+                color: '#38bdf8',
+                fontWeight: 700,
+                fontSize: '0.86rem',
+                outline: 'none'
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={() => setMedidasSerieEditavel('2.95 x 1.80 x 1.42 - Série #1084')}
+              style={{
+                padding: '5px 10px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                borderRadius: 4,
+                background: 'rgba(56, 189, 248, 0.15)',
+                color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                cursor: 'pointer'
+              }}
+              title="Simular medidas e número de série de exemplo"
+            >
+              Simular Medidas
+            </button>
+
+            {medidasSerieEditavel && (
+              <button
+                type="button"
+                onClick={() => setMedidasSerieEditavel('')}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  borderRadius: 4,
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  color: '#94a3b8',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+                title="Deixar campo em branco para preenchimento manual"
+              >
+                Limpar
+              </button>
+            )}
           </div>
 
           {/* Formato de Impressão */}
