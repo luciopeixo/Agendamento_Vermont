@@ -26,7 +26,8 @@ import {
   resolverCnpjCliente,
   resolverCnpjTransportadora,
   limparNomeEmpresa,
-  verificarConformidadeDocumental
+  verificarConformidadeDocumental,
+  obterBaseMotoristas
 } from '../services/agendamentoService';
 import { ModalEditarAgendamento } from './ModalEditarAgendamento';
 import { ModalHistoricoStatus } from './ModalHistoricoStatus';
@@ -224,16 +225,44 @@ export function PainelGestao({
   const [motoristaParaConformidade, setMotoristaParaConformidade] = useState(null);
 
   const handleAbrirConformidadeDireta = (ag) => {
+    const cpfLimpo = String(ag.motorista_cpf || '').replace(/\D/g, '');
+    const base = obterBaseMotoristas();
+    let motExistente = null;
+    if (cpfLimpo) {
+      motExistente = base.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
+    }
+    const limpaCav = String(ag.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    const veicCav = limpaCav ? base.find(m => String(m.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCav && m.crlv_validade_cavalo) : null;
+    const limpaCarr = String(ag.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    const veicCarr = limpaCarr ? base.find(m => (
+      String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr ||
+      String(m.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr
+    ) && (m.crlv_validade_carreta || m.validade_laudo_rocha)) : null;
+    const limpaCarr2 = String(ag.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    const veicCarr2 = limpaCarr2 ? base.find(m => (
+      String(m.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr2 ||
+      String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr2
+    ) && (m.crlv_validade_carreta_2 || m.crlv_validade_carreta)) : null;
+
     setMotoristaParaConformidade({
-      cpf: ag.motorista_cpf || '',
-      nome: ag.motorista_nome || '',
-      telefone: ag.motorista_telefone || '',
-      transportadora: ag.transportadora || '',
-      transportadora_cnpj: ag.transportadora_cnpj || '',
-      tipo_veiculo: ag.tipo_veiculo || 'Carreta / Bitrem',
-      placa_cavalo: ag.placa_cavalo || '',
-      placa_carreta: ag.placa_carreta || '',
-      placa_carreta_2: ag.placa_carreta_2 || ''
+      cpf: ag.motorista_cpf || motExistente?.cpf || '',
+      nome: ag.motorista_nome || motExistente?.nome || '',
+      telefone: ag.motorista_telefone || motExistente?.telefone || '',
+      transportadora: ag.transportadora || motExistente?.transportadora || '',
+      transportadora_cnpj: ag.transportadora_cnpj || motExistente?.transportadora_cnpj || '',
+      tipo_veiculo: ag.tipo_veiculo || motExistente?.tipo_veiculo || 'Carreta / Bitrem',
+      placa_cavalo: ag.placa_cavalo || motExistente?.placa_cavalo || '',
+      placa_carreta: ag.placa_carreta || motExistente?.placa_carreta || '',
+      placa_carreta_2: ag.placa_carreta_2 || motExistente?.placa_carreta_2 || '',
+      cnh_categoria: motExistente?.cnh_categoria || 'E',
+      cnh_validade: motExistente?.cnh_validade || '',
+      crlv_validade_cavalo: motExistente?.crlv_validade_cavalo || veicCav?.crlv_validade_cavalo || '',
+      crlv_validade_carreta: motExistente?.crlv_validade_carreta || veicCarr?.crlv_validade_carreta || '',
+      validade_laudo_rocha: motExistente?.validade_laudo_rocha || veicCarr?.validade_laudo_rocha || '',
+      crlv_validade_carreta_2: motExistente?.crlv_validade_carreta_2 || veicCarr2?.crlv_validade_carreta_2 || '',
+      validade_laudo_rocha_2: motExistente?.validade_laudo_rocha_2 || veicCarr2?.validade_laudo_rocha_2 || '',
+      status_documental: motExistente?.status_documental || 'REGULAR',
+      observacoes: motExistente?.observacoes || ''
     });
   };
 

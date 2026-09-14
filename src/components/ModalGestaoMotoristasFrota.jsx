@@ -136,11 +136,9 @@ export function ModalGestaoMotoristasFrota({
       'Categoria CNH': m.cnh_categoria || '-',
       'Validade CNH': m.cnh_validade || '-',
       'Placa Cavalo': m.placa_cavalo || '-',
-      'Último CRLV Cavalo': m.crlv_validade_cavalo || '-',
-      'Vencimento CRLV Cavalo (+1 ano)': calcularVencimentoUmAno(m.crlv_validade_cavalo) || '-',
+      'Vencimento CRLV Cavalo': m.crlv_validade_cavalo || '-',
       'Placa Carreta': m.placa_carreta || '-',
-      'Último CRLV Carreta': m.crlv_validade_carreta || '-',
-      'Vencimento CRLV Carreta (+1 ano)': calcularVencimentoUmAno(m.crlv_validade_carreta) || '-',
+      'Vencimento CRLV Carreta': m.crlv_validade_carreta || '-',
       'Validade Laudo Rocha / CSV': m.validade_laudo_rocha || '-',
       'Transportadora': m.transportadora || '-',
       'Status Geral': m.conformidade.statusGeral,
@@ -466,14 +464,9 @@ export function ModalGestaoMotoristasFrota({
                           <div style={{ fontWeight: 700, color: '#38bdf8' }}>
                             {item.placa_cavalo || '-'}
                           </div>
-                          <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
-                            Doc: {formatarDataBR(item.crlv_validade_cavalo)}
+                          <div style={{ fontSize: '0.76rem', color: item.crlv_validade_cavalo ? '#cbd5e1' : '#64748b' }}>
+                            CRLV: <strong>{formatarDataBR(item.crlv_validade_cavalo)}</strong>
                           </div>
-                          {vencCavalo && (
-                            <div style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>
-                              Vence: <strong>{formatarDataBR(vencCavalo)}</strong>
-                            </div>
-                          )}
                         </td>
 
                         {/* Carreta e Laudo de Rocha */}
@@ -482,9 +475,8 @@ export function ModalGestaoMotoristasFrota({
                             {item.placa_carreta || '-'}
                             {item.placa_carreta_2 && <span style={{ color: '#94a3b8', fontSize: '0.75rem', marginLeft: 4 }}>+ {item.placa_carreta_2}</span>}
                           </div>
-                          <div style={{ fontSize: '0.76rem', color: '#cbd5e1' }}>
-                            Doc: {formatarDataBR(item.crlv_validade_carreta)}
-                            {vencCarreta && <span style={{ marginLeft: 4 }}>(Vence: {formatarDataBR(vencCarreta)})</span>}
+                          <div style={{ fontSize: '0.76rem', color: item.crlv_validade_carreta ? '#cbd5e1' : '#64748b' }}>
+                            CRLV: <strong>{formatarDataBR(item.crlv_validade_carreta)}</strong>
                           </div>
                           <div style={{ fontSize: '0.76rem', color: item.validade_laudo_rocha ? '#fbbf24' : '#64748b', fontWeight: 600 }}>
                             Laudo CSV: {formatarDataBR(item.validade_laudo_rocha)}

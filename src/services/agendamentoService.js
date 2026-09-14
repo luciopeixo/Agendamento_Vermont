@@ -618,7 +618,54 @@ export async function excluirMotoristaFrota(cpf = '') {
 }
 
 /**
- * Calcula a data de vencimento a partir da data de emissão/exercício do último documento (1 ano após)
+ * Retorna as informações do Detran para o final da placa (mês de vencimento do licenciamento/CRLV)
+ * @param {string} placa 
+ */
+export function obterInfoLicenciamentoPorPlaca(placa = '') {
+  if (!placa) return null;
+  const limpa = String(placa).replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const digitos = limpa.replace(/\D/g, '');
+  if (!digitos) return null;
+  const finalDigito = digitos.slice(-1);
+
+  const mesesPorFinal = {
+    '1': { mesNumero: 3, mesNome: 'Março', diaLimite: 31 },
+    '2': { mesNumero: 4, mesNome: 'Abril', diaLimite: 30 },
+    '3': { mesNumero: 5, mesNome: 'Maio', diaLimite: 31 },
+    '4': { mesNumero: 6, mesNome: 'Junho', diaLimite: 30 },
+    '5': { mesNumero: 7, mesNome: 'Julho', diaLimite: 31 },
+    '6': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 31 },
+    '7': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30 },
+    '8': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31 },
+    '9': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30 },
+    '0': { mesNumero: 12, mesNome: 'Dezembro', diaLimite: 31 }
+  };
+
+  const info = mesesPorFinal[finalDigito];
+  if (!info) return null;
+
+  return {
+    finalDigito,
+    mesNumero: info.mesNumero,
+    mesNome: info.mesNome,
+    diaLimite: info.diaLimite
+  };
+}
+
+/**
+ * Calcula a data de vencimento sugerida do CRLV para a placa em um ano específico
+ */
+export function calcularVencimentoCRLVPorPlaca(placa = '', anoRef = null) {
+  const info = obterInfoLicenciamentoPorPlaca(placa);
+  if (!info) return null;
+  const ano = anoRef || new Date().getFullYear();
+  const mesStr = String(info.mesNumero).padStart(2, '0');
+  const diaStr = String(info.diaLimite).padStart(2, '0');
+  return `${ano}-${mesStr}-${diaStr}`;
+}
+
+/**
+ * Calcula a data de vencimento a partir da data informada
  * @param {string} dataStr YYYY-MM-DD
  * @returns {string|null} YYYY-MM-DD
  */
@@ -806,18 +853,18 @@ export function verificarConformidadeDocumental({
     }
   }
 
-  // 3. CRLV Cavalo (Data do último documento + 1 ano)
-  checarDataCRLV('crlv_validade_cavalo', `CRLV do Cavalo Mecânico${limpaCavalo ? ` (${limpaCavalo})` : ''}`, crlvCavalo);
+  // 3. CRLV Cavalo (Validade/Vencimento do CRLV do Cavalo Mecânico)
+  checarDataValidade('crlv_validade_cavalo', `CRLV do Cavalo Mecânico${limpaCavalo ? ` (${limpaCavalo})` : ''}`, crlvCavalo);
 
-  // 4. CRLV Carreta (Data do último documento + 1 ano)
-  checarDataCRLV('crlv_validade_carreta', `CRLV da Carreta 1${limpaCarreta ? ` (${limpaCarreta})` : ''}`, crlvCarreta);
+  // 4. CRLV Carreta (Validade/Vencimento do CRLV da Carreta 1)
+  checarDataValidade('crlv_validade_carreta', `CRLV da Carreta 1${limpaCarreta ? ` (${limpaCarreta})` : ''}`, crlvCarreta);
 
   // 5. Laudo de Inspeção de Rocha / CSV (Carreta - Validade do Laudo)
   checarDataValidade('validade_laudo_rocha', `Laudo de Rocha / CSV (Carreta ${limpaCarreta || '1'})`, laudoRocha);
 
   // 6. Carreta 2 (se houver)
   if (limpaCarreta2) {
-    checarDataCRLV('crlv_validade_carreta_2', `CRLV da Carreta 2 (${limpaCarreta2})`, crlvCarreta2);
+    checarDataValidade('crlv_validade_carreta_2', `CRLV da Carreta 2 (${limpaCarreta2})`, crlvCarreta2);
     checarDataValidade('validade_laudo_rocha_2', `Laudo de Rocha / CSV (Carreta 2 - ${limpaCarreta2})`, laudoRocha2);
   }
 

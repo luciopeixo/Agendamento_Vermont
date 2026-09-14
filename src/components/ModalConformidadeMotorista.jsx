@@ -9,7 +9,9 @@ import {
   formatarCPF, 
   formatarCNPJ, 
   validarCPF,
-  calcularVencimentoUmAno
+  obterBaseMotoristas,
+  obterInfoLicenciamentoPorPlaca,
+  calcularVencimentoCRLVPorPlaca
 } from '../services/agendamentoService';
 
 export function ModalConformidadeMotorista({ 
@@ -46,27 +48,53 @@ export function ModalConformidadeMotorista({
 
   useEffect(() => {
     if (motoristaInicial) {
+      const cpfLimpo = String(motoristaInicial.cpf || '').replace(/\D/g, '');
+      const base = obterBaseMotoristas();
+      const motBase = cpfLimpo ? base.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo) : null;
+      
+      const limpaCav = String(motoristaInicial.placa_cavalo || motBase?.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const veicCav = limpaCav ? base.find(m => String(m.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCav && m.crlv_validade_cavalo) : null;
+
+      const limpaCarr = String(motoristaInicial.placa_carreta || motBase?.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const veicCarr = limpaCarr ? base.find(m => (
+        String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr ||
+        String(m.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr
+      ) && (m.crlv_validade_carreta || m.validade_laudo_rocha)) : null;
+
+      const limpaCarr2 = String(motoristaInicial.placa_carreta_2 || motBase?.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const veicCarr2 = limpaCarr2 ? base.find(m => (
+        String(m.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr2 ||
+        String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr2
+      ) && (m.crlv_validade_carreta_2 || m.crlv_validade_carreta)) : null;
+
+      const cnhVal = motoristaInicial.cnh_validade || motBase?.cnh_validade || '';
+      const crlvCav = motoristaInicial.crlv_validade_cavalo || motBase?.crlv_validade_cavalo || veicCav?.crlv_validade_cavalo || '';
+      const crlvCarr = motoristaInicial.crlv_validade_carreta || motBase?.crlv_validade_carreta || veicCarr?.crlv_validade_carreta || '';
+      const laudoR = motoristaInicial.validade_laudo_rocha || motBase?.validade_laudo_rocha || veicCarr?.validade_laudo_rocha || '';
+      const crlvCarr2 = motoristaInicial.crlv_validade_carreta_2 || motBase?.crlv_validade_carreta_2 || veicCarr2?.crlv_validade_carreta_2 || '';
+      const laudoR2 = motoristaInicial.validade_laudo_rocha_2 || motBase?.validade_laudo_rocha_2 || veicCarr2?.validade_laudo_rocha_2 || '';
+
       setFormData({
-        cpf: motoristaInicial.cpf || '',
-        nome: motoristaInicial.nome || '',
-        telefone: motoristaInicial.telefone || '',
-        transportadora: motoristaInicial.transportadora || '',
-        transportadora_cnpj: motoristaInicial.transportadora_cnpj || '',
-        tipo_veiculo: motoristaInicial.tipo_veiculo || 'Carreta / Bitrem',
-        placa_cavalo: motoristaInicial.placa_cavalo || '',
-        crlv_validade_cavalo: motoristaInicial.crlv_validade_cavalo || '',
-        placa_carreta: motoristaInicial.placa_carreta || '',
-        crlv_validade_carreta: motoristaInicial.crlv_validade_carreta || '',
-        validade_laudo_rocha: motoristaInicial.validade_laudo_rocha || '',
-        placa_carreta_2: motoristaInicial.placa_carreta_2 || '',
-        crlv_validade_carreta_2: motoristaInicial.crlv_validade_carreta_2 || '',
-        validade_laudo_rocha_2: motoristaInicial.validade_laudo_rocha_2 || '',
-        cnh_categoria: motoristaInicial.cnh_categoria || 'E',
-        cnh_validade: motoristaInicial.cnh_validade || '',
-        status_documental: motoristaInicial.status_documental || 'REGULAR',
-        observacoes: motoristaInicial.observacoes || ''
+        cpf: motoristaInicial.cpf || motBase?.cpf || '',
+        nome: motoristaInicial.nome || motBase?.nome || '',
+        telefone: motoristaInicial.telefone || motBase?.telefone || '',
+        transportadora: motoristaInicial.transportadora || motBase?.transportadora || '',
+        transportadora_cnpj: motoristaInicial.transportadora_cnpj || motBase?.transportadora_cnpj || '',
+        tipo_veiculo: motoristaInicial.tipo_veiculo || motBase?.tipo_veiculo || 'Carreta / Bitrem',
+        placa_cavalo: motoristaInicial.placa_cavalo || motBase?.placa_cavalo || '',
+        crlv_validade_cavalo: crlvCav,
+        placa_carreta: motoristaInicial.placa_carreta || motBase?.placa_carreta || '',
+        crlv_validade_carreta: crlvCarr,
+        validade_laudo_rocha: laudoR,
+        placa_carreta_2: motoristaInicial.placa_carreta_2 || motBase?.placa_carreta_2 || '',
+        crlv_validade_carreta_2: crlvCarr2,
+        validade_laudo_rocha_2: laudoR2,
+        cnh_categoria: motoristaInicial.cnh_categoria || motBase?.cnh_categoria || 'E',
+        cnh_validade: cnhVal,
+        status_documental: motoristaInicial.status_documental || motBase?.status_documental || 'REGULAR',
+        observacoes: motoristaInicial.observacoes || motBase?.observacoes || ''
       });
-      if (motoristaInicial.placa_carreta_2 || motoristaInicial.crlv_validade_carreta_2) {
+      if (motoristaInicial.placa_carreta_2 || motBase?.placa_carreta_2 || crlvCarr2) {
         setTemCarreta2(true);
       }
     }
@@ -486,9 +514,20 @@ export function ModalConformidadeMotorista({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               {/* PLACA CAVALO */}
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                  Placa do Cavalo
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
+                    Placa do Cavalo
+                  </label>
+                  {(() => {
+                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_cavalo);
+                    if (!info) return null;
+                    return (
+                      <span style={{ fontSize: '0.70rem', color: '#38bdf8', fontWeight: 600 }}>
+                        Final {info.finalDigito} ({info.mesNome})
+                      </span>
+                    );
+                  })()}
+                </div>
                 <input
                   type="text"
                   className="form-input"
@@ -499,11 +538,35 @@ export function ModalConformidadeMotorista({
                 />
               </div>
 
-              {/* DATA DO ÚLTIMO CRLV CAVALO */}
+              {/* DATA DE VENCIMENTO DO CRLV CAVALO */}
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                  Data do Último CRLV (Cavalo)
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
+                    Data de Vencimento do CRLV (Cavalo) *
+                  </label>
+                  {(() => {
+                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_cavalo);
+                    if (!info) return null;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleChange('crlv_validade_cavalo', calcularVencimentoCRLVPorPlaca(formData.placa_cavalo))}
+                        style={{
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          color: '#38bdf8',
+                          fontSize: '0.68rem',
+                          borderRadius: 4,
+                          padding: '1px 6px',
+                          cursor: 'pointer'
+                        }}
+                        title={`Preencher automaticamente vencimento pelo Detran (${info.diaLimite}/${String(info.mesNumero).padStart(2, '0')})`}
+                      >
+                        ⚡ Detran {info.mesNome}
+                      </button>
+                    );
+                  })()}
+                </div>
                 <input
                   type="date"
                   className="form-input"
@@ -514,7 +577,7 @@ export function ModalConformidadeMotorista({
                 {formData.crlv_validade_cavalo && (
                   <div style={{ marginTop: 4 }}>
                     {(() => {
-                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_cavalo);
+                      const res = calcularStatusValidade(formData.crlv_validade_cavalo);
                       return (
                         <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
                           ● {res.label}
@@ -551,24 +614,59 @@ export function ModalConformidadeMotorista({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               {/* PLACA CARRETA */}
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                  Placa da Carreta 1
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
+                    Placa da Carreta 1
+                  </label>
+                  {(() => {
+                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta);
+                    if (!info) return null;
+                    return (
+                      <span style={{ fontSize: '0.70rem', color: '#c084fc', fontWeight: 600 }}>
+                        Final {info.finalDigito} ({info.mesNome})
+                      </span>
+                    );
+                  })()}
+                </div>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="ABC-1234"
+                  placeholder="ABC-1234 / ABC1D23"
                   value={formData.placa_carreta}
                   onChange={(e) => handleChange('placa_carreta', formatarPlaca(e.target.value))}
                   style={{ width: '100%' }}
                 />
               </div>
 
-              {/* DATA DO ÚLTIMO CRLV CARRETA */}
+              {/* DATA DE VENCIMENTO DO CRLV CARRETA */}
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                  Data do Último CRLV (Carreta 1)
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
+                    Data de Vencimento do CRLV (Carreta 1) *
+                  </label>
+                  {(() => {
+                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta);
+                    if (!info) return null;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleChange('crlv_validade_carreta', calcularVencimentoCRLVPorPlaca(formData.placa_carreta))}
+                        style={{
+                          background: 'rgba(168, 85, 247, 0.15)',
+                          border: '1px solid rgba(168, 85, 247, 0.3)',
+                          color: '#c084fc',
+                          fontSize: '0.68rem',
+                          borderRadius: 4,
+                          padding: '1px 6px',
+                          cursor: 'pointer'
+                        }}
+                        title={`Preencher automaticamente vencimento pelo Detran (${info.diaLimite}/${String(info.mesNumero).padStart(2, '0')})`}
+                      >
+                        ⚡ Detran {info.mesNome}
+                      </button>
+                    );
+                  })()}
+                </div>
                 <input
                   type="date"
                   className="form-input"
@@ -579,7 +677,7 @@ export function ModalConformidadeMotorista({
                 {formData.crlv_validade_carreta && (
                   <div style={{ marginTop: 4 }}>
                     {(() => {
-                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta);
+                      const res = calcularStatusValidade(formData.crlv_validade_carreta);
                       return (
                         <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
                           ● {res.label}
@@ -641,7 +739,30 @@ export function ModalConformidadeMotorista({
                     />
                   </div>
                   <div>
-                    <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Data Último CRLV (Carreta 2)</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0 }}>Vencimento CRLV (Carreta 2)</label>
+                      {(() => {
+                        const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta_2);
+                        if (!info) return null;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => handleChange('crlv_validade_carreta_2', calcularVencimentoCRLVPorPlaca(formData.placa_carreta_2))}
+                            style={{
+                              background: 'rgba(168, 85, 247, 0.15)',
+                              border: '1px solid rgba(168, 85, 247, 0.3)',
+                              color: '#c084fc',
+                              fontSize: '0.65rem',
+                              borderRadius: 4,
+                              padding: '1px 5px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            ⚡ Final {info.finalDigito} ({info.mesNome})
+                          </button>
+                        );
+                      })()}
+                    </div>
                     <input
                       type="date"
                       className="form-input"
@@ -651,7 +772,7 @@ export function ModalConformidadeMotorista({
                     {formData.crlv_validade_carreta_2 && (
                       <div style={{ marginTop: 2 }}>
                         {(() => {
-                          const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta_2);
+                          const res = calcularStatusValidade(formData.crlv_validade_carreta_2);
                           return (
                             <span style={{ fontSize: '0.68rem', color: res.cor, fontWeight: 700 }}>
                               ● {res.label}
@@ -669,6 +790,18 @@ export function ModalConformidadeMotorista({
                       value={formData.validade_laudo_rocha_2}
                       onChange={(e) => handleChange('validade_laudo_rocha_2', e.target.value)}
                     />
+                    {formData.validade_laudo_rocha_2 && (
+                      <div style={{ marginTop: 2 }}>
+                        {(() => {
+                          const res = calcularStatusValidade(formData.validade_laudo_rocha_2);
+                          return (
+                            <span style={{ fontSize: '0.68rem', color: res.cor, fontWeight: 700 }}>
+                              ● {res.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
