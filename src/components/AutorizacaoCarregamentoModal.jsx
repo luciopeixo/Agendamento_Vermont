@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Printer, X, FileText, CheckCircle2, Shield, Truck, Edit3, 
   Eye, Check, AlertCircle, Layers, Sparkles, MapPin, Ruler
@@ -498,7 +499,7 @@ export function AutorizacaoCarregamentoModal({
     );
   };
 
-  return (
+  return createPortal(
     <div 
       className="modal-autorizacao-overlay"
       style={{
@@ -967,6 +968,7 @@ export function AutorizacaoCarregamentoModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
