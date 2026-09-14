@@ -2100,7 +2100,7 @@ export function PainelGestao({
                                     alignItems: 'center',
                                     gap: 4
                                   }}
-                                  title={`Documentação Vencida: ${conf.itensVencidos.map(i => `${i.titulo} (${i.labelData})`).join(' | ')}. Clique para regularizar.`}
+                                  title={`Documentação Vencida: ${conf.itensVencidos?.map(i => `${i.titulo} (${i.labelData})`)?.join(' | ') || ''}. Clique para regularizar.`}
                                 >
                                   <AlertCircle size={10} /> Doc Vencido
                                 </button>
@@ -2125,7 +2125,7 @@ export function PainelGestao({
                                     alignItems: 'center',
                                     gap: 4
                                   }}
-                                  title={`Documento a vencer: ${conf.itensAVencer.map(i => `${i.titulo} (${i.labelData})`).join(' | ')}. Clique para verificar.`}
+                                  title={`Documento a vencer: ${conf.itensAVencer?.map(i => `${i.titulo} (${i.labelData})`)?.join(' | ') || ''}. Clique para verificar.`}
                                 >
                                   <AlertTriangle size={10} /> Doc A Vencer
                                 </button>

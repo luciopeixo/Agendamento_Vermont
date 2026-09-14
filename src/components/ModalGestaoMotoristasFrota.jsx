@@ -430,8 +430,6 @@ export function ModalGestaoMotoristasFrota({
                     const isVencido = st === 'VENCIDO';
                     const isAvencer = st === 'AVENCER';
                     const isRegular = st === 'REGULAR';
-                    const vencCavalo = calcularVencimentoUmAno(item.crlv_validade_cavalo);
-                    const vencCarreta = calcularVencimentoUmAno(item.crlv_validade_carreta);
 
                     return (
                       <tr 
