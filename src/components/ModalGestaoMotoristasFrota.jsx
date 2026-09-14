@@ -12,7 +12,8 @@ import {
   formatarCNPJ, 
   verificarConformidadeDocumental,
   obterInfoLicenciamentoPorPlaca,
-  avaliarCRLVComDetran
+  avaliarCRLVComDetran,
+  avaliarLaudoRocha
 } from '../services/agendamentoService';
 import { ModalConformidadeMotorista } from './ModalConformidadeMotorista';
 import * as XLSX from 'xlsx';
@@ -142,7 +143,7 @@ export function ModalGestaoMotoristasFrota({
       'Último Registro CRLV Cavalo': m.crlv_validade_cavalo || '-',
       'Placa Carreta': m.placa_carreta || '-',
       'Último Registro CRLV Carreta': m.crlv_validade_carreta || '-',
-      'Validade Laudo Rocha / CSV': m.validade_laudo_rocha || '-',
+      'Último Registro Laudo Rocha / CSV': m.validade_laudo_rocha || '-',
       'Transportadora': m.transportadora || '-',
       'Status Geral': m.conformidade.statusGeral,
       'Pendências / Vencidos': m.conformidade.itensVencidos.map(i => i.titulo).join(', ') || 'Nenhuma'
@@ -434,6 +435,7 @@ export function ModalGestaoMotoristasFrota({
                     const isRegular = st === 'REGULAR';
                     const detranCavalo = item.crlv_validade_cavalo ? avaliarCRLVComDetran(item.crlv_validade_cavalo, item.placa_cavalo) : null;
                     const detranCarreta = item.crlv_validade_carreta ? avaliarCRLVComDetran(item.crlv_validade_carreta, item.placa_carreta) : null;
+                    const laudoEval = item.validade_laudo_rocha ? avaliarLaudoRocha(item.validade_laudo_rocha) : null;
 
                     return (
                       <tr 
@@ -498,9 +500,14 @@ export function ModalGestaoMotoristasFrota({
                               Detran: {detranCarreta.labelDataVencimento}
                             </div>
                           )}
-                          <div style={{ fontSize: '0.76rem', color: item.validade_laudo_rocha ? '#fbbf24' : '#64748b', fontWeight: 600 }}>
-                            Laudo CSV: {formatarDataBR(item.validade_laudo_rocha)}
+                          <div style={{ fontSize: '0.76rem', color: item.validade_laudo_rocha ? '#cbd5e1' : '#64748b', marginTop: 4 }}>
+                            Último Laudo: <strong>{formatarDataBR(item.validade_laudo_rocha)}</strong>
                           </div>
+                          {laudoEval?.labelDataVencimento && (
+                            <div style={{ fontSize: '0.70rem', color: laudoEval.cor, fontWeight: 600 }}>
+                              Validade (+1 ano): {laudoEval.labelDataVencimento}
+                            </div>
+                          )}
                         </td>
 
                         {/* Transportadora */}

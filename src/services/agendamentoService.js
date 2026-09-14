@@ -865,6 +865,61 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
 }
 
 /**
+ * Avalia o status de conformidade do Laudo de Rocha / CSV (+1 ano de validade a partir da Data do Último Laudo)
+ * @param {string} dataUltimoLaudo YYYY-MM-DD
+ * @param {string} dataReferenciaStr Data de referência (hoje ou agendamento)
+ */
+export function avaliarLaudoRocha(dataUltimoLaudo, dataReferenciaStr = '') {
+  if (!dataUltimoLaudo) {
+    return { status: 'vazio', label: 'Não informado', cor: '#94a3b8' };
+  }
+  try {
+    const dataVenc = calcularVencimentoUmAno(dataUltimoLaudo);
+    if (!dataVenc) return { status: 'vazio', label: 'Data inválida', cor: '#94a3b8' };
+    const dataRef = dataReferenciaStr ? new Date(`${dataReferenciaStr}T00:00:00`) : new Date();
+    dataRef.setHours(0, 0, 0, 0);
+    const [anoV, mesV, diaV] = dataVenc.split('-');
+    const docDate = new Date(Number(anoV), Number(mesV) - 1, Number(diaV));
+    const diffMs = docDate.getTime() - dataRef.getTime();
+    const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const [anoE, mesE, diaE] = dataUltimoLaudo.split('-');
+    const labelEmissao = `${diaE}/${mesE}/${anoE}`;
+    const labelVenc = `${diaV}/${mesV}/${anoV}`;
+
+    if (diffDias < 0) {
+      return {
+        status: 'vencido',
+        label: `Último laudo: ${labelEmissao} → Vencido há ${Math.abs(diffDias)} dias (Validade: ${labelVenc})`,
+        cor: '#ef4444',
+        dataVencimento: dataVenc,
+        labelDataVencimento: labelVenc,
+        dias: Math.abs(diffDias)
+      };
+    } else if (diffDias <= 30) {
+      return {
+        status: 'avencer',
+        label: `Último laudo: ${labelEmissao} → Vence em ${diffDias} dias (${labelVenc})`,
+        cor: '#f59e0b',
+        dataVencimento: dataVenc,
+        labelDataVencimento: labelVenc,
+        dias: diffDias
+      };
+    } else {
+      return {
+        status: 'valido',
+        label: `Último laudo: ${labelEmissao} → Válido até ${labelVenc} (+1 ano)`,
+        cor: '#22c55e',
+        dataVencimento: dataVenc,
+        labelDataVencimento: labelVenc,
+        dias: diffDias
+      };
+    }
+  } catch (_e) {
+    return { status: 'vazio', label: 'Data inválida', cor: '#94a3b8' };
+  }
+}
+
+/**
  * Verifica a conformidade documental completa de um motorista e veículos em relação a uma data
  * @returns {{ cadastrado: boolean, statusGeral: 'REGULAR' | 'AVENCER' | 'VENCIDO' | 'NAO_CADASTRADO', itensVencidos: Array, itensAVencer: Array, alertas: Array, motorista: Object }}
  */
@@ -1000,6 +1055,31 @@ export function verificarConformidadeDocumental({
     }
   };
 
+  // Checagem de Laudo de Rocha / CSV (+1 Ano a partir da Data do Último Laudo)
+  const checarLaudoRocha = (campoNome, label, dataUltimoLaudo) => {
+    if (!dataUltimoLaudo) return;
+    const res = avaliarLaudoRocha(dataUltimoLaudo, refDataStr);
+    if (res.status === 'vencido') {
+      itensVencidos.push({
+        campo: campoNome,
+        titulo: label,
+        data: res.dataVencimento,
+        labelData: res.labelDataVencimento,
+        diasVencido: res.dias,
+        detalhes: res.label
+      });
+    } else if (res.status === 'avencer') {
+      itensAVencer.push({
+        campo: campoNome,
+        titulo: label,
+        data: res.dataVencimento,
+        labelData: res.labelDataVencimento,
+        diasRestantes: res.dias,
+        detalhes: res.label
+      });
+    }
+  };
+
   // Valores obtidos individualmente (permite troca de veículos entre motoristas)
   const cnhValidade = motorista?.cnh_validade;
   const cnhCategoria = motorista?.cnh_categoria;
@@ -1030,13 +1110,13 @@ export function verificarConformidadeDocumental({
   // 4. CRLV Carreta (Último Registro vs Detran)
   checarCRLVComDetran('crlv_validade_carreta', `Último Registro CRLV Carreta 1${limpaCarreta ? ` (${limpaCarreta})` : ''}`, crlvCarreta, limpaCarreta);
 
-  // 5. Laudo de Inspeção de Rocha / CSV (Carreta - Validade do Laudo)
-  checarDataValidade('validade_laudo_rocha', `Laudo de Rocha / CSV (Carreta ${limpaCarreta || '1'})`, laudoRocha);
+  // 5. Laudo de Inspeção de Rocha / CSV (Data do Último Laudo + 1 Ano)
+  checarLaudoRocha('validade_laudo_rocha', `Último Registro Laudo de Rocha / CSV (Carreta ${limpaCarreta || '1'})`, laudoRocha);
 
   // 6. Carreta 2 (se houver)
   if (limpaCarreta2) {
     checarCRLVComDetran('crlv_validade_carreta_2', `Último Registro CRLV Carreta 2 (${limpaCarreta2})`, crlvCarreta2, limpaCarreta2);
-    checarDataValidade('validade_laudo_rocha_2', `Laudo de Rocha / CSV (Carreta 2 - ${limpaCarreta2})`, laudoRocha2);
+    checarLaudoRocha('validade_laudo_rocha_2', `Último Registro Laudo de Rocha / CSV (Carreta 2 - ${limpaCarreta2})`, laudoRocha2);
   }
 
   // Identifica campos essenciais não preenchidos
@@ -1044,10 +1124,10 @@ export function verificarConformidadeDocumental({
   if (!cnhValidade) camposFaltando.push('Validade CNH');
   if (!crlvCavalo) camposFaltando.push(`Último Registro CRLV Cavalo${limpaCavalo ? ` (${limpaCavalo})` : ''}`);
   if (!crlvCarreta) camposFaltando.push(`Último Registro CRLV Carreta${limpaCarreta ? ` (${limpaCarreta})` : ''}`);
-  if (!laudoRocha) camposFaltando.push(`Laudo de Rocha / CSV${limpaCarreta ? ` (${limpaCarreta})` : ''}`);
+  if (!laudoRocha) camposFaltando.push(`Último Registro Laudo de Rocha / CSV${limpaCarreta ? ` (${limpaCarreta})` : ''}`);
   if (limpaCarreta2) {
     if (!crlvCarreta2) camposFaltando.push(`Último Registro CRLV Carreta 2 (${limpaCarreta2})`);
-    if (!laudoRocha2) camposFaltando.push(`Laudo Rocha Carreta 2 (${limpaCarreta2})`);
+    if (!laudoRocha2) camposFaltando.push(`Último Registro Laudo Rocha Carreta 2 (${limpaCarreta2})`);
   }
 
   let statusGeral = 'REGULAR';

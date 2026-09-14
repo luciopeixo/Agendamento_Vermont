@@ -12,7 +12,8 @@ import {
   obterBaseMotoristas,
   obterInfoLicenciamentoPorPlaca,
   calcularVencimentoCRLVPorPlaca,
-  avaliarCRLVComDetran
+  avaliarCRLVComDetran,
+  avaliarLaudoRocha
 } from '../services/agendamentoService';
 
 export function ModalConformidadeMotorista({ 
@@ -649,10 +650,10 @@ export function ModalConformidadeMotorista({
                 )}
               </div>
 
-              {/* VALIDADE LAUDO ROCHA / CSV */}
+              {/* DATA DO ÚLTIMO LAUDO ROCHA / CSV */}
               <div>
                 <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                  Validade do Laudo de Rocha / CSV *
+                  Data do Último Laudo de Rocha / CSV *
                 </label>
                 <input
                   type="date"
@@ -664,7 +665,7 @@ export function ModalConformidadeMotorista({
                 {formData.validade_laudo_rocha && (
                   <div style={{ marginTop: 4 }}>
                     {(() => {
-                      const res = calcularStatusValidade(formData.validade_laudo_rocha);
+                      const res = avaliarLaudoRocha(formData.validade_laudo_rocha);
                       return (
                         <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
                           ● {res.label}
@@ -744,7 +745,9 @@ export function ModalConformidadeMotorista({
                     )}
                   </div>
                   <div>
-                    <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Validade Laudo Rocha 2</label>
+                    <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                      Data do Último Laudo de Rocha (Carreta 2)
+                    </label>
                     <input
                       type="date"
                       className="form-input"
@@ -754,7 +757,7 @@ export function ModalConformidadeMotorista({
                     {formData.validade_laudo_rocha_2 && (
                       <div style={{ marginTop: 2 }}>
                         {(() => {
-                          const res = calcularStatusValidade(formData.validade_laudo_rocha_2);
+                          const res = avaliarLaudoRocha(formData.validade_laudo_rocha_2);
                           return (
                             <span style={{ fontSize: '0.68rem', color: res.cor, fontWeight: 700 }}>
                               ● {res.label}
