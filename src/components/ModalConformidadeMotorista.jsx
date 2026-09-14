@@ -8,7 +8,8 @@ import {
   excluirMotoristaFrota, 
   formatarCPF, 
   formatarCNPJ, 
-  validarCPF 
+  validarCPF,
+  calcularVencimentoUmAno
 } from '../services/agendamentoService';
 
 export function ModalConformidadeMotorista({ 
@@ -130,6 +131,47 @@ export function ModalConformidadeMotorista({
       }
     } catch (_e) {
       return { status: 'vazio', label: 'Data inválida', cor: '#94a3b8', bg: 'rgba(148, 163, 184, 0.1)' };
+    }
+  };
+
+  // Avalia visualmente o status do CRLV (Data do Último Documento Emitido + 1 ano de validade)
+  const calcularStatusValidadeCRLV = (dataUltimoDoc) => {
+    if (!dataUltimoDoc) return { status: 'vazio', label: 'Não informado', cor: '#94a3b8' };
+    try {
+      const dataVenc = calcularVencimentoUmAno(dataUltimoDoc);
+      if (!dataVenc) return { status: 'vazio', label: 'Data inválida', cor: '#94a3b8' };
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const [anoV, mesV, diaV] = dataVenc.split('-');
+      const docDate = new Date(anoV, mesV - 1, diaV);
+      const diffMs = docDate.getTime() - hoje.getTime();
+      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+      const [anoE, mesE, diaE] = dataUltimoDoc.split('-');
+      const labelEmissao = `${diaE}/${mesE}/${anoE}`;
+      const labelVenc = `${diaV}/${mesV}/${anoV}`;
+
+      if (diffDias < 0) {
+        return {
+          status: 'vencido',
+          label: `Último doc: ${labelEmissao} → Vencido há ${Math.abs(diffDias)} dias (Expirou em ${labelVenc})`,
+          cor: '#ef4444'
+        };
+      } else if (diffDias <= 30) {
+        return {
+          status: 'avencer',
+          label: `Último doc: ${labelEmissao} → Vence em ${diffDias} dias (${labelVenc})`,
+          cor: '#f59e0b'
+        };
+      } else {
+        return {
+          status: 'valido',
+          label: `Último doc: ${labelEmissao} → Válido até ${labelVenc} (+1 ano)`,
+          cor: '#22c55e'
+        };
+      }
+    } catch (_e) {
+      return { status: 'vazio', label: 'Data inválida', cor: '#94a3b8' };
     }
   };
 
@@ -455,10 +497,10 @@ export function ModalConformidadeMotorista({
                 />
               </div>
 
-              {/* VENCIMENTO CRLV CAVALO */}
+              {/* DATA DO ÚLTIMO CRLV CAVALO */}
               <div>
                 <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                  Vencimento CRLV (Cavalo)
+                  Data do Último CRLV (Cavalo)
                 </label>
                 <input
                   type="date"
@@ -470,7 +512,7 @@ export function ModalConformidadeMotorista({
                 {formData.crlv_validade_cavalo && (
                   <div style={{ marginTop: 4 }}>
                     {(() => {
-                      const res = calcularStatusValidade(formData.crlv_validade_cavalo);
+                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_cavalo);
                       return (
                         <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
                           ● {res.label}
@@ -520,10 +562,10 @@ export function ModalConformidadeMotorista({
                 />
               </div>
 
-              {/* VENCIMENTO CRLV CARRETA */}
+              {/* DATA DO ÚLTIMO CRLV CARRETA */}
               <div>
                 <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                  Vencimento CRLV (Carreta 1)
+                  Data do Último CRLV (Carreta 1)
                 </label>
                 <input
                   type="date"
@@ -535,7 +577,7 @@ export function ModalConformidadeMotorista({
                 {formData.crlv_validade_carreta && (
                   <div style={{ marginTop: 4 }}>
                     {(() => {
-                      const res = calcularStatusValidade(formData.crlv_validade_carreta);
+                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta);
                       return (
                         <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
                           ● {res.label}
@@ -597,13 +639,25 @@ export function ModalConformidadeMotorista({
                     />
                   </div>
                   <div>
-                    <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Vencimento CRLV Carreta 2</label>
+                    <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Data Último CRLV (Carreta 2)</label>
                     <input
                       type="date"
                       className="form-input"
                       value={formData.crlv_validade_carreta_2}
                       onChange={(e) => handleChange('crlv_validade_carreta_2', e.target.value)}
                     />
+                    {formData.crlv_validade_carreta_2 && (
+                      <div style={{ marginTop: 2 }}>
+                        {(() => {
+                          const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta_2);
+                          return (
+                            <span style={{ fontSize: '0.68rem', color: res.cor, fontWeight: 700 }}>
+                              ● {res.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Validade Laudo Rocha 2</label>

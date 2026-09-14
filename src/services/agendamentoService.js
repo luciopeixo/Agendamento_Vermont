@@ -465,6 +465,26 @@ export async function excluirMotoristaFrota(cpf = '') {
 }
 
 /**
+ * Calcula a data de vencimento a partir da data de emissão/exercício do último documento (1 ano após)
+ * @param {string} dataStr YYYY-MM-DD
+ * @returns {string|null} YYYY-MM-DD
+ */
+export function calcularVencimentoUmAno(dataStr) {
+  if (!dataStr) return null;
+  try {
+    const [ano, mes, dia] = dataStr.split('-').map(Number);
+    if (!ano || !mes || !dia) return null;
+    const dataVenc = new Date(ano + 1, mes - 1, dia);
+    const y = dataVenc.getFullYear();
+    const m = String(dataVenc.getMonth() + 1).padStart(2, '0');
+    const d = String(dataVenc.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  } catch (_e) {
+    return null;
+  }
+}
+
+/**
  * Verifica a conformidade documental completa de um motorista e veículos em relação a uma data
  * @returns {{ cadastrado: boolean, statusGeral: 'REGULAR' | 'AVENCER' | 'VENCIDO' | 'NAO_CADASTRADO', itensVencidos: Array, itensAVencer: Array, alertas: Array, motorista: Object }}
  */
@@ -513,7 +533,8 @@ export function verificarConformidadeDocumental({
   const itensAVencer = [];
   const alertas = [];
 
-  const checarData = (campoNome, label, dataValor) => {
+  // Checagem de documento com data de validade direta (ex: CNH e Laudo de Rocha)
+  const checarDataValidade = (campoNome, label, dataValor) => {
     if (!dataValor) return;
     try {
       const docDate = new Date(`${dataValor}T00:00:00`);
@@ -542,8 +563,42 @@ export function verificarConformidadeDocumental({
     } catch (_e) {}
   };
 
-  // 1. CNH Validade
-  checarData('cnh_validade', 'CNH do Motorista', motorista.cnh_validade);
+  // Checagem de CRLV (Data do Último Documento Emitido + 1 Ano de Validade)
+  const checarDataCRLV = (campoNome, label, dataUltimoDoc) => {
+    if (!dataUltimoDoc) return;
+    try {
+      const dataVenc = calcularVencimentoUmAno(dataUltimoDoc);
+      if (!dataVenc) return;
+      const docDate = new Date(`${dataVenc}T00:00:00`);
+      const diffMs = docDate.getTime() - dataReferencia.getTime();
+      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      const [ano, mes, dia] = dataUltimoDoc.split('-');
+      const dataEmissaoBR = `${dia}/${mes}/${ano}`;
+      const [anoV, mesV, diaV] = dataVenc.split('-');
+      const dataVencBR = `${diaV}/${mesV}/${anoV}`;
+
+      if (diffDias < 0) {
+        itensVencidos.push({
+          campo: campoNome,
+          titulo: `${label} (Último doc: ${dataEmissaoBR})`,
+          data: dataVenc,
+          labelData: dataVencBR,
+          diasVencido: Math.abs(diffDias)
+        });
+      } else if (diffDias <= 30) {
+        itensAVencer.push({
+          campo: campoNome,
+          titulo: `${label} (Último doc: ${dataEmissaoBR})`,
+          data: dataVenc,
+          labelData: dataVencBR,
+          diasRestantes: diffDias
+        });
+      }
+    } catch (_e) {}
+  };
+
+  // 1. CNH Validade (Validade impressa na CNH)
+  checarDataValidade('cnh_validade', 'CNH do Motorista', motorista.cnh_validade);
 
   // 2. Categoria CNH (Verifica compatibilidade com carreta/pesados)
   const isCarretaOuPesado = String(tipoVeiculo || motorista.tipo_veiculo || '').toLowerCase().includes('carreta') || 
@@ -557,19 +612,19 @@ export function verificarConformidadeDocumental({
     }
   }
 
-  // 3. CRLV Cavalo
-  checarData('crlv_validade_cavalo', 'CRLV do Cavalo Mecânico', motorista.crlv_validade_cavalo);
+  // 3. CRLV Cavalo (Data do último documento + 1 ano)
+  checarDataCRLV('crlv_validade_cavalo', 'CRLV do Cavalo Mecânico', motorista.crlv_validade_cavalo);
 
-  // 4. CRLV Carreta
-  checarData('crlv_validade_carreta', 'CRLV da Carreta 1', motorista.crlv_validade_carreta);
+  // 4. CRLV Carreta (Data do último documento + 1 ano)
+  checarDataCRLV('crlv_validade_carreta', 'CRLV da Carreta 1', motorista.crlv_validade_carreta);
 
-  // 5. Laudo de Inspeção de Rocha / CSV (Carreta)
-  checarData('validade_laudo_rocha', 'Laudo de Inspeção de Rocha / CSV (Carreta)', motorista.validade_laudo_rocha);
+  // 5. Laudo de Inspeção de Rocha / CSV (Carreta - Validade do Laudo)
+  checarDataValidade('validade_laudo_rocha', 'Laudo de Inspeção de Rocha / CSV (Carreta)', motorista.validade_laudo_rocha);
 
   // 6. Carreta 2 (se houver)
   if (motorista.placa_carreta_2 || placaCarreta2) {
-    checarData('crlv_validade_carreta_2', 'CRLV da Carreta 2', motorista.crlv_validade_carreta_2);
-    checarData('validade_laudo_rocha_2', 'Laudo de Inspeção de Rocha / CSV (Carreta 2)', motorista.validade_laudo_rocha_2);
+    checarDataCRLV('crlv_validade_carreta_2', 'CRLV da Carreta 2', motorista.crlv_validade_carreta_2);
+    checarDataValidade('validade_laudo_rocha_2', 'Laudo de Inspeção de Rocha / CSV (Carreta 2)', motorista.validade_laudo_rocha_2);
   }
 
   let statusGeral = 'REGULAR';

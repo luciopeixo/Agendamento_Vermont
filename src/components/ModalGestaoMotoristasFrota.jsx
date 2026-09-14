@@ -7,7 +7,8 @@ import {
   obterBaseMotoristasCompleta, 
   formatarCPF, 
   formatarCNPJ, 
-  verificarConformidadeDocumental 
+  verificarConformidadeDocumental,
+  calcularVencimentoUmAno
 } from '../services/agendamentoService';
 import { ModalConformidadeMotorista } from './ModalConformidadeMotorista';
 import * as XLSX from 'xlsx';
@@ -118,9 +119,11 @@ export function ModalGestaoMotoristasFrota({
       'Categoria CNH': m.cnh_categoria || '-',
       'Validade CNH': m.cnh_validade || '-',
       'Placa Cavalo': m.placa_cavalo || '-',
-      'CRLV Cavalo': m.crlv_validade_cavalo || '-',
+      'Último CRLV Cavalo': m.crlv_validade_cavalo || '-',
+      'Vencimento CRLV Cavalo (+1 ano)': calcularVencimentoUmAno(m.crlv_validade_cavalo) || '-',
       'Placa Carreta': m.placa_carreta || '-',
-      'CRLV Carreta': m.crlv_validade_carreta || '-',
+      'Último CRLV Carreta': m.crlv_validade_carreta || '-',
+      'Vencimento CRLV Carreta (+1 ano)': calcularVencimentoUmAno(m.crlv_validade_carreta) || '-',
       'Validade Laudo Rocha / CSV': m.validade_laudo_rocha || '-',
       'Transportadora': m.transportadora || '-',
       'Status Geral': m.conformidade.statusGeral,
@@ -374,7 +377,7 @@ export function ModalGestaoMotoristasFrota({
                   <tr style={{ background: 'rgba(15, 23, 42, 0.85)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
                     <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Motorista / CPF</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>CNH & Categoria</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Cavalo (CRLV)</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Cavalo (Último CRLV)</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Carreta / Laudo Rocha (CSV)</th>
                     <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Transportadora</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center', color: '#cbd5e1', fontWeight: 700 }}>Status</th>
@@ -386,6 +389,8 @@ export function ModalGestaoMotoristasFrota({
                     const st = item.conformidade.statusGeral;
                     const isVencido = st === 'VENCIDO';
                     const isAvencer = st === 'AVENCER';
+                    const vencCavalo = calcularVencimentoUmAno(item.crlv_validade_cavalo);
+                    const vencCarreta = calcularVencimentoUmAno(item.crlv_validade_carreta);
 
                     return (
                       <tr 
@@ -420,8 +425,13 @@ export function ModalGestaoMotoristasFrota({
                             {item.placa_cavalo || '-'}
                           </div>
                           <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>
-                            CRLV: {formatarDataBR(item.crlv_validade_cavalo)}
+                            Doc: {formatarDataBR(item.crlv_validade_cavalo)}
                           </div>
+                          {vencCavalo && (
+                            <div style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>
+                              Vence: <strong>{formatarDataBR(vencCavalo)}</strong>
+                            </div>
+                          )}
                         </td>
 
                         {/* Carreta e Laudo de Rocha */}
@@ -431,7 +441,8 @@ export function ModalGestaoMotoristasFrota({
                             {item.placa_carreta_2 && <span style={{ color: '#94a3b8', fontSize: '0.75rem', marginLeft: 4 }}>+ {item.placa_carreta_2}</span>}
                           </div>
                           <div style={{ fontSize: '0.76rem', color: '#cbd5e1' }}>
-                            CRLV: {formatarDataBR(item.crlv_validade_carreta)}
+                            Doc: {formatarDataBR(item.crlv_validade_carreta)}
+                            {vencCarreta && <span style={{ marginLeft: 4 }}>(Vence: {formatarDataBR(vencCarreta)})</span>}
                           </div>
                           <div style={{ fontSize: '0.76rem', color: item.validade_laudo_rocha ? '#fbbf24' : '#64748b', fontWeight: 600 }}>
                             Laudo CSV: {formatarDataBR(item.validade_laudo_rocha)}
