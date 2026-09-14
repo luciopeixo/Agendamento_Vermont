@@ -650,7 +650,7 @@ export async function excluirMotoristaFrota(cpf = '') {
 }
 
 /**
- * Retorna as informações do Detran para o final da placa (mês de vencimento do licenciamento/CRLV)
+ * Retorna as informações oficiais do Detran-ES para o final da placa (Instrução de Serviço Nº 43 / Detran-ES)
  * @param {string} placa 
  */
 export function obterInfoLicenciamentoPorPlaca(placa = '') {
@@ -660,17 +660,18 @@ export function obterInfoLicenciamentoPorPlaca(placa = '') {
   if (!digitos) return null;
   const finalDigito = digitos.slice(-1);
 
+  // Calendário Oficial Detran-ES (Setembro)
   const mesesPorFinal = {
-    '1': { mesNumero: 3, mesNome: 'Março', diaLimite: 31 },
-    '2': { mesNumero: 4, mesNome: 'Abril', diaLimite: 30 },
-    '3': { mesNumero: 5, mesNome: 'Maio', diaLimite: 31 },
-    '4': { mesNumero: 6, mesNome: 'Junho', diaLimite: 30 },
-    '5': { mesNumero: 7, mesNome: 'Julho', diaLimite: 31 },
-    '6': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 31 },
-    '7': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30 },
-    '8': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31 },
-    '9': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30 },
-    '0': { mesNumero: 12, mesNome: 'Dezembro', diaLimite: 31 }
+    '1': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 9, labelPar: '1 e 2' },
+    '2': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 9, labelPar: '1 e 2' },
+    '3': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 10, labelPar: '3 e 4' },
+    '4': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 10, labelPar: '3 e 4' },
+    '5': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 11, labelPar: '5 e 6' },
+    '6': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 11, labelPar: '5 e 6' },
+    '7': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 14, labelPar: '7 e 8' },
+    '8': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 14, labelPar: '7 e 8' },
+    '9': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 15, labelPar: '9 e 0' },
+    '0': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 15, labelPar: '9 e 0' }
   };
 
   const info = mesesPorFinal[finalDigito];
@@ -680,7 +681,8 @@ export function obterInfoLicenciamentoPorPlaca(placa = '') {
     finalDigito,
     mesNumero: info.mesNumero,
     mesNome: info.mesNome,
-    diaLimite: info.diaLimite
+    diaLimite: info.diaLimite,
+    labelPar: info.labelPar
   };
 }
 
@@ -717,7 +719,7 @@ export function calcularVencimentoUmAno(dataStr) {
 }
 
 /**
- * Avalia o status de conformidade do CRLV baseado na Data do Último Registro e o calendário do Detran para o final da placa.
+ * Avalia o status de conformidade do CRLV baseado na Data do Último Registro e o calendário do Detran-ES para o final da placa.
  * @param {string} dataUltimoRegistro YYYY-MM-DD
  * @param {string} placa Placa do veículo
  * @param {string} dataReferenciaStr Data de referência (hoje ou data do agendamento)
@@ -778,46 +780,62 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
       }
     }
 
-    // Com regra do Detran pelo final da placa
+    // Datas do calendário Detran-ES
     const limiteDetranEsteAno = new Date(anoRef, info.mesNumero - 1, info.diaLimite, 23, 59, 59);
     const dataLimiteEsteAnoStr = `${anoRef}-${String(info.mesNumero).padStart(2, '0')}-${String(info.diaLimite).padStart(2, '0')}`;
     const labelLimiteEsteAno = `${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}/${anoRef}`;
 
-    // Estamos antes da data limite do Detran deste ano?
-    if (dataRef.getTime() <= limiteDetranEsteAno.getTime()) {
-      // Se o registro é de pelo menos o ano anterior (anoRef - 1) ou ano atual (anoRef), é válido até a data limite deste ano
-      if (anoReg >= anoRef - 1) {
-        const diffMs = limiteDetranEsteAno.getTime() - dataRef.getTime();
-        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const limiteDetranProxAno = new Date(anoRef + 1, info.mesNumero - 1, info.diaLimite, 23, 59, 59);
+    const dataLimiteProxAnoStr = `${anoRef + 1}-${String(info.mesNumero).padStart(2, '0')}-${String(info.diaLimite).padStart(2, '0')}`;
+    const labelLimiteProxAno = `${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}/${anoRef + 1}`;
 
-        if (diffDias <= 30) {
-          return {
-            status: 'avencer',
-            label: `Último registro: ${dataRegFormatada} → Vence em ${diffDias} dias (Detran: ${labelLimiteEsteAno})`,
-            cor: '#f59e0b',
-            dataVencimento: dataLimiteEsteAnoStr,
-            labelDataVencimento: labelLimiteEsteAno,
-            dias: diffDias,
-            infoDetran: info
-          };
-        } else {
-          return {
-            status: 'valido',
-            label: `Último registro: ${dataRegFormatada} → Válido até ${labelLimiteEsteAno} (Detran Final ${info.finalDigito})`,
-            cor: '#22c55e',
-            dataVencimento: dataLimiteEsteAnoStr,
-            labelDataVencimento: labelLimiteEsteAno,
-            dias: diffDias,
-            infoDetran: info
-          };
-        }
+    // CASO 1: O veículo JÁ FOI LICENCIADO no ano de referência ou posterior (anoReg >= anoRef)
+    // Ex: Em 2026, o CRLV tem data de emissão de 2026. Logo, o licenciamento 2026 está cumprido e é válido até o vencimento de 2027!
+    if (anoReg >= anoRef) {
+      const diffMs = limiteDetranProxAno.getTime() - dataRef.getTime();
+      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+      return {
+        status: 'valido',
+        label: `Último registro: ${dataRegFormatada} → Válido até ${labelLimiteProxAno} (Detran-ES Final ${info.finalDigito})`,
+        cor: '#22c55e',
+        dataVencimento: dataLimiteProxAnoStr,
+        labelDataVencimento: labelLimiteProxAno,
+        dias: diffDias,
+        infoDetran: info
+      };
+    }
+
+    // CASO 2: O veículo possui registro do ANO ANTERIOR (anoReg === anoRef - 1)
+    // Ex: Em 2026, o último registro é de 2025. O veículo precisa renovar até a data do Detran-ES em 2026.
+    if (anoReg === anoRef - 1) {
+      const diffMs = limiteDetranEsteAno.getTime() - dataRef.getTime();
+      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDias > 30) {
+        return {
+          status: 'valido',
+          label: `Último registro: ${dataRegFormatada} → Válido até ${labelLimiteEsteAno} (Detran-ES Final ${info.finalDigito})`,
+          cor: '#22c55e',
+          dataVencimento: dataLimiteEsteAnoStr,
+          labelDataVencimento: labelLimiteEsteAno,
+          dias: diffDias,
+          infoDetran: info
+        };
+      } else if (diffDias >= 0) {
+        return {
+          status: 'avencer',
+          label: `Último registro: ${dataRegFormatada} → Vence em ${diffDias} dias (Detran-ES: ${labelLimiteEsteAno})`,
+          cor: '#f59e0b',
+          dataVencimento: dataLimiteEsteAnoStr,
+          labelDataVencimento: labelLimiteEsteAno,
+          dias: diffDias,
+          infoDetran: info
+        };
       } else {
-        // Registro muito antigo
-        const diffMs = dataRef.getTime() - limiteDetranEsteAno.getTime();
-        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
         return {
           status: 'vencido',
-          label: `Último registro: ${dataRegFormatada} → Vencido (Exige registro ${anoRef - 1}/${anoRef})`,
+          label: `Último registro: ${dataRegFormatada} → Vencido em ${labelLimiteEsteAno} há ${Math.abs(diffDias)} dias (Detran-ES Final ${info.finalDigito})`,
           cor: '#ef4444',
           dataVencimento: dataLimiteEsteAnoStr,
           labelDataVencimento: labelLimiteEsteAno,
@@ -825,40 +843,20 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
           infoDetran: info
         };
       }
-    } else {
-      // Já passou a data limite do Detran deste ano
-      if (anoReg >= anoRef) {
-        // Já renovou no ano corrente! Válido até o limite do ano seguinte
-        const limiteDetranProxAno = new Date(anoRef + 1, info.mesNumero - 1, info.diaLimite, 23, 59, 59);
-        const dataLimiteProxAnoStr = `${anoRef + 1}-${String(info.mesNumero).padStart(2, '0')}-${String(info.diaLimite).padStart(2, '0')}`;
-        const labelLimiteProxAno = `${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}/${anoRef + 1}`;
-        const diffMs = limiteDetranProxAno.getTime() - dataRef.getTime();
-        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-        return {
-          status: 'valido',
-          label: `Último registro: ${dataRegFormatada} → Válido até ${labelLimiteProxAno} (Detran Final ${info.finalDigito})`,
-          cor: '#22c55e',
-          dataVencimento: dataLimiteProxAnoStr,
-          labelDataVencimento: labelLimiteProxAno,
-          dias: diffDias,
-          infoDetran: info
-        };
-      } else {
-        // Não renovou e a data do Detran já passou -> Vencido
-        const diffMs = dataRef.getTime() - limiteDetranEsteAno.getTime();
-        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-        return {
-          status: 'vencido',
-          label: `Último registro: ${dataRegFormatada} → Vencido em ${labelLimiteEsteAno} há ${diffDias} dias (Detran Final ${info.finalDigito})`,
-          cor: '#ef4444',
-          dataVencimento: dataLimiteEsteAnoStr,
-          labelDataVencimento: labelLimiteEsteAno,
-          dias: diffDias,
-          infoDetran: info
-        };
-      }
     }
+
+    // CASO 3: Registro de 2 anos ou mais atrás (anoReg < anoRef - 1)
+    const diffMs = dataRef.getTime() - limiteDetranEsteAno.getTime();
+    const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return {
+      status: 'vencido',
+      label: `Último registro: ${dataRegFormatada} → Vencido (Exige renovação Detran-ES ${anoRef})`,
+      cor: '#ef4444',
+      dataVencimento: dataLimiteEsteAnoStr,
+      labelDataVencimento: labelLimiteEsteAno,
+      dias: Math.abs(diffDias),
+      infoDetran: info
+    };
   } catch (_e) {
     return { status: 'vazio', label: 'Data inválida', cor: '#94a3b8' };
   }

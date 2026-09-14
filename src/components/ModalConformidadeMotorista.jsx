@@ -524,9 +524,9 @@ export function ModalConformidadeMotorista({
                           padding: '2px 6px',
                           fontWeight: 700
                         }}
-                        title={`Vencimento oficial pelo Detran para placa final ${info.finalDigito}: ${info.diaLimite}/${String(info.mesNumero).padStart(2, '0')}`}
+                        title={`Vencimento oficial pelo Detran-ES para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/09`}
                       >
-                        ⚡ Detran: {info.diaLimite}/{String(info.mesNumero).padStart(2, '0')} ({info.mesNome})
+                        ⚡ Detran-ES: {String(info.diaLimite).padStart(2, '0')}/09 (Final {info.labelPar || info.finalDigito})
                       </span>
                     );
                   })()}
@@ -622,9 +622,9 @@ export function ModalConformidadeMotorista({
                           padding: '2px 6px',
                           fontWeight: 700
                         }}
-                        title={`Vencimento oficial pelo Detran para placa final ${info.finalDigito}: ${info.diaLimite}/${String(info.mesNumero).padStart(2, '0')}`}
+                        title={`Vencimento oficial pelo Detran-ES para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/09`}
                       >
-                        ⚡ Detran: {info.diaLimite}/{String(info.mesNumero).padStart(2, '0')} ({info.mesNome})
+                        ⚡ Detran-ES: {String(info.diaLimite).padStart(2, '0')}/09 (Final {info.labelPar || info.finalDigito})
                       </span>
                     );
                   })()}
@@ -719,8 +719,9 @@ export function ModalConformidadeMotorista({
                               padding: '2px 5px',
                               fontWeight: 700
                             }}
+                            title={`Vencimento oficial pelo Detran-ES para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/09`}
                           >
-                            ⚡ Detran: {info.diaLimite}/{String(info.mesNumero).padStart(2, '0')} ({info.mesNome})
+                            ⚡ Detran-ES: {String(info.diaLimite).padStart(2, '0')}/09 (Final {info.labelPar || info.finalDigito})
                           </span>
                         );
                       })()}
