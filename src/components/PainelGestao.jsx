@@ -25,7 +25,8 @@ import {
   STATUS_AGENDAMENTO,
   resolverCnpjCliente,
   resolverCnpjTransportadora,
-  limparNomeEmpresa
+  limparNomeEmpresa,
+  verificarConformidadeDocumental
 } from '../services/agendamentoService';
 import { ModalEditarAgendamento } from './ModalEditarAgendamento';
 import { ModalHistoricoStatus } from './ModalHistoricoStatus';
@@ -33,6 +34,8 @@ import { ModalConfirmarStatus } from './ModalConfirmarStatus';
 import { ModalLimpezaTestes } from './ModalLimpezaTestes';
 import { GraficosBlocosAdmin } from './GraficosBlocosAdmin';
 import { AutorizacaoCarregamentoModal } from './AutorizacaoCarregamentoModal';
+import { ModalGestaoMotoristasFrota } from './ModalGestaoMotoristasFrota';
+import { ModalConformidadeMotorista } from './ModalConformidadeMotorista';
 
 /**
  * Emite som harmônico suave usando a Web Audio API (sem arquivos externos)
@@ -215,6 +218,24 @@ export function PainelGestao({
 
   // Estado para o modal de limpeza de registros de teste em lote
   const [modalLimpezaAberto, setModalLimpezaAberto] = useState(false);
+
+  // Estados para Gestão de Conformidade de Motoristas & Frota (Exclusivo Pedreiras & Admin)
+  const [modalGestaoFrotaAberto, setModalGestaoFrotaAberto] = useState(false);
+  const [motoristaParaConformidade, setMotoristaParaConformidade] = useState(null);
+
+  const handleAbrirConformidadeDireta = (ag) => {
+    setMotoristaParaConformidade({
+      cpf: ag.motorista_cpf || '',
+      nome: ag.motorista_nome || '',
+      telefone: ag.motorista_telefone || '',
+      transportadora: ag.transportadora || '',
+      transportadora_cnpj: ag.transportadora_cnpj || '',
+      tipo_veiculo: ag.tipo_veiculo || 'Carreta / Bitrem',
+      placa_cavalo: ag.placa_cavalo || '',
+      placa_carreta: ag.placa_carreta || '',
+      placa_carreta_2: ag.placa_carreta_2 || ''
+    });
+  };
 
   // Estados de Paginação da Tabela Operacional (padrão 20 por página)
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -976,9 +997,19 @@ export function PainelGestao({
           </div>
 
           <button
-            onClick={handleExportarExcel}
+            onClick={() => setModalGestaoFrotaAberto(true)}
             className="btn btn-secondary"
             style={{ padding: '9px 16px', fontWeight: 600, gap: 8, background: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399' }}
+            title="Gerenciar base interna de motoristas e conformidade de frota (CNH, CRLVs e Laudos de Rocha/CSV)"
+          >
+            <ShieldCheck size={18} />
+            Motoristas & Frota
+          </button>
+
+          <button
+            onClick={handleExportarExcel}
+            className="btn btn-secondary"
+            style={{ padding: '9px 16px', fontWeight: 600, gap: 8, background: 'rgba(255, 255, 255, 0.05)', borderColor: 'rgba(255, 255, 255, 0.12)' }}
             title="Exportar dados da tabela para planilha Excel (CSV UTF-8)"
           >
             <FileSpreadsheet size={18} />
@@ -2003,13 +2034,124 @@ export function PainelGestao({
                         </div>
                       </td>
 
-                      {/* Motorista / CPF */}
+                      {/* Motorista / CPF & Conformidade */}
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ fontWeight: 600, color: '#fff' }}>{ag.motorista_nome}</div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)', fontFamily: 'monospace' }}>CPF: {ag.motorista_cpf}</div>
                         {ag.motorista_telefone && (
                           <div style={{ fontSize: '0.74rem', color: 'var(--info)' }}>{ag.motorista_telefone}</div>
                         )}
+
+                        {/* Selo de Conformidade Documental (CNH, CRLVs, Laudo de Rocha) */}
+                        {(() => {
+                          const conf = verificarConformidadeDocumental({
+                            cpf: ag.motorista_cpf,
+                            placaCavalo: ag.placa_cavalo,
+                            placaCarreta: ag.placa_carreta,
+                            placaCarreta2: ag.placa_carreta_2,
+                            dataAgendamento: ag.data_agendamento,
+                            tipoVeiculo: ag.tipo_veiculo
+                          });
+
+                          if (conf.statusGeral === 'VENCIDO') {
+                            return (
+                              <div style={{ marginTop: 4 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAbrirConformidadeDireta(ag)}
+                                  className="badge"
+                                  style={{
+                                    cursor: 'pointer',
+                                    background: 'rgba(239, 68, 68, 0.2)',
+                                    color: '#fca5a5',
+                                    border: '1px solid #ef4444',
+                                    fontSize: '0.68rem',
+                                    padding: '2px 6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4
+                                  }}
+                                  title={`Documentação Vencida: ${conf.itensVencidos.map(i => `${i.titulo} (${i.labelData})`).join(' | ')}. Clique para regularizar.`}
+                                >
+                                  <AlertCircle size={10} /> Doc Vencido
+                                </button>
+                              </div>
+                            );
+                          }
+                          if (conf.statusGeral === 'AVENCER') {
+                            return (
+                              <div style={{ marginTop: 4 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAbrirConformidadeDireta(ag)}
+                                  className="badge"
+                                  style={{
+                                    cursor: 'pointer',
+                                    background: 'rgba(245, 158, 11, 0.2)',
+                                    color: '#fde047',
+                                    border: '1px solid #f59e0b',
+                                    fontSize: '0.68rem',
+                                    padding: '2px 6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4
+                                  }}
+                                  title={`Documento a vencer: ${conf.itensAVencer.map(i => `${i.titulo} (${i.labelData})`).join(' | ')}. Clique para verificar.`}
+                                >
+                                  <AlertTriangle size={10} /> Doc A Vencer
+                                </button>
+                              </div>
+                            );
+                          }
+                          if (conf.statusGeral === 'REGULAR') {
+                            return (
+                              <div style={{ marginTop: 4 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAbrirConformidadeDireta(ag)}
+                                  className="badge"
+                                  style={{
+                                    cursor: 'pointer',
+                                    background: 'rgba(34, 197, 94, 0.15)',
+                                    color: '#86efac',
+                                    border: '1px solid rgba(34, 197, 94, 0.35)',
+                                    fontSize: '0.68rem',
+                                    padding: '2px 6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4
+                                  }}
+                                  title="Documentação em dia (CNH, CRLVs e Laudo de Rocha válidos). Clique para ver detalhes."
+                                >
+                                  <CheckCircle2 size={10} /> Doc Regular
+                                </button>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div style={{ marginTop: 4 }}>
+                              <button
+                                type="button"
+                                onClick={() => handleAbrirConformidadeDireta(ag)}
+                                className="badge"
+                                style={{
+                                  cursor: 'pointer',
+                                  background: 'rgba(148, 163, 184, 0.12)',
+                                  color: '#cbd5e1',
+                                  border: '1px solid rgba(148, 163, 184, 0.25)',
+                                  fontSize: '0.68rem',
+                                  padding: '2px 6px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}
+                                title="Motorista/Veículo ainda não possui cadastro completo de conformidade. Clique para cadastrar."
+                              >
+                                <ShieldAlert size={10} /> Doc Não Cad.
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Veículo / Placas Dinâmicas */}
@@ -2353,6 +2495,28 @@ export function PainelGestao({
           onFechar={() => setModalLimpezaAberto(false)}
           onConcluido={() => {
             setModalLimpezaAberto(false);
+            carregarDados(true);
+          }}
+        />
+      )}
+
+      {/* Modal de Central de Gestão de Motoristas & Frota (Pedreiras & Admin) */}
+      {modalGestaoFrotaAberto && (
+        <ModalGestaoMotoristasFrota
+          usuarioNome={usuarioInfo.nome}
+          isAdmin={isAdmin}
+          aoFechar={() => setModalGestaoFrotaAberto(false)}
+        />
+      )}
+
+      {/* Modal de Conformidade Rápida de Motorista & Frota (ao clicar no selo da tabela) */}
+      {motoristaParaConformidade && (
+        <ModalConformidadeMotorista
+          motoristaInicial={motoristaParaConformidade}
+          usuarioNome={usuarioInfo.nome}
+          aoFechar={() => setMotoristaParaConformidade(null)}
+          aoSalvar={() => {
+            setMotoristaParaConformidade(null);
             carregarDados(true);
           }}
         />

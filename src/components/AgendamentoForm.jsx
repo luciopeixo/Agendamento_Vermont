@@ -31,7 +31,8 @@ import {
   validarCPF,
   consultarMotoristaPorCPF,
   validarCNPJ,
-  consultarCNPJReceita
+  consultarCNPJReceita,
+  verificarConformidadeDocumental
 } from '../services/agendamentoService';
 
 export function AgendamentoForm({ onAgendamentoSucesso }) {
@@ -176,6 +177,60 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     cidade: '',
     fonte: ''
   });
+
+  // Estado de Conformidade Documental (Base Interna da Pedreira: CNH, CRLVs, Laudo de Rocha)
+  const [statusConformidade, setStatusConformidade] = useState({
+    verificado: false,
+    cadastrado: false,
+    statusGeral: 'REGULAR',
+    itensVencidos: [],
+    itensAVencer: [],
+    alertas: []
+  });
+
+  // Verificação automática de conformidade documental com a base interna da pedreira
+  useEffect(() => {
+    const cpfLimpo = String(formData.motorista_cpf || '').replace(/\D/g, '');
+    const temCavalo = Boolean(formData.placa_cavalo && formData.placa_cavalo.trim().length >= 4);
+    const temCarreta = Boolean(formData.placa_carreta && formData.placa_carreta.trim().length >= 4);
+
+    if (cpfLimpo.length === 11 || temCavalo || temCarreta) {
+      const res = verificarConformidadeDocumental({
+        cpf: cpfLimpo,
+        placaCavalo: formData.placa_cavalo,
+        placaCarreta: formData.placa_carreta,
+        placaCarreta2: formData.placa_carreta_2,
+        dataAgendamento: formData.data_agendamento || hoje,
+        tipoVeiculo: formData.tipo_veiculo
+      });
+
+      setStatusConformidade({
+        verificado: true,
+        cadastrado: res.cadastrado,
+        statusGeral: res.statusGeral,
+        itensVencidos: res.itensVencidos || [],
+        itensAVencer: res.itensAVencer || [],
+        alertas: res.alertas || []
+      });
+    } else {
+      setStatusConformidade({
+        verificado: false,
+        cadastrado: false,
+        statusGeral: 'REGULAR',
+        itensVencidos: [],
+        itensAVencer: [],
+        alertas: []
+      });
+    }
+  }, [
+    formData.motorista_cpf, 
+    formData.placa_cavalo, 
+    formData.placa_carreta, 
+    formData.placa_carreta_2, 
+    formData.data_agendamento, 
+    formData.tipo_veiculo,
+    hoje
+  ]);
 
   // Máscaras de formatação
   const formatarCNPJ = (valor) => {
@@ -2542,6 +2597,52 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   required
                   style={{ textTransform: 'uppercase', fontFamily: 'monospace', fontSize: '1rem', letterSpacing: '0.08em' }}
                 />
+              </div>
+            )}
+
+            {/* Aviso em Destaque de Documentação Desatualizada / Vencida (Base Interna da Pedreira) */}
+            {statusConformidade.itensVencidos.length > 0 && (
+              <div className="animate-fade" style={{
+                gridColumn: 'span 2',
+                marginTop: 12,
+                padding: '16px 18px',
+                borderRadius: 12,
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1.5px solid #ef4444',
+                boxShadow: '0 4px 20px rgba(239, 68, 68, 0.15)',
+                color: '#fff'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <AlertTriangle size={22} color="#ef4444" style={{ flexShrink: 0 }} />
+                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#fca5a5' }}>
+                    Aviso Importante: Documentação Desatualizada
+                  </h4>
+                </div>
+                <p style={{ margin: '0 0 10px 0', fontSize: '0.84rem', color: '#e2e8f0', lineHeight: 1.4 }}>
+                  Constatamos que este motorista/veículo possui documento(s) <strong>vencido(s) ou desatualizado(s)</strong> em relação à data do carregamento:
+                </p>
+                <ul style={{ margin: '0 0 12px 18px', padding: 0, fontSize: '0.82rem', color: '#fecaca' }}>
+                  {statusConformidade.itensVencidos.map((item, idx) => (
+                    <li key={idx} style={{ marginBottom: 4 }}>
+                      <strong>{item.titulo}:</strong> Vencido em <strong>{item.labelData}</strong> (há {item.diasVencido} dias)
+                    </li>
+                  ))}
+                </ul>
+                <div style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  background: 'rgba(0, 0, 0, 0.35)',
+                  fontSize: '0.78rem',
+                  color: '#cbd5e1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <Info size={14} color="#38bdf8" style={{ flexShrink: 0 }} />
+                  <span>
+                    <strong>Orientação:</strong> O agendamento poderá ser concluído, mas o motorista deverá apresentar a documentação renovada e regularizada na portaria da pedreira Vermont para autorização do carregamento.
+                  </span>
+                </div>
               </div>
             )}
           </div>

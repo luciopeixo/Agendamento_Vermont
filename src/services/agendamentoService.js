@@ -272,7 +272,7 @@ function codificarBaseMotoristasLocal(lista = []) {
 }
 
 /**
- * Retorna todos os motoristas salvos na base local interna
+ * Retorna todos os motoristas salvos na base local interna com dados completos de conformidade
  */
 export function obterBaseMotoristas() {
   try {
@@ -284,7 +284,16 @@ export function obterBaseMotoristas() {
 }
 
 /**
- * Salva ou atualiza um motorista na base cadastral (local e sincronizado criptografado no Supabase)
+ * Retorna a lista de motoristas e frota ordenada por nome
+ */
+export function obterBaseMotoristasCompleta() {
+  const lista = obterBaseMotoristas();
+  return lista.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+}
+
+/**
+ * Salva ou atualiza um motorista na base cadastral (local e sincronizado com Supabase)
+ * Preserva campos de conformidade (CNH, CRLVs, Laudos) já existentes caso venha de um agendamento simples
  */
 export async function salvarMotoristaNaBase(dadosMotorista = {}) {
   try {
@@ -295,34 +304,47 @@ export async function salvarMotoristaNaBase(dadosMotorista = {}) {
 
     const base = obterBaseMotoristas();
     const index = base.findIndex(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
+    const existente = index !== -1 ? base[index] : {};
 
-    const transpLimpa = limparNomeEmpresa(dadosMotorista.transportadora || dadosMotorista.nome_transportadora || '').toUpperCase() || null;
-    const transpCnpj = dadosMotorista.transportadora_cnpj || extrairCnpj(dadosMotorista.transportadora) || obterCnpjEmpresaCache(transpLimpa) || null;
-    const nomeLimpo = (dadosMotorista.motorista_nome || dadosMotorista.nome || '').trim().toUpperCase();
-    const telLimpo = dadosMotorista.motorista_telefone || dadosMotorista.telefone || null;
+    const transpLimpa = limparNomeEmpresa(dadosMotorista.transportadora || dadosMotorista.nome_transportadora || existente.transportadora || '').toUpperCase() || null;
+    const transpCnpj = dadosMotorista.transportadora_cnpj || extrairCnpj(dadosMotorista.transportadora) || existente.transportadora_cnpj || obterCnpjEmpresaCache(transpLimpa) || null;
+    const nomeLimpo = (dadosMotorista.motorista_nome || dadosMotorista.nome || existente.nome || '').trim().toUpperCase();
+    const telLimpo = dadosMotorista.motorista_telefone || dadosMotorista.telefone || existente.telefone || null;
 
     const novoRegistro = {
+      ...existente,
       cpf: cpfLimpo,
       nome: nomeLimpo,
       telefone: telLimpo,
       transportadora: transpLimpa,
       transportadora_cnpj: transpCnpj,
-      tipo_veiculo: dadosMotorista.tipo_veiculo || null,
-      placa_cavalo: dadosMotorista.placa_cavalo || null,
-      placa_carreta: dadosMotorista.placa_carreta || null,
-      placa_carreta_2: dadosMotorista.placa_carreta_2 || null,
-      atualizado_em: new Date().toISOString()
+      tipo_veiculo: dadosMotorista.tipo_veiculo || existente.tipo_veiculo || null,
+      placa_cavalo: (dadosMotorista.placa_cavalo || existente.placa_cavalo || '').toUpperCase() || null,
+      placa_carreta: (dadosMotorista.placa_carreta || existente.placa_carreta || '').toUpperCase() || null,
+      placa_carreta_2: (dadosMotorista.placa_carreta_2 || existente.placa_carreta_2 || '').toUpperCase() || null,
+      // Conformidade Documental (Preserva se já preenchido)
+      cnh_categoria: dadosMotorista.cnh_categoria || existente.cnh_categoria || 'E',
+      cnh_validade: dadosMotorista.cnh_validade || existente.cnh_validade || null,
+      crlv_validade_cavalo: dadosMotorista.crlv_validade_cavalo || existente.crlv_validade_cavalo || null,
+      crlv_validade_carreta: dadosMotorista.crlv_validade_carreta || existente.crlv_validade_carreta || null,
+      validade_laudo_rocha: dadosMotorista.validade_laudo_rocha || existente.validade_laudo_rocha || null,
+      crlv_validade_carreta_2: dadosMotorista.crlv_validade_carreta_2 || existente.crlv_validade_carreta_2 || null,
+      validade_laudo_rocha_2: dadosMotorista.validade_laudo_rocha_2 || existente.validade_laudo_rocha_2 || null,
+      status_documental: dadosMotorista.status_documental || existente.status_documental || 'REGULAR',
+      observacoes: dadosMotorista.observacoes || existente.observacoes || '',
+      atualizado_em: new Date().toISOString(),
+      atualizado_por: dadosMotorista.atualizado_por || existente.atualizado_por || 'SISTEMA'
     };
 
     if (index !== -1) {
-      base[index] = { ...base[index], ...novoRegistro };
+      base[index] = novoRegistro;
     } else {
       base.push(novoRegistro);
     }
 
     localStorage.setItem(MOTORISTAS_BASE_KEY, codificarBaseMotoristasLocal(base));
 
-    // Sincroniza de forma criptografada no Supabase via RPC segura se configurado
+    // Sincroniza no Supabase se configurado
     if (isSupabaseConfigurado() && nomeLimpo) {
       try {
         await supabase.rpc('salvar_motorista', {
@@ -332,12 +354,239 @@ export async function salvarMotoristaNaBase(dadosMotorista = {}) {
           p_transportadora: transpLimpa || ''
         });
       } catch (_errRpc) {
-        // Fallback silencioso se a migration RPC estiver pendente no banco
+        // Fallback silencioso
       }
     }
   } catch (e) {
     console.warn('Erro ao salvar motorista na base:', e);
   }
+}
+
+/**
+ * Salva ou edita diretamente o cadastro completo de conformidade de motorista e frota (Pedreira / Admin)
+ */
+export async function salvarMotoristaFrotaConformidade(dados = {}) {
+  try {
+    const rawCpf = dados.cpf || dados.motorista_cpf;
+    if (!rawCpf) return { sucesso: false, erro: 'CPF é obrigatório.' };
+    const cpfLimpo = String(rawCpf).replace(/\D/g, '');
+    if (cpfLimpo.length !== 11) return { sucesso: false, erro: 'CPF inválido (deve ter 11 dígitos).' };
+
+    const base = obterBaseMotoristas();
+    const index = base.findIndex(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
+    const existente = index !== -1 ? base[index] : {};
+
+    const registroAtualizado = {
+      ...existente,
+      cpf: cpfLimpo,
+      nome: (dados.nome || dados.motorista_nome || existente.nome || '').trim().toUpperCase(),
+      telefone: dados.telefone || dados.motorista_telefone || existente.telefone || '',
+      transportadora: (dados.transportadora || existente.transportadora || '').trim().toUpperCase(),
+      transportadora_cnpj: dados.transportadora_cnpj || existente.transportadora_cnpj || '',
+      tipo_veiculo: dados.tipo_veiculo || existente.tipo_veiculo || 'Carreta / Bitrem',
+      placa_cavalo: (dados.placa_cavalo || existente.placa_cavalo || '').toUpperCase().trim(),
+      placa_carreta: (dados.placa_carreta || existente.placa_carreta || '').toUpperCase().trim(),
+      placa_carreta_2: (dados.placa_carreta_2 || existente.placa_carreta_2 || '').toUpperCase().trim(),
+      // Documentação
+      cnh_categoria: (dados.cnh_categoria || existente.cnh_categoria || 'E').toUpperCase().trim(),
+      cnh_validade: dados.cnh_validade || null,
+      crlv_validade_cavalo: dados.crlv_validade_cavalo || null,
+      crlv_validade_carreta: dados.crlv_validade_carreta || null,
+      validade_laudo_rocha: dados.validade_laudo_rocha || null,
+      crlv_validade_carreta_2: dados.crlv_validade_carreta_2 || null,
+      validade_laudo_rocha_2: dados.validade_laudo_rocha_2 || null,
+      status_documental: dados.status_documental || 'REGULAR',
+      observacoes: (dados.observacoes || '').trim(),
+      atualizado_em: new Date().toISOString(),
+      atualizado_por: dados.atualizado_por || 'PEDREIRA/ADMIN'
+    };
+
+    if (index !== -1) {
+      base[index] = registroAtualizado;
+    } else {
+      base.push(registroAtualizado);
+    }
+
+    localStorage.setItem(MOTORISTAS_BASE_KEY, codificarBaseMotoristasLocal(base));
+
+    if (isSupabaseConfigurado()) {
+      try {
+        await supabase.from('base_motoristas').upsert({
+          cpf: cpfLimpo,
+          nome: registroAtualizado.nome,
+          telefone: registroAtualizado.telefone,
+          transportadora: registroAtualizado.transportadora,
+          cnh_categoria: registroAtualizado.cnh_categoria,
+          cnh_validade: registroAtualizado.cnh_validade,
+          placa_cavalo: registroAtualizado.placa_cavalo,
+          crlv_validade_cavalo: registroAtualizado.crlv_validade_cavalo,
+          placa_carreta: registroAtualizado.placa_carreta,
+          crlv_validade_carreta: registroAtualizado.crlv_validade_carreta,
+          validade_laudo_rocha: registroAtualizado.validade_laudo_rocha,
+          placa_carreta_2: registroAtualizado.placa_carreta_2,
+          crlv_validade_carreta_2: registroAtualizado.crlv_validade_carreta_2,
+          validade_laudo_rocha_2: registroAtualizado.validade_laudo_rocha_2,
+          observacoes: registroAtualizado.observacoes,
+          atualizado_em: new Date().toISOString()
+        }, { onConflict: 'cpf' });
+      } catch (_e) {
+        // Fallback
+      }
+    }
+
+    return { sucesso: true, motorista: registroAtualizado };
+  } catch (err) {
+    return { sucesso: false, erro: err.message || 'Erro ao salvar conformidade.' };
+  }
+}
+
+/**
+ * Exclui um motorista/veículo da base de conformidade
+ */
+export async function excluirMotoristaFrota(cpf = '') {
+  try {
+    const cpfLimpo = String(cpf).replace(/\D/g, '');
+    if (!cpfLimpo) return false;
+
+    const base = obterBaseMotoristas();
+    const filtrada = base.filter(m => String(m.cpf).replace(/\D/g, '') !== cpfLimpo);
+    localStorage.setItem(MOTORISTAS_BASE_KEY, codificarBaseMotoristasLocal(filtrada));
+
+    if (isSupabaseConfigurado()) {
+      try {
+        await supabase.from('base_motoristas').delete().eq('cpf', cpfLimpo);
+      } catch (_e) {}
+    }
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Verifica a conformidade documental completa de um motorista e veículos em relação a uma data
+ * @returns {{ cadastrado: boolean, statusGeral: 'REGULAR' | 'AVENCER' | 'VENCIDO' | 'NAO_CADASTRADO', itensVencidos: Array, itensAVencer: Array, alertas: Array, motorista: Object }}
+ */
+export function verificarConformidadeDocumental({ 
+  cpf = '', 
+  placaCavalo = '', 
+  placaCarreta = '', 
+  placaCarreta2 = '', 
+  dataAgendamento = '',
+  tipoVeiculo = ''
+}) {
+  const cpfLimpo = String(cpf || '').replace(/\D/g, '');
+  const refDataStr = dataAgendamento || new Date().toISOString().split('T')[0];
+  const dataReferencia = new Date(`${refDataStr}T23:59:59`);
+
+  const base = obterBaseMotoristas();
+  let motorista = null;
+
+  if (cpfLimpo) {
+    motorista = base.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
+  }
+
+  // Se não encontrou por CPF, tenta encontrar pela placa do cavalo ou carreta
+  if (!motorista && placaCavalo) {
+    const limpaCavalo = String(placaCavalo).replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    motorista = base.find(m => String(m.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCavalo);
+  }
+
+  if (!motorista && placaCarreta) {
+    const limpaCarreta = String(placaCarreta).replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    motorista = base.find(m => String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarreta);
+  }
+
+  if (!motorista) {
+    return {
+      cadastrado: false,
+      statusGeral: 'NAO_CADASTRADO',
+      itensVencidos: [],
+      itensAVencer: [],
+      alertas: [],
+      motorista: null
+    };
+  }
+
+  const itensVencidos = [];
+  const itensAVencer = [];
+  const alertas = [];
+
+  const checarData = (campoNome, label, dataValor) => {
+    if (!dataValor) return;
+    try {
+      const docDate = new Date(`${dataValor}T00:00:00`);
+      const diffMs = docDate.getTime() - dataReferencia.getTime();
+      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      const [ano, mes, dia] = dataValor.split('-');
+      const dataFormatada = `${dia}/${mes}/${ano}`;
+
+      if (diffDias < 0) {
+        itensVencidos.push({
+          campo: campoNome,
+          titulo: label,
+          data: dataValor,
+          labelData: dataFormatada,
+          diasVencido: Math.abs(diffDias)
+        });
+      } else if (diffDias <= 30) {
+        itensAVencer.push({
+          campo: campoNome,
+          titulo: label,
+          data: dataValor,
+          labelData: dataFormatada,
+          diasRestantes: diffDias
+        });
+      }
+    } catch (_e) {}
+  };
+
+  // 1. CNH Validade
+  checarData('cnh_validade', 'CNH do Motorista', motorista.cnh_validade);
+
+  // 2. Categoria CNH (Verifica compatibilidade com carreta/pesados)
+  const isCarretaOuPesado = String(tipoVeiculo || motorista.tipo_veiculo || '').toLowerCase().includes('carreta') || 
+                            String(tipoVeiculo || motorista.tipo_veiculo || '').toLowerCase().includes('bitrem') ||
+                            Boolean(placaCarreta || motorista.placa_carreta);
+  
+  if (isCarretaOuPesado && motorista.cnh_categoria) {
+    const cat = String(motorista.cnh_categoria).toUpperCase().trim();
+    if (cat === 'B' || cat === 'C') {
+      alertas.push(`CNH Categoria '${cat}' pode ser incompatível com conjunto articulado/carreta (exige categoria 'E').`);
+    }
+  }
+
+  // 3. CRLV Cavalo
+  checarData('crlv_validade_cavalo', 'CRLV do Cavalo Mecânico', motorista.crlv_validade_cavalo);
+
+  // 4. CRLV Carreta
+  checarData('crlv_validade_carreta', 'CRLV da Carreta 1', motorista.crlv_validade_carreta);
+
+  // 5. Laudo de Inspeção de Rocha / CSV (Carreta)
+  checarData('validade_laudo_rocha', 'Laudo de Inspeção de Rocha / CSV (Carreta)', motorista.validade_laudo_rocha);
+
+  // 6. Carreta 2 (se houver)
+  if (motorista.placa_carreta_2 || placaCarreta2) {
+    checarData('crlv_validade_carreta_2', 'CRLV da Carreta 2', motorista.crlv_validade_carreta_2);
+    checarData('validade_laudo_rocha_2', 'Laudo de Inspeção de Rocha / CSV (Carreta 2)', motorista.validade_laudo_rocha_2);
+  }
+
+  let statusGeral = 'REGULAR';
+  if (itensVencidos.length > 0 || motorista.status_documental === 'BLOQUEADO' || motorista.status_documental === 'VENCIDO') {
+    statusGeral = 'VENCIDO';
+  } else if (itensAVencer.length > 0 || motorista.status_documental === 'PENDENTE') {
+    statusGeral = 'AVENCER';
+  }
+
+  return {
+    cadastrado: true,
+    statusGeral,
+    itensVencidos,
+    itensAVencer,
+    alertas,
+    motorista
+  };
 }
 
 /**
@@ -355,7 +604,7 @@ export function formatarCPF(valor = '') {
 }
 
 /**
- * Consulta um motorista pelo CPF na base interna e no histórico (com suporte a criptografia Supabase)
+ * Consulta um motorista pelo CPF na base interna e no histórico (com suporte a conformidade documental)
  */
 export async function consultarMotoristaPorCPF(cpf = '') {
   if (!cpf) return { valido: null, encontrado: false, motorista: null };
@@ -378,7 +627,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
 
   const cpfFormatado = formatarCPF(cpfLimpo);
 
-  // 2. Busca na base local (cadastros e sementes protegidos)
+  // 2. Busca na base local (cadastros protegidos e conformidade)
   const baseLocal = obterBaseMotoristas();
   const encontradoLocal = baseLocal.find(m => {
     const mCpf = String(m.cpf || '').replace(/\D/g, '');
@@ -393,6 +642,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
       encontrado: true,
       origem: 'base_local',
       motorista: {
+        cpf: cpfLimpo,
         nome: encontradoLocal.nome,
         telefone: encontradoLocal.telefone || '',
         transportadora: transpNome,
@@ -400,54 +650,56 @@ export async function consultarMotoristaPorCPF(cpf = '') {
         tipo_veiculo: encontradoLocal.tipo_veiculo || '',
         placa_cavalo: encontradoLocal.placa_cavalo || '',
         placa_carreta: encontradoLocal.placa_carreta || '',
-        placa_carreta_2: encontradoLocal.placa_carreta_2 || ''
+        placa_carreta_2: encontradoLocal.placa_carreta_2 || '',
+        cnh_categoria: encontradoLocal.cnh_categoria || 'E',
+        cnh_validade: encontradoLocal.cnh_validade || null,
+        crlv_validade_cavalo: encontradoLocal.crlv_validade_cavalo || null,
+        crlv_validade_carreta: encontradoLocal.crlv_validade_carreta || null,
+        validade_laudo_rocha: encontradoLocal.validade_laudo_rocha || null,
+        crlv_validade_carreta_2: encontradoLocal.crlv_validade_carreta_2 || null,
+        validade_laudo_rocha_2: encontradoLocal.validade_laudo_rocha_2 || null,
+        status_documental: encontradoLocal.status_documental || 'REGULAR',
+        observacoes: encontradoLocal.observacoes || ''
       }
     };
   }
 
-  // 3. Se Supabase configurado, busca primeiro via RPC criptografada segura (PostgreSQL PGCrypto)
+  // 3. Se Supabase configurado, busca na tabela base_motoristas
   if (isSupabaseConfigurado()) {
     try {
-      // 3.1 Consulta via RPC segura criptografada (descriptografa em runtime no banco)
-      const { data: dataRpc, error: errorRpc } = await supabase
-        .rpc('consultar_motorista', { p_cpf: cpfLimpo });
-
-      if (!errorRpc && dataRpc && dataRpc.length > 0 && dataRpc[0].nome) {
-        const mot = {
-          nome: dataRpc[0].nome,
-          telefone: dataRpc[0].telefone || '',
-          transportadora: dataRpc[0].transportadora || '',
-          tipo_veiculo: '',
-          placa_cavalo: '',
-          placa_carreta: '',
-          placa_carreta_2: ''
-        };
-        salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
-        return { valido: true, encontrado: true, origem: 'base_supabase_criptografada', motorista: mot };
-      }
-
-      // 3.2 Consulta direta na tabela base_motoristas (caso legado/não-migrado)
       const { data: dataBase, error: errorBase } = await supabase
         .from('base_motoristas')
-        .select('nome, telefone, transportadora')
+        .select('*')
         .or(`cpf.eq.${cpfLimpo},cpf.eq.${cpfFormatado}`)
         .limit(1);
 
       if (!errorBase && dataBase && dataBase.length > 0 && dataBase[0].nome) {
+        const item = dataBase[0];
         const mot = {
-          nome: dataBase[0].nome,
-          telefone: dataBase[0].telefone || '',
-          transportadora: dataBase[0].transportadora || '',
-          tipo_veiculo: '',
-          placa_cavalo: '',
-          placa_carreta: '',
-          placa_carreta_2: ''
+          cpf: cpfLimpo,
+          nome: item.nome,
+          telefone: item.telefone || '',
+          transportadora: item.transportadora || '',
+          transportadora_cnpj: item.transportadora_cnpj || '',
+          tipo_veiculo: item.tipo_veiculo || '',
+          placa_cavalo: item.placa_cavalo || '',
+          placa_carreta: item.placa_carreta || '',
+          placa_carreta_2: item.placa_carreta_2 || '',
+          cnh_categoria: item.cnh_categoria || 'E',
+          cnh_validade: item.cnh_validade || null,
+          crlv_validade_cavalo: item.crlv_validade_cavalo || null,
+          crlv_validade_carreta: item.crlv_validade_carreta || null,
+          validade_laudo_rocha: item.validade_laudo_rocha || null,
+          crlv_validade_carreta_2: item.crlv_validade_carreta_2 || null,
+          validade_laudo_rocha_2: item.validade_laudo_rocha_2 || null,
+          status_documental: item.status_documental || 'REGULAR',
+          observacoes: item.observacoes || ''
         };
-        salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
+        salvarMotoristaFrotaConformidade(mot);
         return { valido: true, encontrado: true, origem: 'base_supabase', motorista: mot };
       }
 
-      // 3.3 Consulta no histórico de agendamentos salvos no Supabase
+      // Consulta no histórico de agendamentos salvos no Supabase
       const { data, error } = await supabase
         .from('agendamentos_pedreira')
         .select('motorista_nome, motorista_telefone, transportadora, tipo_veiculo, placa_cavalo, placa_carreta, placa_carreta_2')
@@ -457,6 +709,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
 
       if (!error && data && data.length > 0 && data[0].motorista_nome) {
         const mot = {
+          cpf: cpfLimpo,
           nome: data[0].motorista_nome,
           telefone: data[0].motorista_telefone || '',
           transportadora: data[0].transportadora || '',
@@ -483,6 +736,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
     const transpNome = limparNomeEmpresa(agLocal.transportadora || '');
     const transpCnpj = agLocal.transportadora_cnpj || resolverCnpjTransportadora(agLocal) || null;
     const mot = {
+      cpf: cpfLimpo,
       nome: agLocal.motorista_nome,
       telefone: agLocal.motorista_telefone || '',
       transportadora: transpNome,
