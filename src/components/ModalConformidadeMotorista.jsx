@@ -587,7 +587,7 @@ export function ModalConformidadeMotorista({
                         }}
                         title={`Vencimento oficial pelo Detran-${formData.uf_cavalo || 'ES'} para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}`}
                       >
-                        ⚡ Detran-{formData.uf_cavalo || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
+                        ⚡ Detran-{formData.uf_cavalo || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/{String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
                       </span>
                     );
                   })()}
@@ -698,7 +698,7 @@ export function ModalConformidadeMotorista({
                         }}
                         title={`Vencimento oficial pelo Detran-${formData.uf_carreta || 'ES'} para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}`}
                       >
-                        ⚡ Detran-{formData.uf_carreta || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
+                        ⚡ Detran-{formData.uf_carreta || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/{String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
                       </span>
                     );
                   })()}
@@ -809,7 +809,7 @@ export function ModalConformidadeMotorista({
                             }}
                             title={`Vencimento oficial pelo Detran-${formData.uf_carreta_2 || 'ES'} para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}`}
                           >
-                            ⚡ Detran-{formData.uf_carreta_2 || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
+                            ⚡ Detran-{formData.uf_carreta_2 || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/{String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
                           </span>
                         );
                       })()}
