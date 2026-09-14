@@ -292,6 +292,159 @@ export function obterBaseMotoristasCompleta() {
 }
 
 /**
+ * Carrega a base unificada e consolidada de todos os motoristas cadastrados
+ * Unifica: Base de Conformidade (localStorage / Supabase) + Histórico completo de agendamentos
+ */
+export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
+  const mapaMotoristas = new Map();
+
+  // 1. Carrega o que já está na base local de conformidade
+  const baseLocal = obterBaseMotoristas();
+  baseLocal.forEach(m => {
+    const rawC = String(m.cpf || '').replace(/\D/g, '');
+    if (rawC.length === 11) {
+      mapaMotoristas.set(rawC, {
+        ...m,
+        cpf: rawC,
+        nome: (m.nome || '').trim().toUpperCase()
+      });
+    }
+  });
+
+  // 2. Se houver agendamentos em memória / passados como prop
+  if (Array.isArray(agendamentosProp) && agendamentosProp.length > 0) {
+    agendamentosProp.forEach(ag => {
+      const rawC = String(ag.motorista_cpf || '').replace(/\D/g, '');
+      if (rawC.length === 11 && ag.motorista_nome) {
+        const existente = mapaMotoristas.get(rawC) || {};
+        mapaMotoristas.set(rawC, {
+          cpf: rawC,
+          nome: (ag.motorista_nome || existente.nome || '').trim().toUpperCase(),
+          telefone: ag.motorista_telefone || existente.telefone || '',
+          transportadora: (ag.transportadora || existente.transportadora || '').trim().toUpperCase(),
+          transportadora_cnpj: ag.transportadora_cnpj || existente.transportadora_cnpj || '',
+          tipo_veiculo: ag.tipo_veiculo || existente.tipo_veiculo || 'Carreta / Bitrem',
+          placa_cavalo: (ag.placa_cavalo || existente.placa_cavalo || '').toUpperCase().trim(),
+          placa_carreta: (ag.placa_carreta || existente.placa_carreta || '').toUpperCase().trim(),
+          placa_carreta_2: (ag.placa_carreta_2 || existente.placa_carreta_2 || '').toUpperCase().trim(),
+          cnh_categoria: existente.cnh_categoria || 'E',
+          cnh_validade: existente.cnh_validade || null,
+          crlv_validade_cavalo: existente.crlv_validade_cavalo || null,
+          crlv_validade_carreta: existente.crlv_validade_carreta || null,
+          validade_laudo_rocha: existente.validade_laudo_rocha || null,
+          crlv_validade_carreta_2: existente.crlv_validade_carreta_2 || null,
+          validade_laudo_rocha_2: existente.validade_laudo_rocha_2 || null,
+          status_documental: existente.status_documental || 'REGULAR',
+          observacoes: existente.observacoes || '',
+          atualizado_em: existente.atualizado_em || new Date().toISOString()
+        });
+      }
+    });
+  }
+
+  // 3. Se Supabase configurado, busca diretamente em base_motoristas e em agendamentos_pedreira
+  if (isSupabaseConfigurado()) {
+    try {
+      // 3.1 Consulta base_motoristas
+      const { data: dataBase, error: errBase } = await supabase
+        .from('base_motoristas')
+        .select('*');
+
+      if (!errBase && Array.isArray(dataBase)) {
+        dataBase.forEach(item => {
+          const rawC = String(item.cpf || '').replace(/\D/g, '');
+          if (rawC.length === 11) {
+            const existente = mapaMotoristas.get(rawC) || {};
+            mapaMotoristas.set(rawC, {
+              ...existente,
+              ...item,
+              cpf: rawC,
+              nome: (item.nome || existente.nome || '').trim().toUpperCase()
+            });
+          }
+        });
+      }
+
+      // 3.2 Consulta agendamentos_pedreira para extrair todos os motoristas de todos os tempos
+      const { data: dataAgs, error: errAgs } = await supabase
+        .from('agendamentos_pedreira')
+        .select('motorista_cpf, motorista_nome, motorista_telefone, transportadora, transportadora_cnpj, tipo_veiculo, placa_cavalo, placa_carreta, placa_carreta_2, created_at')
+        .order('created_at', { ascending: false });
+
+      if (!errAgs && Array.isArray(dataAgs)) {
+        dataAgs.forEach(ag => {
+          const rawC = String(ag.motorista_cpf || '').replace(/\D/g, '');
+          if (rawC.length === 11 && ag.motorista_nome) {
+            const existente = mapaMotoristas.get(rawC) || {};
+            mapaMotoristas.set(rawC, {
+              cpf: rawC,
+              nome: (ag.motorista_nome || existente.nome || '').trim().toUpperCase(),
+              telefone: existente.telefone || ag.motorista_telefone || '',
+              transportadora: (existente.transportadora || ag.transportadora || '').trim().toUpperCase(),
+              transportadora_cnpj: existente.transportadora_cnpj || ag.transportadora_cnpj || '',
+              tipo_veiculo: existente.tipo_veiculo || ag.tipo_veiculo || 'Carreta / Bitrem',
+              placa_cavalo: (existente.placa_cavalo || ag.placa_cavalo || '').toUpperCase().trim(),
+              placa_carreta: (existente.placa_carreta || ag.placa_carreta || '').toUpperCase().trim(),
+              placa_carreta_2: (existente.placa_carreta_2 || ag.placa_carreta_2 || '').toUpperCase().trim(),
+              cnh_categoria: existente.cnh_categoria || 'E',
+              cnh_validade: existente.cnh_validade || null,
+              crlv_validade_cavalo: existente.crlv_validade_cavalo || null,
+              crlv_validade_carreta: existente.crlv_validade_carreta || null,
+              validade_laudo_rocha: existente.validade_laudo_rocha || null,
+              crlv_validade_carreta_2: existente.crlv_validade_carreta_2 || null,
+              validade_laudo_rocha_2: existente.validade_laudo_rocha_2 || null,
+              status_documental: existente.status_documental || 'REGULAR',
+              observacoes: existente.observacoes || '',
+              atualizado_em: existente.atualizado_em || ag.created_at || new Date().toISOString()
+            });
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar motoristas do Supabase:', e);
+    }
+  }
+
+  // 4. Também consulta no histórico local de agendamentos
+  const agsLocais = obterAgendamentosLocais();
+  agsLocais.forEach(ag => {
+    const rawC = String(ag.motorista_cpf || '').replace(/\D/g, '');
+    if (rawC.length === 11 && ag.motorista_nome) {
+      const existente = mapaMotoristas.get(rawC) || {};
+      mapaMotoristas.set(rawC, {
+        cpf: rawC,
+        nome: (ag.motorista_nome || existente.nome || '').trim().toUpperCase(),
+        telefone: existente.telefone || ag.motorista_telefone || '',
+        transportadora: (existente.transportadora || ag.transportadora || '').trim().toUpperCase(),
+        transportadora_cnpj: existente.transportadora_cnpj || ag.transportadora_cnpj || '',
+        tipo_veiculo: existente.tipo_veiculo || ag.tipo_veiculo || 'Carreta / Bitrem',
+        placa_cavalo: (existente.placa_cavalo || ag.placa_cavalo || '').toUpperCase().trim(),
+        placa_carreta: (existente.placa_carreta || ag.placa_carreta || '').toUpperCase().trim(),
+        placa_carreta_2: (existente.placa_carreta_2 || ag.placa_carreta_2 || '').toUpperCase().trim(),
+        cnh_categoria: existente.cnh_categoria || 'E',
+        cnh_validade: existente.cnh_validade || null,
+        crlv_validade_cavalo: existente.crlv_validade_cavalo || null,
+        crlv_validade_carreta: existente.crlv_validade_carreta || null,
+        validade_laudo_rocha: existente.validade_laudo_rocha || null,
+        crlv_validade_carreta_2: existente.crlv_validade_carreta_2 || null,
+        validade_laudo_rocha_2: existente.validade_laudo_rocha_2 || null,
+        status_documental: existente.status_documental || 'REGULAR',
+        observacoes: existente.observacoes || '',
+        atualizado_em: existente.atualizado_em || new Date().toISOString()
+      });
+    }
+  });
+
+  const listaCompleta = Array.from(mapaMotoristas.values());
+  listaCompleta.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+
+  // Salva no cache local para persistência rápida
+  localStorage.setItem(MOTORISTAS_BASE_KEY, codificarBaseMotoristasLocal(listaCompleta));
+
+  return listaCompleta;
+}
+
+/**
  * Salva ou atualiza um motorista na base cadastral (local e sincronizado com Supabase)
  * Preserva campos de conformidade (CNH, CRLVs, Laudos) já existentes caso venha de um agendamento simples
  */

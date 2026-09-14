@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { 
   obterBaseMotoristasCompleta, 
+  carregarBaseMotoristasUnificada,
   formatarCPF, 
   formatarCNPJ, 
   verificarConformidadeDocumental,
@@ -16,22 +17,32 @@ import * as XLSX from 'xlsx';
 export function ModalGestaoMotoristasFrota({ 
   aoFechar, 
   usuarioNome = 'ADMIN',
-  isAdmin = false 
+  isAdmin = false,
+  todosAgendamentos = []
 }) {
-  const [lista, setLista] = useState([]);
+  const [lista, setLista] = useState(() => obterBaseMotoristasCompleta());
+  const [carregando, setCarregando] = useState(false);
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('todos'); // 'todos' | 'regulares' | 'avencer' | 'vencidos'
   const [motoristaEditando, setMotoristaEditando] = useState(null);
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
 
-  const carregarDados = () => {
-    const dados = obterBaseMotoristasCompleta();
-    setLista(dados);
+  const carregarDados = async () => {
+    setCarregando(true);
+    try {
+      const dados = await carregarBaseMotoristasUnificada(todosAgendamentos);
+      setLista(dados);
+    } catch (e) {
+      console.warn('Erro ao carregar motoristas:', e);
+      setLista(obterBaseMotoristasCompleta());
+    } finally {
+      setCarregando(false);
+    }
   };
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [todosAgendamentos]);
 
   // Processa cada motorista com a verificação de conformidade em relação a hoje
   const listaProcessada = useMemo(() => {
@@ -212,6 +223,17 @@ export function ModalGestaoMotoristasFrota({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              type="button"
+              onClick={carregarDados}
+              disabled={carregando}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.82rem', padding: '8px 12px' }}
+              title="Recarregar e sincronizar base de motoristas com todos os agendamentos"
+            >
+              <RefreshCw size={15} className={carregando ? 'spin' : ''} />
+              <span>{carregando ? 'Atualizando...' : 'Recarregar'}</span>
+            </button>
             <button
               type="button"
               onClick={exportarExcel}

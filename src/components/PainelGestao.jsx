@@ -2505,6 +2505,7 @@ export function PainelGestao({
         <ModalGestaoMotoristasFrota
           usuarioNome={usuarioInfo.nome}
           isAdmin={isAdmin}
+          todosAgendamentos={todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos}
           aoFechar={() => setModalGestaoFrotaAberto(false)}
         />
       )}
