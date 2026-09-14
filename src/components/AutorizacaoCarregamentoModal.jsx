@@ -92,8 +92,10 @@ export function AutorizacaoCarregamentoModal({
   // Campo de destino: por padrão em branco, obrigatório antes de imprimir
   const [destinoEditavel, setDestinoEditavel] = useState('');
   const [erroDestino, setErroDestino] = useState(false);
-  // Campo aberto de medidas e série dos blocos
-  const [medidasSerieEditavel, setMedidasSerieEditavel] = useState('');
+  // Medidas e Série na mesma linha de cada bloco
+  const [medidasBloco1, setMedidasBloco1] = useState('');
+  const [medidasBloco2, setMedidasBloco2] = useState('');
+  const [medidasBloco3, setMedidasBloco3] = useState('');
   const [viasPorFolha, setViasPorFolha] = useState('dupla'); // 'dupla' (2 por página A4) ou 'unica' (1 por página)
   
   const inputDestinoRef = useRef(null);
@@ -373,47 +375,54 @@ export function AutorizacaoCarregamentoModal({
               </td>
             </tr>
 
-            {/* MEDIDAS / Nº DE SÉRIE (Campo aberto antes das numerações dos blocos) */}
-            <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
-                MEDIDAS / SÉRIE:
-              </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', minHeight: isCompact ? '20px' : '26px' }}>
-                {medidasSerieEditavel.trim() ? (
-                  medidasSerieEditavel.toUpperCase()
-                ) : (
-                  <span style={{ color: 'transparent', display: 'inline-block', minHeight: isCompact ? '13px' : '16px' }}>&nbsp;</span>
-                )}
-              </td>
-            </tr>
-
             {/* BLOCO 01 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 BLOCO 01:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 900, color: '#000000', fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
-                {bloco1 || '-'}
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', color: '#000000' }}>
+                <span style={{ fontWeight: 900, fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
+                  {bloco1 || '-'}
+                </span>
+                {medidasBloco1.trim() && (
+                  <span style={{ marginLeft: isCompact ? '8px' : '12px', fontWeight: 700, fontSize: isCompact ? '0.74rem' : '0.86rem', color: '#111827' }}>
+                    — {medidasBloco1.toUpperCase()}
+                  </span>
+                )}
               </td>
             </tr>
 
             {/* BLOCO 02 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 BLOCO 02:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 900, color: '#000000', fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
-                {bloco2}
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', color: '#000000' }}>
+                <span style={{ fontWeight: 900, fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
+                  {bloco2}
+                </span>
+                {bloco2 && medidasBloco2.trim() && (
+                  <span style={{ marginLeft: isCompact ? '8px' : '12px', fontWeight: 700, fontSize: isCompact ? '0.74rem' : '0.86rem', color: '#111827' }}>
+                    — {medidasBloco2.toUpperCase()}
+                  </span>
+                )}
               </td>
             </tr>
 
             {/* BLOCO 03 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 BLOCO 03:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 900, color: '#000000', fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
-                {bloco3}
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', color: '#000000' }}>
+                <span style={{ fontWeight: 900, fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
+                  {bloco3}
+                </span>
+                {bloco3 && medidasBloco3.trim() && (
+                  <span style={{ marginLeft: isCompact ? '8px' : '12px', fontWeight: 700, fontSize: isCompact ? '0.74rem' : '0.86rem', color: '#111827' }}>
+                    — {medidasBloco3.toUpperCase()}
+                  </span>
+                )}
               </td>
             </tr>
 
@@ -608,30 +617,30 @@ export function AutorizacaoCarregamentoModal({
             </div>
           </div>
 
-          {/* Campo Aberto: Medidas e Número de Série do Bloco */}
+          {/* Campo Aberto: Medidas e Número de Série dos Blocos (na mesma linha) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Ruler size={16} color="#38bdf8" />
               <label 
-                htmlFor="input-medidas-autorizacao"
+                htmlFor="input-medidas-bloco1"
                 style={{ 
                   fontSize: '0.85rem', 
                   color: '#f1f5f9', 
                   fontWeight: 700 
                 }}
               >
-                Medidas / Nº de Série:
+                Medidas / Série (Bloco 01):
               </label>
             </div>
 
             <input
-              id="input-medidas-autorizacao"
+              id="input-medidas-bloco1"
               type="text"
-              value={medidasSerieEditavel}
-              onChange={(e) => setMedidasSerieEditavel(e.target.value)}
-              placeholder="Ex: 2.90 x 1.85 x 1.40 | Série #8842 (ou deixe em branco p/ preencher à mão)"
+              value={medidasBloco1}
+              onChange={(e) => setMedidasBloco1(e.target.value)}
+              placeholder="Ex: 2.95 x 1.80 x 1.42 - Série #1084 (ou em branco p/ caneta)"
               style={{
-                minWidth: '280px',
+                minWidth: '270px',
                 padding: '7px 12px',
                 background: 'rgba(15, 23, 42, 0.9)',
                 border: '1px solid rgba(56, 189, 248, 0.4)',
@@ -643,9 +652,59 @@ export function AutorizacaoCarregamentoModal({
               }}
             />
 
+            {blocosPedreira.length > 1 && (
+              <input
+                type="text"
+                value={medidasBloco2}
+                onChange={(e) => setMedidasBloco2(e.target.value)}
+                placeholder="Medidas Bloco 02..."
+                title="Medidas e Série do Bloco 02"
+                style={{
+                  minWidth: '180px',
+                  padding: '7px 12px',
+                  background: 'rgba(15, 23, 42, 0.9)',
+                  border: '1px solid rgba(56, 189, 248, 0.4)',
+                  borderRadius: 6,
+                  color: '#38bdf8',
+                  fontWeight: 700,
+                  fontSize: '0.86rem',
+                  outline: 'none'
+                }}
+              />
+            )}
+
+            {blocosPedreira.length > 2 && (
+              <input
+                type="text"
+                value={medidasBloco3}
+                onChange={(e) => setMedidasBloco3(e.target.value)}
+                placeholder="Medidas Bloco 03..."
+                title="Medidas e Série do Bloco 03"
+                style={{
+                  minWidth: '180px',
+                  padding: '7px 12px',
+                  background: 'rgba(15, 23, 42, 0.9)',
+                  border: '1px solid rgba(56, 189, 248, 0.4)',
+                  borderRadius: 6,
+                  color: '#38bdf8',
+                  fontWeight: 700,
+                  fontSize: '0.86rem',
+                  outline: 'none'
+                }}
+              />
+            )}
+
             <button
               type="button"
-              onClick={() => setMedidasSerieEditavel('2.95 x 1.80 x 1.42 - Série #1084')}
+              onClick={() => {
+                setMedidasBloco1('2.95 x 1.80 x 1.42 - SÉRIE #1084');
+                if (blocosPedreira.length > 1) {
+                  setMedidasBloco2('2.85 x 1.75 x 1.38 - SÉRIE #1085');
+                }
+                if (blocosPedreira.length > 2) {
+                  setMedidasBloco3('2.70 x 1.65 x 1.30 - SÉRIE #1086');
+                }
+              }}
               style={{
                 padding: '5px 10px',
                 fontSize: '0.74rem',
@@ -656,15 +715,19 @@ export function AutorizacaoCarregamentoModal({
                 border: '1px solid rgba(56, 189, 248, 0.3)',
                 cursor: 'pointer'
               }}
-              title="Simular medidas e número de série de exemplo"
+              title="Simular medidas e número de série de exemplo na linha do bloco"
             >
               Simular Medidas
             </button>
 
-            {medidasSerieEditavel && (
+            {(medidasBloco1 || medidasBloco2 || medidasBloco3) && (
               <button
                 type="button"
-                onClick={() => setMedidasSerieEditavel('')}
+                onClick={() => {
+                  setMedidasBloco1('');
+                  setMedidasBloco2('');
+                  setMedidasBloco3('');
+                }}
                 style={{
                   padding: '4px 8px',
                   fontSize: '0.72rem',
@@ -675,7 +738,7 @@ export function AutorizacaoCarregamentoModal({
                   border: 'none',
                   cursor: 'pointer'
                 }}
-                title="Deixar campo em branco para preenchimento manual"
+                title="Deixar campos em branco para preenchimento manual"
               >
                 Limpar
               </button>
