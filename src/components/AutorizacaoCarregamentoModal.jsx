@@ -258,7 +258,8 @@ export function AutorizacaoCarregamentoModal({
         .modal-autorizacao-overlay {
           position: static !important;
           display: block !important;
-          background: transparent !important;
+          background: #ffffff !important;
+          background-color: #ffffff !important;
           padding: 0 !important;
           margin: 0 !important;
           width: 100% !important;
@@ -268,13 +269,21 @@ export function AutorizacaoCarregamentoModal({
         .modal-autorizacao-box {
           position: static !important;
           display: block !important;
-          background: transparent !important;
+          background: #ffffff !important;
+          background-color: #ffffff !important;
           border: none !important;
           box-shadow: none !important;
           padding: 0 !important;
           margin: 0 !important;
           max-width: 100% !important;
           max-height: none !important;
+          overflow: visible !important;
+        }
+        .modal-autorizacao-scroll-container {
+          background: #ffffff !important;
+          background-color: #ffffff !important;
+          padding: 0 !important;
+          margin: 0 !important;
           overflow: visible !important;
         }
         #area-impressao-autorizacao {
@@ -288,6 +297,7 @@ export function AutorizacaoCarregamentoModal({
           margin: 0 auto !important;
           padding: 0 !important;
           background: #ffffff !important;
+          background-color: #ffffff !important;
           color: #000000 !important;
           page-break-after: avoid !important;
           page-break-inside: avoid !important;
@@ -374,35 +384,36 @@ export function AutorizacaoCarregamentoModal({
           borderCollapse: 'collapse',
           fontSize: isCompact ? '0.78rem' : '0.90rem',
           border: '1.5px solid #000000',
-          tableLayout: 'fixed'
+          tableLayout: 'fixed',
+          background: '#ffffff'
         }}>
           <tbody>
             {/* DATA */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#ffffff', color: '#000000' }}>
                 DATA:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', background: '#ffffff' }}>
                 {dataFormatada}
               </td>
             </tr>
 
             {/* CLIENTE */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#ffffff', color: '#000000' }}>
                 CLIENTE:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word', lineHeight: 1.15 }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word', lineHeight: 1.15, background: '#ffffff' }}>
                 {clienteFormatado}
               </td>
             </tr>
 
             {/* DESTINO */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#ffffff', color: '#000000' }}>
                 DESTINO:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, color: destinoEditavel ? '#000000' : '#ef4444' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, background: '#ffffff', color: destinoEditavel ? '#000000' : '#ef4444' }}>
                 {destinoEditavel.trim() ? (
                   destinoEditavel.toUpperCase()
                 ) : (
@@ -415,10 +426,10 @@ export function AutorizacaoCarregamentoModal({
 
             {/* BLOCO 01 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#ffffff', color: '#000000' }}>
                 BLOCO 01:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', color: '#000000' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', color: '#000000', background: '#ffffff' }}>
                 <span style={{ fontWeight: 900, fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
                   {bloco1 || '-'}
                 </span>
@@ -432,10 +443,10 @@ export function AutorizacaoCarregamentoModal({
 
             {/* BLOCO 02 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#ffffff', color: '#000000' }}>
                 BLOCO 02:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', color: '#000000' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', color: '#000000', background: '#ffffff' }}>
                 <span style={{ fontWeight: 900, fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
                   {bloco2}
                 </span>
@@ -449,10 +460,10 @@ export function AutorizacaoCarregamentoModal({
 
             {/* BLOCO 03 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ width: '36%', padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#ffffff', color: '#000000' }}>
                 BLOCO 03:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', color: '#000000' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', color: '#000000', background: '#ffffff' }}>
                 <span style={{ fontWeight: 900, fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
                   {bloco3}
                 </span>
@@ -466,30 +477,30 @@ export function AutorizacaoCarregamentoModal({
 
             {/* TRANSPORTADORA */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#ffffff', color: '#000000' }}>
                 TRANSPORTADORA:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word', lineHeight: 1.15 }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word', lineHeight: 1.15, background: '#ffffff' }}>
                 {transportadoraFormatada}
               </td>
             </tr>
 
             {/* MOTORISTA */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#ffffff', color: '#000000' }}>
                 MOTORISTA:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word', lineHeight: 1.15 }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word', lineHeight: 1.15, background: '#ffffff' }}>
                 {motoristaFormatado}
               </td>
             </tr>
 
             {/* PLACA */}
             <tr>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#ffffff', color: '#000000' }}>
                 PLACA:
               </td>
-              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 900, color: '#000000', fontSize: isCompact ? '0.82rem' : '0.94rem' }}>
+              <td style={{ padding: isCompact ? '3.5px 8px' : '7px 12px', fontWeight: 900, color: '#000000', fontSize: isCompact ? '0.82rem' : '0.94rem', background: '#ffffff' }}>
                 {placasFormatadas}
               </td>
             </tr>
@@ -875,7 +886,7 @@ export function AutorizacaoCarregamentoModal({
         )}
 
         {/* Visualização Prévia do Documento (Área que será impressa) */}
-        <div style={{
+        <div className="modal-autorizacao-scroll-container" style={{
           padding: '20px',
           flex: 1,
           overflowY: 'auto',
