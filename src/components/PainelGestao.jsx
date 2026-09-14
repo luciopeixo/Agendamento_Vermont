@@ -2145,7 +2145,7 @@ export function PainelGestao({
                                   alignItems: 'center',
                                   gap: 4
                                 }}
-                                title="Motorista/Veículo ainda não possui cadastro completo de conformidade. Clique para cadastrar."
+                                title={conf.camposFaltando?.length > 0 ? `Documentos pendentes de preenchimento: ${conf.camposFaltando.join(', ')}. Clique para regularizar.` : "Motorista/Veículo ainda não possui cadastro completo de conformidade. Clique para cadastrar."}
                               >
                                 <ShieldAlert size={10} /> Doc Não Cad.
                               </button>

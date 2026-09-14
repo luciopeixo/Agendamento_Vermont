@@ -780,18 +780,35 @@ export function verificarConformidadeDocumental({
     checarDataValidade('validade_laudo_rocha_2', 'Laudo de Inspeção de Rocha / CSV (Carreta 2)', motorista.validade_laudo_rocha_2);
   }
 
+  // Identifica campos essenciais não preenchidos
+  const camposFaltando = [];
+  if (!motorista.cnh_validade) camposFaltando.push('Validade CNH');
+  if (!motorista.crlv_validade_cavalo) camposFaltando.push('CRLV Cavalo');
+  if (!motorista.crlv_validade_carreta) camposFaltando.push('CRLV Carreta');
+  if (!motorista.validade_laudo_rocha) camposFaltando.push('Laudo de Rocha / CSV');
+  if (motorista.placa_carreta_2 || placaCarreta2) {
+    if (!motorista.crlv_validade_carreta_2) camposFaltando.push('CRLV Carreta 2');
+    if (!motorista.validade_laudo_rocha_2) camposFaltando.push('Laudo Rocha Carreta 2');
+  }
+
   let statusGeral = 'REGULAR';
   if (itensVencidos.length > 0 || motorista.status_documental === 'BLOQUEADO' || motorista.status_documental === 'VENCIDO') {
     statusGeral = 'VENCIDO';
+  } else if (camposFaltando.length > 0) {
+    // Se faltam dados/documentos na base, fica como Não Cadastrado / Pendente
+    statusGeral = 'NAO_CADASTRADO';
   } else if (itensAVencer.length > 0 || motorista.status_documental === 'PENDENTE') {
     statusGeral = 'AVENCER';
+  } else {
+    statusGeral = 'REGULAR';
   }
 
   return {
-    cadastrado: true,
+    cadastrado: camposFaltando.length === 0,
     statusGeral,
     itensVencidos,
     itensAVencer,
+    camposFaltando,
     alertas,
     motorista
   };

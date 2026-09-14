@@ -68,18 +68,22 @@ export function ModalGestaoMotoristasFrota({
     let regulares = 0;
     let avencer = 0;
     let vencidos = 0;
+    let pendentes = 0;
 
     listaProcessada.forEach(item => {
-      if (item.conformidade.statusGeral === 'VENCIDO') vencidos++;
-      else if (item.conformidade.statusGeral === 'AVENCER') avencer++;
-      else regulares++;
+      const st = item.conformidade?.statusGeral;
+      if (st === 'VENCIDO') vencidos++;
+      else if (st === 'AVENCER') avencer++;
+      else if (st === 'REGULAR') regulares++;
+      else pendentes++;
     });
 
     return {
       todos: listaProcessada.length,
       regulares,
       avencer,
-      vencidos
+      vencidos,
+      pendentes
     };
   }, [listaProcessada]);
 
@@ -89,11 +93,13 @@ export function ModalGestaoMotoristasFrota({
 
     // Filtro de status
     if (filtroStatus === 'regulares') {
-      res = res.filter(m => m.conformidade.statusGeral === 'REGULAR');
+      res = res.filter(m => m.conformidade?.statusGeral === 'REGULAR');
     } else if (filtroStatus === 'avencer') {
-      res = res.filter(m => m.conformidade.statusGeral === 'AVENCER');
+      res = res.filter(m => m.conformidade?.statusGeral === 'AVENCER');
     } else if (filtroStatus === 'vencidos') {
-      res = res.filter(m => m.conformidade.statusGeral === 'VENCIDO');
+      res = res.filter(m => m.conformidade?.statusGeral === 'VENCIDO');
+    } else if (filtroStatus === 'pendentes') {
+      res = res.filter(m => m.conformidade?.statusGeral === 'NAO_CADASTRADO' || m.conformidade?.statusGeral === 'PENDENTE');
     }
 
     // Busca textual
@@ -373,6 +379,21 @@ export function ModalGestaoMotoristasFrota({
             >
               🔴 Vencidos ({contadores.vencidos})
             </button>
+            <button
+              type="button"
+              onClick={() => setFiltroStatus('pendentes')}
+              className="btn"
+              style={{
+                fontSize: '0.8rem',
+                padding: '6px 12px',
+                borderRadius: 20,
+                background: filtroStatus === 'pendentes' ? 'rgba(148, 163, 184, 0.25)' : 'rgba(148, 163, 184, 0.1)',
+                border: filtroStatus === 'pendentes' ? '1px solid #94a3b8' : '1px solid rgba(148, 163, 184, 0.2)',
+                color: '#cbd5e1'
+              }}
+            >
+              ⚪ Doc Pendente ({contadores.pendentes})
+            </button>
           </div>
         </div>
 
@@ -384,13 +405,9 @@ export function ModalGestaoMotoristasFrota({
               textAlign: 'center',
               color: '#94a3b8'
             }}>
-              <ShieldCheck size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
-              <p style={{ fontSize: '1rem', fontWeight: 600, color: '#e2e8f0', margin: 0 }}>
-                Nenhum motorista ou veículo encontrado com os filtros atuais.
-              </p>
-              <p style={{ fontSize: '0.82rem', marginTop: 4 }}>
-                Clique em <strong>"+ Novo Motorista / Veículo"</strong> para cadastrar.
-              </p>
+              <AlertCircle size={40} style={{ margin: '0 auto 12px', color: '#64748b' }} />
+              <p style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Nenhum motorista/veículo encontrado</p>
+              <p style={{ margin: '4px 0 0', fontSize: '0.84rem' }}>Tente ajustar a busca ou o filtro de status.</p>
             </div>
           ) : (
             <div className="table-responsive-container" style={{ border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 12 }}>
@@ -408,9 +425,10 @@ export function ModalGestaoMotoristasFrota({
                 </thead>
                 <tbody>
                   {listaFiltrada.map((item, idx) => {
-                    const st = item.conformidade.statusGeral;
+                    const st = item.conformidade?.statusGeral;
                     const isVencido = st === 'VENCIDO';
                     const isAvencer = st === 'AVENCER';
+                    const isRegular = st === 'REGULAR';
                     const vencCavalo = calcularVencimentoUmAno(item.crlv_validade_cavalo);
                     const vencCarreta = calcularVencimentoUmAno(item.crlv_validade_carreta);
 
@@ -483,7 +501,7 @@ export function ModalGestaoMotoristasFrota({
                             <span 
                               className="badge" 
                               style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid #ef4444', fontWeight: 800, padding: '4px 8px' }}
-                              title={item.conformidade.itensVencidos.map(i => `${i.titulo} (${i.labelData})`).join(' | ')}
+                              title={item.conformidade?.itensVencidos?.map(i => `${i.titulo} (${i.labelData})`).join(' | ')}
                             >
                               🔴 Vencido
                             </span>
@@ -491,16 +509,24 @@ export function ModalGestaoMotoristasFrota({
                             <span 
                               className="badge" 
                               style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#fde047', border: '1px solid #f59e0b', fontWeight: 800, padding: '4px 8px' }}
-                              title={item.conformidade.itensAVencer.map(i => `${i.titulo} (${i.labelData})`).join(' | ')}
+                              title={item.conformidade?.itensAVencer?.map(i => `${i.titulo} (${i.labelData})`).join(' | ')}
                             >
                               🟡 A Vencer
                             </span>
-                          ) : (
+                          ) : isRegular ? (
                             <span 
                               className="badge" 
                               style={{ background: 'rgba(34, 197, 94, 0.2)', color: '#86efac', border: '1px solid #22c55e', fontWeight: 800, padding: '4px 8px' }}
                             >
                               🟢 Regular
+                            </span>
+                          ) : (
+                            <span 
+                              className="badge" 
+                              style={{ background: 'rgba(148, 163, 184, 0.15)', color: '#cbd5e1', border: '1px solid rgba(148, 163, 184, 0.3)', fontWeight: 600, padding: '4px 8px' }}
+                              title={item.conformidade?.camposFaltando?.length > 0 ? `Pendente de dados: ${item.conformidade.camposFaltando.join(', ')}` : 'Documentos não preenchidos'}
+                            >
+                              ⚪ Doc Pendente
                             </span>
                           )}
                         </td>
