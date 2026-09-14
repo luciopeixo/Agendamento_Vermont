@@ -125,8 +125,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
   // Status de conformidade da CNH do motorista
   const statusCNH = useMemo(() => {
-    return obterStatusConformidadeCNH(formData.motorista_cpf, formData.data_agendamento);
-  }, [formData.motorista_cpf, formData.data_agendamento]);
+    return obterStatusConformidadeCNH(formData.motorista_cpf, formData.data_agendamento, formData.motorista_nome);
+  }, [formData.motorista_cpf, formData.data_agendamento, formData.motorista_nome]);
 
   // Status de conformidade do Cavalo Mecânico
   const statusDocCavalo = useMemo(() => {
@@ -222,6 +222,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     if (cpfLimpo.length === 11 || temCavalo || temCarreta) {
       const res = verificarConformidadeDocumental({
         cpf: cpfLimpo,
+        nome: formData.motorista_nome,
         placaCavalo: formData.placa_cavalo,
         placaCarreta: formData.placa_carreta,
         placaCarreta2: formData.placa_carreta_2,

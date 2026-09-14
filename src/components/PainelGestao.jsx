@@ -27,7 +27,8 @@ import {
   resolverCnpjTransportadora,
   limparNomeEmpresa,
   verificarConformidadeDocumental,
-  obterBaseMotoristas
+  obterBaseMotoristas,
+  carregarBaseMotoristasUnificada
 } from '../services/agendamentoService';
 import { ModalEditarAgendamento } from './ModalEditarAgendamento';
 import { ModalHistoricoStatus } from './ModalHistoricoStatus';
@@ -302,6 +303,9 @@ export function PainelGestao({
 
       setPendenciasAnteriores(pendentes);
       setTodosAgendamentos(listaCompletaGeral);
+
+      // Sincroniza a base de motoristas em segundo plano com o Supabase e histórico de agendamentos
+      carregarBaseMotoristasUnificada(listaCompletaGeral).catch(e => console.warn('Sync motoristas:', e));
 
       const mapaAnterior = statusAnterioresMapRef.current;
       const novosCarregamentos = [];
@@ -2075,6 +2079,7 @@ export function PainelGestao({
                         {(() => {
                           const conf = verificarConformidadeDocumental({
                             cpf: ag.motorista_cpf,
+                            nome: ag.motorista_nome,
                             placaCavalo: ag.placa_cavalo,
                             placaCarreta: ag.placa_carreta,
                             placaCarreta2: ag.placa_carreta_2,

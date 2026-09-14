@@ -63,8 +63,8 @@ export function ModalEditarAgendamento({
 
   // Status de conformidade em tempo real para edição
   const statusCNH = useMemo(() => {
-    return obterStatusConformidadeCNH(formData.motorista_cpf, formData.data_agendamento);
-  }, [formData.motorista_cpf, formData.data_agendamento]);
+    return obterStatusConformidadeCNH(formData.motorista_cpf, formData.data_agendamento, formData.motorista_nome);
+  }, [formData.motorista_cpf, formData.data_agendamento, formData.motorista_nome]);
 
   const statusDocCavalo = useMemo(() => {
     return obterStatusConformidadeCavalo(formData.placa_cavalo, formData.data_agendamento);
