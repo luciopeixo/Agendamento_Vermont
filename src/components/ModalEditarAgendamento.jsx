@@ -67,16 +67,16 @@ export function ModalEditarAgendamento({
   }, [formData.motorista_cpf, formData.data_agendamento, formData.motorista_nome]);
 
   const statusDocCavalo = useMemo(() => {
-    return obterStatusConformidadeCavalo(formData.placa_cavalo, formData.data_agendamento);
-  }, [formData.placa_cavalo, formData.data_agendamento]);
+    return obterStatusConformidadeCavalo(formData.placa_cavalo, formData.data_agendamento, '', formData.motorista_cpf, formData.motorista_nome);
+  }, [formData.placa_cavalo, formData.data_agendamento, formData.motorista_cpf, formData.motorista_nome]);
 
   const statusDocCarreta1 = useMemo(() => {
-    return obterStatusConformidadeCarreta(formData.placa_carreta, formData.data_agendamento);
-  }, [formData.placa_carreta, formData.data_agendamento]);
+    return obterStatusConformidadeCarreta(formData.placa_carreta, formData.data_agendamento, '', formData.motorista_cpf, formData.motorista_nome);
+  }, [formData.placa_carreta, formData.data_agendamento, formData.motorista_cpf, formData.motorista_nome]);
 
   const statusDocCarreta2 = useMemo(() => {
-    return obterStatusConformidadeCarreta(formData.placa_carreta_2, formData.data_agendamento);
-  }, [formData.placa_carreta_2, formData.data_agendamento]);
+    return obterStatusConformidadeCarreta(formData.placa_carreta_2, formData.data_agendamento, '', formData.motorista_cpf, formData.motorista_nome);
+  }, [formData.placa_carreta_2, formData.data_agendamento, formData.motorista_cpf, formData.motorista_nome]);
 
   const handleChange = (campo, valor) => {
     setFormData(prev => {

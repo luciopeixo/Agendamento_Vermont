@@ -1429,13 +1429,29 @@ export function obterStatusConformidadeCNH(cpf = '', dataReferenciaStr = '', nom
 /**
  * Retorna o status de conformidade do Cavalo Mecânico pela Placa
  */
-export function obterStatusConformidadeCavalo(placaCavalo = '', dataReferenciaStr = '', ufInformada = '') {
+export function obterStatusConformidadeCavalo(placaCavalo = '', dataReferenciaStr = '', ufInformada = '', cpf = '', nome = '') {
   if (!placaCavalo) return null;
   const limpa = String(placaCavalo).replace(/[^A-Z0-9]/gi, '').toUpperCase();
   if (limpa.length < 7) return null;
 
+  const rawCpfLimpo = String(cpf || '').replace(/\D/g, '');
+  const cpfLimpo = rawCpfLimpo.length >= 10 && rawCpfLimpo.length <= 11 ? rawCpfLimpo.padStart(11, '0') : rawCpfLimpo;
+  const nomeLimpo = String(nome || '').trim().toUpperCase();
+
   const base = obterBaseMotoristas();
-  const veic = base.find(m => String(m.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpa && m.crlv_validade_cavalo);
+  let veic = base.find(m => String(m.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpa && m.crlv_validade_cavalo);
+
+  if (!veic && cpfLimpo.length === 11) {
+    veic = base.find(m => {
+      const c = String(m.cpf || m.motorista_cpf || '').replace(/\D/g, '');
+      const cNorm = c.length >= 10 && c.length <= 11 ? c.padStart(11, '0') : c;
+      return cNorm === cpfLimpo && m.crlv_validade_cavalo;
+    });
+  }
+
+  if (!veic && nomeLimpo) {
+    veic = base.find(m => String(m.nome || m.motorista_nome || '').trim().toUpperCase() === nomeLimpo && m.crlv_validade_cavalo);
+  }
 
   if (!veic || !veic.crlv_validade_cavalo) {
     return {
@@ -1453,7 +1469,7 @@ export function obterStatusConformidadeCavalo(placaCavalo = '', dataReferenciaSt
     return {
       cadastrado: true,
       status: 'vencido',
-      label: `CRLV Cavalo Vencido (${res.labelDataVencimento || 'Detran-' + uf})`,
+      label: `CRLV Cavalo Vencido em ${res.labelDataVencimento || 'Detran-' + uf}`,
       cor: '#ef4444',
       bg: 'rgba(239, 68, 68, 0.15)',
       detalhes: res.label
@@ -1482,16 +1498,32 @@ export function obterStatusConformidadeCavalo(placaCavalo = '', dataReferenciaSt
 /**
  * Retorna o status de conformidade da Carreta (CRLV + Laudo de Rocha) pela Placa
  */
-export function obterStatusConformidadeCarreta(placaCarreta = '', dataReferenciaStr = '', ufInformada = '') {
+export function obterStatusConformidadeCarreta(placaCarreta = '', dataReferenciaStr = '', ufInformada = '', cpf = '', nome = '') {
   if (!placaCarreta) return null;
   const limpa = String(placaCarreta).replace(/[^A-Z0-9]/gi, '').toUpperCase();
   if (limpa.length < 7) return null;
 
+  const rawCpfLimpo = String(cpf || '').replace(/\D/g, '');
+  const cpfLimpo = rawCpfLimpo.length >= 10 && rawCpfLimpo.length <= 11 ? rawCpfLimpo.padStart(11, '0') : rawCpfLimpo;
+  const nomeLimpo = String(nome || '').trim().toUpperCase();
+
   const base = obterBaseMotoristas();
-  const veic = base.find(m => (
+  let veic = base.find(m => (
     String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpa ||
     String(m.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpa
   ) && (m.crlv_validade_carreta || m.validade_laudo_rocha));
+
+  if (!veic && cpfLimpo.length === 11) {
+    veic = base.find(m => {
+      const c = String(m.cpf || m.motorista_cpf || '').replace(/\D/g, '');
+      const cNorm = c.length >= 10 && c.length <= 11 ? c.padStart(11, '0') : c;
+      return cNorm === cpfLimpo && (m.crlv_validade_carreta || m.validade_laudo_rocha);
+    });
+  }
+
+  if (!veic && nomeLimpo) {
+    veic = base.find(m => String(m.nome || m.motorista_nome || '').trim().toUpperCase() === nomeLimpo && (m.crlv_validade_carreta || m.validade_laudo_rocha));
+  }
 
   if (!veic) {
     return {
@@ -1515,7 +1547,7 @@ export function obterStatusConformidadeCarreta(placaCarreta = '', dataReferencia
   if (temVencido) {
     const motivos = [];
     if (resCRLV?.status === 'vencido') motivos.push(`CRLV Vencido (${resCRLV.labelDataVencimento})`);
-    if (resLaudo?.status === 'vencido') motivos.push(`Laudo Vencido (${resLaudo.labelDataVencimento})`);
+    if (resLaudo?.status === 'vencido') motivos.push(`Laudo de Rocha Vencido (${resLaudo.labelDataVencimento})`);
     return {
       cadastrado: true,
       status: 'vencido',
@@ -1527,12 +1559,12 @@ export function obterStatusConformidadeCarreta(placaCarreta = '', dataReferencia
     };
   } else if (temAVencer) {
     const motivos = [];
-    if (resCRLV?.status === 'avencer') motivos.push(`CRLV vence em ${resCRLV.dias}d`);
-    if (resLaudo?.status === 'avencer') motivos.push(`Laudo vence em ${resLaudo.dias}d`);
+    if (resCRLV?.status === 'avencer') motivos.push(`CRLV vence em ${resCRLV.dias}d (${resCRLV.labelDataVencimento})`);
+    if (resLaudo?.status === 'avencer') motivos.push(`Laudo de Rocha vence em ${resLaudo.dias}d (${resLaudo.labelDataVencimento})`);
     return {
       cadastrado: true,
       status: 'avencer',
-      label: `Doc. Carreta próxima do vencimento: ${motivos.join(' | ')}`,
+      label: `Doc. Carreta a Vencer: ${motivos.join(' | ')}`,
       cor: '#f59e0b',
       bg: 'rgba(245, 158, 11, 0.15)',
       resCRLV,
@@ -1540,12 +1572,12 @@ export function obterStatusConformidadeCarreta(placaCarreta = '', dataReferencia
     };
   } else if (resCRLV?.status === 'valido' || resLaudo?.status === 'valido') {
     const detalhes = [];
-    if (resCRLV?.status === 'valido') detalhes.push(`CRLV até ${resCRLV.labelDataVencimento}`);
-    if (resLaudo?.status === 'valido') detalhes.push(`Laudo até ${resLaudo.labelDataVencimento}`);
+    if (resCRLV?.status === 'valido') detalhes.push(`CRLV até ${resCRLV.labelDataVencimento} (Detran-${uf})`);
+    if (resLaudo?.status === 'valido') detalhes.push(`Laudo Rocha até ${resLaudo.labelDataVencimento}`);
     return {
       cadastrado: true,
       status: 'valido',
-      label: `Carreta Regular: ${detalhes.join(' e ')}`,
+      label: `Carreta Regular: ${detalhes.join(' | ')}`,
       cor: '#22c55e',
       bg: 'rgba(34, 197, 94, 0.15)',
       resCRLV,

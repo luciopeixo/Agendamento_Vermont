@@ -130,18 +130,18 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
   // Status de conformidade do Cavalo Mecânico
   const statusDocCavalo = useMemo(() => {
-    return obterStatusConformidadeCavalo(formData.placa_cavalo, formData.data_agendamento);
-  }, [formData.placa_cavalo, formData.data_agendamento]);
+    return obterStatusConformidadeCavalo(formData.placa_cavalo, formData.data_agendamento, '', formData.motorista_cpf, formData.motorista_nome);
+  }, [formData.placa_cavalo, formData.data_agendamento, formData.motorista_cpf, formData.motorista_nome]);
 
-  // Status de conformidade da 1ª Carreta (CRLV + Laudo)
+  // Status de conformidade da 1ª Carreta (CRLV + Laudo de Rocha)
   const statusDocCarreta1 = useMemo(() => {
-    return obterStatusConformidadeCarreta(formData.placa_carreta, formData.data_agendamento);
-  }, [formData.placa_carreta, formData.data_agendamento]);
+    return obterStatusConformidadeCarreta(formData.placa_carreta, formData.data_agendamento, '', formData.motorista_cpf, formData.motorista_nome);
+  }, [formData.placa_carreta, formData.data_agendamento, formData.motorista_cpf, formData.motorista_nome]);
 
   // Status de conformidade da 2ª Carreta (se houver)
   const statusDocCarreta2 = useMemo(() => {
-    return obterStatusConformidadeCarreta(formData.placa_carreta_2, formData.data_agendamento);
-  }, [formData.placa_carreta_2, formData.data_agendamento]);
+    return obterStatusConformidadeCarreta(formData.placa_carreta_2, formData.data_agendamento, '', formData.motorista_cpf, formData.motorista_nome);
+  }, [formData.placa_carreta_2, formData.data_agendamento, formData.motorista_cpf, formData.motorista_nome]);
 
   // Estado da validação e busca de CPF em tempo real
   const [statusCPF, setStatusCPF] = useState({
