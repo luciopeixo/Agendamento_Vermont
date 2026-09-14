@@ -1,82 +1,72 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Printer, X, FileText, CheckCircle2, Shield, Truck, Edit2, 
-  Copy, Eye, Check, AlertCircle, Layers
+  Printer, X, FileText, CheckCircle2, Shield, Truck, Edit3, 
+  Eye, Check, AlertCircle, Layers, Sparkles, MapPin
 } from 'lucide-react';
 import { 
   formatarDataBR, 
   formatarPlacasExibicao, 
   limparNomeEmpresa, 
-  extrairBlocosDigitados,
-  saoMesmaPedreira,
-  isPedreiraUruoca
+  extrairBlocosDigitados, 
+  saoMesmaPedreira 
 } from '../services/agendamentoService';
 
 /**
- * Retorna o título oficial da autorização baseado na pedreira ou material
+ * Componente do Logotipo Oficial da Vermont Mineração para cabeçalho
  */
-export function formatarTituloAutorizacao(pedreira = '', material = '') {
-  const pedr = String(pedreira || '').toUpperCase();
-  const mat = String(material || '').toUpperCase();
+function LogoVermontHeader() {
+  const [imgErro, setImgErro] = useState(false);
 
-  if (pedr.includes('URUOCA') || mat.includes('TAJ MAHAL')) {
-    return 'AUTORIZAÇÃO DE CARREGAMENTO TAJ MAHAL';
-  }
-  if (pedr.includes('NEGRESCO') || mat.includes('NEGRESCO')) {
-    return 'AUTORIZAÇÃO DE CARREGAMENTO NEGRESCO';
-  }
-  if (pedr.includes('DEL MARE') || pedr.includes('DELMARE') || mat.includes('DEL MARE')) {
-    return 'AUTORIZAÇÃO DE CARREGAMENTO DEL MARE';
-  }
-  if (pedr.includes('JAIBARAS') || pedr.includes('SOBRAL') || mat.includes('BRECCIA IMPERIALE')) {
-    return 'AUTORIZAÇÃO DE CARREGAMENTO JAIBARAS';
-  }
-  if (pedr.includes('SERROTE') || pedr.includes('SÃO GONÇALO') || pedr.includes('SAO GONCALO') || mat.includes('BLUE DEEP')) {
-    return 'AUTORIZAÇÃO DE CARREGAMENTO SERROTE';
-  }
-  if (pedr.includes('BEBERIBE') || mat.includes('RAFFINATO')) {
-    return 'AUTORIZAÇÃO DE CARREGAMENTO BEBERIBE';
-  }
-
-  // Fallback com material ou pedreira
-  if (material) {
-    return `AUTORIZAÇÃO DE CARREGAMENTO ${material.toUpperCase().trim()}`;
-  }
-  return `AUTORIZAÇÃO DE CARREGAMENTO ${pedreira.split('-')[0].toUpperCase().trim()}`;
-}
-
-/**
- * Tenta inferir o destino (UF/Estado) a partir do nome do cliente, observações ou destinatário
- */
-export function inferirDestinoCliente(agendamento = {}) {
-  const textoCompleto = `${agendamento.cliente || ''} ${agendamento.observacoes || ''} ${agendamento.justificativa_outros || ''}`.toUpperCase();
-
-  // Estados comuns de exportação / destino de rochas
-  const ufs = ['ES', 'CE', 'SP', 'MG', 'RJ', 'PR', 'SC', 'RS', 'BA', 'PE', 'RN', 'PB', 'MA', 'PI', 'PA', 'GO', 'TO'];
-  
-  for (const uf of ufs) {
-    const regexUf = new RegExp(`\\b${uf}\\b`);
-    if (regexUf.test(textoCompleto)) {
-      return uf;
-    }
-  }
-
-  if (textoCompleto.includes('ESPIRITO SANTO') || textoCompleto.includes('ESPÍRITO SANTO') || textoCompleto.includes('CACHOEIRO') || textoCompleto.includes('VITORIA') || textoCompleto.includes('VITÓRIA')) {
-    return 'ES';
-  }
-  if (textoCompleto.includes('CEARA') || textoCompleto.includes('CEARÁ') || textoCompleto.includes('FORTALEZA') || textoCompleto.includes('SOBRAL') || textoCompleto.includes('PECEM') || textoCompleto.includes('PECÉM')) {
-    return 'CE';
-  }
-  if (textoCompleto.includes('SAO PAULO') || textoCompleto.includes('SÃO PAULO') || textoCompleto.includes('SANTOS')) {
-    return 'SP';
-  }
-
-  // Padrão de clientes do ES (Zucchi, Antolini, Guidoni, Marbrasa, Brasigran, etc.)
-  if (textoCompleto.includes('ZUCCHI') || textoCompleto.includes('ANTOLINI') || textoCompleto.includes('GUIDONI') || textoCompleto.includes('MARBRASA') || textoCompleto.includes('BRASIGRAN') || textoCompleto.includes('MINERACAO ITAPEMIRIM')) {
-    return 'ES';
-  }
-
-  return 'ES';
+  return (
+    <div style={{ textAlign: 'center', marginBottom: 12 }}>
+      {!imgErro ? (
+        <img 
+          src="https://vermontmineracao.com/wp-content/uploads/2022/07/logo-vermont-site-1.png" 
+          alt="Vermont Mineração" 
+          style={{ 
+            height: '48px', 
+            maxWidth: '220px', 
+            objectFit: 'contain',
+            display: 'inline-block'
+          }}
+          onError={() => setImgErro(true)}
+        />
+      ) : (
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '4px 12px',
+          border: '2px solid #00762c',
+          borderRadius: 8
+        }}>
+          <div style={{
+            width: 32,
+            height: 32,
+            background: '#00762c',
+            color: '#ffffff',
+            borderRadius: 6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 900,
+            fontSize: '1.2rem',
+            fontFamily: 'sans-serif'
+          }}>
+            V
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <span style={{ display: 'block', fontSize: '1.1rem', fontWeight: 900, letterSpacing: '0.08em', color: '#00762c', lineHeight: 1.1 }}>
+              VERMONT
+            </span>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.22em', color: '#16a34a', lineHeight: 1 }}>
+              MINERAÇÃO
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AutorizacaoCarregamentoModal({
@@ -87,11 +77,14 @@ export function AutorizacaoCarregamentoModal({
 }) {
   if (!agendamento) return null;
 
-  // Estados editáveis para ajuste fino antes de imprimir
-  const [destinoEditavel, setDestinoEditavel] = useState(() => inferirDestinoCliente(agendamento));
+  // Campo de destino: por padrão em branco, obrigatório antes de imprimir
+  const [destinoEditavel, setDestinoEditavel] = useState('');
+  const [erroDestino, setErroDestino] = useState(false);
   const [viasPorFolha, setViasPorFolha] = useState('dupla'); // 'dupla' (2 por página A4) ou 'unica' (1 por página)
+  
+  const inputDestinoRef = useRef(null);
 
-  // Pedreira de referência: se o usuário logado for operador de uma pedreira específica, usa a sua; senão usa a do agendamento
+  // Pedreira de referência: se for operador específico, isola a pedreira do operador
   const pedreiraReferencia = useMemo(() => {
     if (pedreiraOperador && pedreiraOperador !== 'todas') {
       return pedreiraOperador;
@@ -136,8 +129,9 @@ export function AutorizacaoCarregamentoModal({
             blocosDaPedreiraAtual.push(bloco);
           }
         } else {
-          if (!blocosDeOutrasPedreiras.includes(`${bloco} (${item.pedreira.split('-')[0].trim()})`)) {
-            blocosDeOutrasPedreiras.push(`${bloco} (${item.pedreira.split('-')[0].trim()})`);
+          const nomePedrCurto = item.pedreira ? item.pedreira.split('-')[0].trim() : 'Outra';
+          if (!blocosDeOutrasPedreiras.includes(`${bloco} (${nomePedrCurto})`)) {
+            blocosDeOutrasPedreiras.push(`${bloco} (${nomePedrCurto})`);
           }
         }
       });
@@ -155,13 +149,8 @@ export function AutorizacaoCarregamentoModal({
     };
   }, [agendamento, todosAgendamentos, pedreiraReferencia]);
 
-  const tituloDocumento = useMemo(() => {
-    return formatarTituloAutorizacao(pedreiraReferencia, agendamento.material);
-  }, [pedreiraReferencia, agendamento.material]);
-
   const clienteFormatado = useMemo(() => {
     const limpo = limparNomeEmpresa(agendamento.cliente);
-    // Se tiver nome muito longo (ex: RAZÃO SOCIAL LTDA), mantém legível em caixa alta
     return limpo ? limpo.toUpperCase() : 'NÃO INFORMADO';
   }, [agendamento.cliente]);
 
@@ -192,8 +181,18 @@ export function AutorizacaoCarregamentoModal({
     return formatarDataBR(agendamento.data_agendamento);
   }, [agendamento.data_agendamento]);
 
-  // Executa impressão limpa no formato retrato A4
+  // Validação e Execução de Impressão
   const handleImprimir = () => {
+    const destinoLimpo = (destinoEditavel || '').trim();
+    if (!destinoLimpo) {
+      setErroDestino(true);
+      if (inputDestinoRef.current) {
+        inputDestinoRef.current.focus();
+      }
+      return;
+    }
+
+    setErroDestino(false);
     document.body.classList.add('imprimindo-autorizacao');
     const styleEl = document.createElement('style');
     styleEl.id = 'autorizacao-print-style';
@@ -218,6 +217,8 @@ export function AutorizacaoCarregamentoModal({
           padding: 0 !important;
           background: #ffffff !important;
           color: #000000 !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
         }
         .no-print {
           display: none !important;
@@ -247,144 +248,134 @@ export function AutorizacaoCarregamentoModal({
       <div style={{
         background: '#ffffff',
         color: '#000000',
-        padding: '16px 20px',
+        padding: '18px 24px',
         borderRadius: 8,
-        border: '1px solid #d1d5db',
+        border: '1px solid #94a3b8',
         fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif",
-        maxWidth: '540px',
+        maxWidth: '560px',
         margin: '0 auto',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
       }}>
         {/* Topo com Logomarca Oficial da Vermont Mineração */}
-        <div style={{ textAlign: 'center', marginBottom: 10 }}>
-          <img 
-            src="https://vermontmineracao.com/wp-content/uploads/2022/07/logo-vermont-site-1.png" 
-            alt="Vermont Mineração" 
-            style={{ 
-              height: '46px', 
-              maxWidth: '200px', 
-              objectFit: 'contain',
-              display: 'inline-block'
-            }}
-            onError={(e) => {
-              e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'block';
-            }}
-          />
-          <div style={{ display: 'none', fontWeight: 900, fontSize: '1.2rem', letterSpacing: '1px', color: '#00762c' }}>
-            VERMONT MINERAÇÃO
-          </div>
-        </div>
+        <LogoVermontHeader />
 
-        {/* Título Oficial em Caixa Alta */}
+        {/* Título Oficial Exclusivo: AUTORIZAÇÃO DE CARREGAMENTO */}
         <div style={{
           textAlign: 'center',
-          fontSize: '1.05rem',
+          fontSize: '1.12rem',
           fontWeight: 900,
-          letterSpacing: '0.5px',
+          letterSpacing: '0.8px',
           color: '#000000',
-          marginBottom: 12,
+          marginBottom: 14,
           textTransform: 'uppercase',
           borderBottom: '2px solid #000000',
           paddingBottom: 6
         }}>
-          {tituloDocumento}
+          AUTORIZAÇÃO DE CARREGAMENTO
         </div>
 
-        {/* Tabela Formatada Padrão Vermont */}
+        {/* Tabela Formatada com Bordas e Linhas Nítidas */}
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
-          fontSize: '0.88rem',
-          border: '1px solid #000000'
+          fontSize: '0.90rem',
+          border: '1.5px solid #000000',
+          tableLayout: 'fixed'
         }}>
           <tbody>
             {/* DATA */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ width: '38%', padding: '6px 10px', fontWeight: 800, borderRight: '1px solid #000000', background: '#f9fafb' }}>
+              <td style={{ width: '38%', padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 DATA:
               </td>
-              <td style={{ padding: '6px 10px', fontWeight: 700 }}>
+              <td style={{ padding: '7px 12px', fontWeight: 700, color: '#000000' }}>
                 {dataFormatada}
               </td>
             </tr>
 
             {/* CLIENTE */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '6px 10px', fontWeight: 800, borderRight: '1px solid #000000', background: '#f9fafb' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 CLIENTE:
               </td>
-              <td style={{ padding: '6px 10px', fontWeight: 700 }}>
+              <td style={{ padding: '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word' }}>
                 {clienteFormatado}
               </td>
             </tr>
 
             {/* DESTINO */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '6px 10px', fontWeight: 800, borderRight: '1px solid #000000', background: '#f9fafb' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 DESTINO:
               </td>
-              <td style={{ padding: '6px 10px', fontWeight: 700 }}>
-                {destinoEditavel || 'ES'}
+              <td style={{ padding: '7px 12px', fontWeight: 800, color: destinoEditavel ? '#000000' : '#ef4444' }}>
+                {destinoEditavel.trim() ? (
+                  destinoEditavel.toUpperCase()
+                ) : (
+                  <span style={{ fontSize: '0.82rem', fontStyle: 'italic', color: '#ef4444' }}>
+                    * Destino Obrigatório (Preencha acima)
+                  </span>
+                )}
               </td>
             </tr>
 
             {/* BLOCO 01 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '6px 10px', fontWeight: 800, borderRight: '1px solid #000000', background: '#f9fafb' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 BLOCO 01:
               </td>
-              <td style={{ padding: '6px 10px', fontWeight: 800, color: '#000000' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 900, color: '#000000', fontSize: '0.94rem' }}>
                 {bloco1 || '-'}
               </td>
             </tr>
 
             {/* BLOCO 02 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '6px 10px', fontWeight: 800, borderRight: '1px solid #000000', background: '#f9fafb' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 BLOCO 02:
               </td>
-              <td style={{ padding: '6px 10px', fontWeight: 800, color: '#000000' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 900, color: '#000000', fontSize: '0.94rem' }}>
                 {bloco2}
               </td>
             </tr>
 
             {/* BLOCO 03 */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '6px 10px', fontWeight: 800, borderRight: '1px solid #000000', background: '#f9fafb' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 BLOCO 03:
               </td>
-              <td style={{ padding: '6px 10px', fontWeight: 800, color: '#000000' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 900, color: '#000000', fontSize: '0.94rem' }}>
                 {bloco3}
               </td>
             </tr>
 
             {/* TRANSPORTADORA */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '6px 10px', fontWeight: 800, borderRight: '1px solid #000000', background: '#f9fafb' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 TRANSPORTADORA:
               </td>
-              <td style={{ padding: '6px 10px', fontWeight: 700 }}>
+              <td style={{ padding: '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word' }}>
                 {transportadoraFormatada}
               </td>
             </tr>
 
             {/* MOTORISTA */}
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '6px 10px', fontWeight: 800, borderRight: '1px solid #000000', background: '#f9fafb' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 MOTORISTA:
               </td>
-              <td style={{ padding: '6px 10px', fontWeight: 700 }}>
+              <td style={{ padding: '7px 12px', fontWeight: 700, color: '#000000', wordBreak: 'break-word' }}>
                 {motoristaFormatado}
               </td>
             </tr>
 
             {/* PLACA */}
             <tr>
-              <td style={{ padding: '6px 10px', fontWeight: 800, borderRight: '1px solid #000000', background: '#f9fafb' }}>
+              <td style={{ padding: '7px 12px', fontWeight: 800, borderRight: '1.5px solid #000000', background: '#f8fafc', color: '#111827' }}>
                 PLACA:
               </td>
-              <td style={{ padding: '6px 10px', fontWeight: 800 }}>
+              <td style={{ padding: '7px 12px', fontWeight: 900, color: '#000000', fontSize: '0.94rem' }}>
                 {placasFormatadas}
               </td>
             </tr>
@@ -415,7 +406,7 @@ export function AutorizacaoCarregamentoModal({
         borderRadius: 16,
         width: '100%',
         maxWidth: '820px',
-        maxHeight: '92vh',
+        maxHeight: '94vh',
         display: 'flex',
         flexDirection: 'column',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 35px rgba(0, 118, 44, 0.2)',
@@ -448,7 +439,7 @@ export function AutorizacaoCarregamentoModal({
                 Autorização de Carregamento
               </h2>
               <p style={{ margin: 0, fontSize: '0.8rem', color: '#94a3b8' }}>
-                {pedreiraReferencia} • Documento oficial para expedição e balança
+                {pedreiraReferencia} • Documento oficial padronizado
               </p>
             </div>
           </div>
@@ -471,53 +462,96 @@ export function AutorizacaoCarregamentoModal({
           </button>
         </div>
 
-        {/* Barra de Ajustes Rápidos (Destino, Formato de Impressão) */}
+        {/* Barra de Ajustes Obrigatórios (Destino e Formato de Impressão) */}
         <div className="no-print" style={{
-          padding: '12px 20px',
-          background: 'rgba(0, 0, 0, 0.3)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '14px 20px',
+          background: erroDestino ? 'rgba(239, 68, 68, 0.12)' : 'rgba(0, 0, 0, 0.35)',
+          borderBottom: erroDestino ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: 12
+          gap: 12,
+          transition: 'all 0.2s ease'
         }}>
-          {/* Campo Destino Ajustável */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 600 }}>
-              Destino (UF/Cidade):
-            </span>
+          {/* Campo Destino Obrigatório */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <MapPin size={16} color={erroDestino ? '#f87171' : '#4ade80'} />
+              <label 
+                htmlFor="input-destino-autorizacao"
+                style={{ 
+                  fontSize: '0.85rem', 
+                  color: erroDestino ? '#f87171' : '#f1f5f9', 
+                  fontWeight: 700 
+                }}
+              >
+                Destino (UF/Cidade) <span style={{ color: '#ef4444' }}>*obrigatório</span>:
+              </label>
+            </div>
+
             <input
+              id="input-destino-autorizacao"
+              ref={inputDestinoRef}
               type="text"
               value={destinoEditavel}
-              onChange={(e) => setDestinoEditavel(e.target.value.toUpperCase())}
-              placeholder="Ex: ES, SP, CE..."
+              onChange={(e) => {
+                setDestinoEditavel(e.target.value.toUpperCase());
+                if (e.target.value.trim()) setErroDestino(false);
+              }}
+              placeholder="Digite o destino (Ex: ES, CE, SP...)"
               style={{
-                width: '110px',
-                padding: '6px 10px',
-                background: 'rgba(15, 23, 42, 0.8)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
+                minWidth: '220px',
+                padding: '7px 12px',
+                background: erroDestino ? 'rgba(239, 68, 68, 0.15)' : 'rgba(15, 23, 42, 0.9)',
+                border: erroDestino ? '2px solid #ef4444' : '1px solid rgba(74, 222, 128, 0.4)',
                 borderRadius: 6,
-                color: '#4ade80',
+                color: '#ffffff',
                 fontWeight: 700,
-                fontSize: '0.85rem',
-                textAlign: 'center',
-                outline: 'none'
+                fontSize: '0.88rem',
+                outline: 'none',
+                boxShadow: erroDestino ? '0 0 10px rgba(239, 68, 68, 0.4)' : 'none'
               }}
             />
+
+            {/* Botões de atalho rápido de UF */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['ES', 'CE', 'SP', 'MG', 'RJ'].map((uf) => (
+                <button
+                  key={uf}
+                  type="button"
+                  onClick={() => {
+                    setDestinoEditavel(uf);
+                    setErroDestino(false);
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    borderRadius: 4,
+                    background: destinoEditavel === uf ? 'var(--vermont-green)' : 'rgba(255, 255, 255, 0.08)',
+                    color: destinoEditavel === uf ? '#ffffff' : '#cbd5e1',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {uf}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Formato de Impressão */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 600 }}>
-              Vias por folha:
+              Formato:
             </span>
             <div style={{ display: 'flex', background: 'rgba(0,0,0,0.4)', borderRadius: 6, padding: 2, border: '1px solid rgba(255,255,255,0.1)' }}>
               <button
                 type="button"
                 onClick={() => setViasPorFolha('dupla')}
                 style={{
-                  padding: '4px 10px',
+                  padding: '5px 12px',
                   background: viasPorFolha === 'dupla' ? 'var(--vermont-green)' : 'transparent',
                   color: viasPorFolha === 'dupla' ? '#fff' : '#94a3b8',
                   border: 'none',
@@ -527,13 +561,13 @@ export function AutorizacaoCarregamentoModal({
                   cursor: 'pointer'
                 }}
               >
-                2 Vias (Meia Folha)
+                2 Vias (Meia Página)
               </button>
               <button
                 type="button"
                 onClick={() => setViasPorFolha('unica')}
                 style={{
-                  padding: '4px 10px',
+                  padding: '5px 12px',
                   background: viasPorFolha === 'unica' ? 'var(--vermont-green)' : 'transparent',
                   color: viasPorFolha === 'unica' ? '#fff' : '#94a3b8',
                   border: 'none',
@@ -549,10 +583,32 @@ export function AutorizacaoCarregamentoModal({
           </div>
         </div>
 
+        {/* Mensagem de Erro / Alerta se tentar imprimir sem destino */}
+        {erroDestino && (
+          <div className="no-print" style={{
+            margin: '10px 20px 0',
+            padding: '8px 14px',
+            background: 'rgba(239, 68, 68, 0.18)',
+            border: '1px solid #ef4444',
+            borderRadius: 8,
+            color: '#fca5a5',
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8
+          }}>
+            <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Atenção:</strong> É obrigatório informar o <strong>Destino</strong> (UF ou Cidade) antes de gerar a impressão do documento.
+            </span>
+          </div>
+        )}
+
         {/* Alerta Informativo se houver blocos em outras pedreiras */}
         {outrosBlocosOutrasPedreiras.length > 0 && (
           <div className="no-print" style={{
-            margin: '12px 20px 0',
+            margin: '10px 20px 0',
             padding: '10px 14px',
             background: 'rgba(56, 189, 248, 0.1)',
             border: '1px solid rgba(56, 189, 248, 0.3)',
@@ -591,7 +647,7 @@ export function AutorizacaoCarregamentoModal({
 
             {/* 2ª Via (se modo folha dupla estiver ativado) */}
             {viasPorFolha === 'dupla' && (
-              <div style={{ borderTop: '1px dashed #9ca3af', paddingTop: '24px' }}>
+              <div style={{ borderTop: '1.5px dashed #94a3b8', paddingTop: '24px' }}>
                 {renderizarViaDocumento(2)}
               </div>
             )}
@@ -627,9 +683,9 @@ export function AutorizacaoCarregamentoModal({
             onClick={handleImprimir}
             className="btn btn-vermont"
             style={{
-              padding: '9px 22px',
+              padding: '10px 24px',
               fontWeight: 700,
-              fontSize: '0.9rem',
+              fontSize: '0.92rem',
               gap: 8,
               boxShadow: '0 4px 14px rgba(0, 118, 44, 0.4)'
             }}
