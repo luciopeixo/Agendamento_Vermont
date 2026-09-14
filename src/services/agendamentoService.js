@@ -1370,6 +1370,207 @@ export function verificarConformidadeDocumental({
 }
 
 /**
+ * Retorna o status de conformidade da CNH para um CPF específico
+ */
+export function obterStatusConformidadeCNH(cpf = '', dataReferenciaStr = '') {
+  const cpfLimpo = String(cpf || '').replace(/\D/g, '');
+  if (cpfLimpo.length < 11) return null;
+  const base = obterBaseMotoristas();
+  const mot = base.find(m => String(m.cpf || '').replace(/\D/g, '') === cpfLimpo);
+  if (!mot || !mot.cnh_validade) {
+    return {
+      cadastrado: Boolean(mot),
+      status: 'sem_cnh',
+      label: mot ? 'Sem registro de CNH na base' : 'Motorista não cadastrado na base de conformidade',
+      cor: '#94a3b8'
+    };
+  }
+
+  try {
+    const dataRef = dataReferenciaStr ? new Date(`${dataReferenciaStr}T00:00:00`) : new Date();
+    dataRef.setHours(0, 0, 0, 0);
+    const [ano, mes, dia] = mot.cnh_validade.split('-').map(Number);
+    const docDate = new Date(ano, mes - 1, dia);
+    const diffMs = docDate.getTime() - dataRef.getTime();
+    const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    const dataFmt = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${ano}`;
+    const cat = mot.cnh_categoria || 'E';
+
+    if (diffDias < 0) {
+      return {
+        cadastrado: true,
+        status: 'vencido',
+        label: `CNH Vencida há ${Math.abs(diffDias)} dias (${dataFmt}) - Cat. ${cat}`,
+        cor: '#ef4444',
+        bg: 'rgba(239, 68, 68, 0.15)',
+        validade: mot.cnh_validade,
+        categoria: cat,
+        dias: Math.abs(diffDias)
+      };
+    } else if (diffDias <= 30) {
+      return {
+        cadastrado: true,
+        status: 'avencer',
+        label: `CNH vence em ${diffDias} dias (${dataFmt}) - Cat. ${cat}`,
+        cor: '#f59e0b',
+        bg: 'rgba(245, 158, 11, 0.15)',
+        validade: mot.cnh_validade,
+        categoria: cat,
+        dias: diffDias
+      };
+    } else {
+      return {
+        cadastrado: true,
+        status: 'valido',
+        label: `CNH Regular / Válida até ${dataFmt} (Cat. ${cat})`,
+        cor: '#22c55e',
+        bg: 'rgba(34, 197, 94, 0.15)',
+        validade: mot.cnh_validade,
+        categoria: cat,
+        dias: diffDias
+      };
+    }
+  } catch (_e) {
+    return null;
+  }
+}
+
+/**
+ * Retorna o status de conformidade do Cavalo Mecânico pela Placa
+ */
+export function obterStatusConformidadeCavalo(placaCavalo = '', dataReferenciaStr = '', ufInformada = '') {
+  if (!placaCavalo) return null;
+  const limpa = String(placaCavalo).replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  if (limpa.length < 7) return null;
+
+  const base = obterBaseMotoristas();
+  const veic = base.find(m => String(m.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpa && m.crlv_validade_cavalo);
+
+  if (!veic || !veic.crlv_validade_cavalo) {
+    return {
+      cadastrado: false,
+      status: 'sem_registro',
+      label: 'Sem CRLV do cavalo registrado na base',
+      cor: '#94a3b8'
+    };
+  }
+
+  const uf = ufInformada || veic.uf_cavalo || identificarUFPelaPlaca(limpa) || 'ES';
+  const res = avaliarCRLVComDetran(veic.crlv_validade_cavalo, limpa, dataReferenciaStr, uf);
+
+  if (res.status === 'vencido') {
+    return {
+      cadastrado: true,
+      status: 'vencido',
+      label: `CRLV Cavalo Vencido (${res.labelDataVencimento || 'Detran-' + uf})`,
+      cor: '#ef4444',
+      bg: 'rgba(239, 68, 68, 0.15)',
+      detalhes: res.label
+    };
+  } else if (res.status === 'avencer') {
+    return {
+      cadastrado: true,
+      status: 'avencer',
+      label: `CRLV Cavalo vence em ${res.dias} dias (${res.labelDataVencimento})`,
+      cor: '#f59e0b',
+      bg: 'rgba(245, 158, 11, 0.15)',
+      detalhes: res.label
+    };
+  } else {
+    return {
+      cadastrado: true,
+      status: 'valido',
+      label: `CRLV Cavalo Regular / Válido até ${res.labelDataVencimento} (Detran-${uf})`,
+      cor: '#22c55e',
+      bg: 'rgba(34, 197, 94, 0.15)',
+      detalhes: res.label
+    };
+  }
+}
+
+/**
+ * Retorna o status de conformidade da Carreta (CRLV + Laudo de Rocha) pela Placa
+ */
+export function obterStatusConformidadeCarreta(placaCarreta = '', dataReferenciaStr = '', ufInformada = '') {
+  if (!placaCarreta) return null;
+  const limpa = String(placaCarreta).replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  if (limpa.length < 7) return null;
+
+  const base = obterBaseMotoristas();
+  const veic = base.find(m => (
+    String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpa ||
+    String(m.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpa
+  ) && (m.crlv_validade_carreta || m.validade_laudo_rocha));
+
+  if (!veic) {
+    return {
+      cadastrado: false,
+      status: 'sem_registro',
+      label: 'Sem documentos da carreta registrados na base',
+      cor: '#94a3b8'
+    };
+  }
+
+  const uf = ufInformada || veic.uf_carreta || identificarUFPelaPlaca(limpa) || 'ES';
+  const crlvData = veic.crlv_validade_carreta || veic.crlv_validade_carreta_2;
+  const laudoData = veic.validade_laudo_rocha || veic.validade_laudo_rocha_2;
+
+  const resCRLV = crlvData ? avaliarCRLVComDetran(crlvData, limpa, dataReferenciaStr, uf) : null;
+  const resLaudo = laudoData ? avaliarLaudoRocha(laudoData, dataReferenciaStr) : null;
+
+  const temVencido = resCRLV?.status === 'vencido' || resLaudo?.status === 'vencido';
+  const temAVencer = resCRLV?.status === 'avencer' || resLaudo?.status === 'avencer';
+
+  if (temVencido) {
+    const motivos = [];
+    if (resCRLV?.status === 'vencido') motivos.push(`CRLV Vencido (${resCRLV.labelDataVencimento})`);
+    if (resLaudo?.status === 'vencido') motivos.push(`Laudo Vencido (${resLaudo.labelDataVencimento})`);
+    return {
+      cadastrado: true,
+      status: 'vencido',
+      label: `Doc. Carreta Vencida: ${motivos.join(' | ')}`,
+      cor: '#ef4444',
+      bg: 'rgba(239, 68, 68, 0.15)',
+      resCRLV,
+      resLaudo
+    };
+  } else if (temAVencer) {
+    const motivos = [];
+    if (resCRLV?.status === 'avencer') motivos.push(`CRLV vence em ${resCRLV.dias}d`);
+    if (resLaudo?.status === 'avencer') motivos.push(`Laudo vence em ${resLaudo.dias}d`);
+    return {
+      cadastrado: true,
+      status: 'avencer',
+      label: `Doc. Carreta próxima do vencimento: ${motivos.join(' | ')}`,
+      cor: '#f59e0b',
+      bg: 'rgba(245, 158, 11, 0.15)',
+      resCRLV,
+      resLaudo
+    };
+  } else if (resCRLV?.status === 'valido' || resLaudo?.status === 'valido') {
+    const detalhes = [];
+    if (resCRLV?.status === 'valido') detalhes.push(`CRLV até ${resCRLV.labelDataVencimento}`);
+    if (resLaudo?.status === 'valido') detalhes.push(`Laudo até ${resLaudo.labelDataVencimento}`);
+    return {
+      cadastrado: true,
+      status: 'valido',
+      label: `Carreta Regular: ${detalhes.join(' e ')}`,
+      cor: '#22c55e',
+      bg: 'rgba(34, 197, 94, 0.15)',
+      resCRLV,
+      resLaudo
+    };
+  }
+
+  return {
+    cadastrado: false,
+    status: 'sem_registro',
+    label: 'Sem documentos da carreta registrados na base',
+    cor: '#94a3b8'
+  };
+}
+
+/**
  * Formata sequência numérica como CPF padrão XXX.XXX.XXX-XX
  */
 export function formatarCPF(valor = '') {

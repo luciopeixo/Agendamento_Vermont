@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Truck, Calendar, Clock, MapPin, AlertTriangle, Send, Info, Mail, FileCheck, Layers, ArrowRight,
   CheckCircle, UserCheck, Sparkles, Building2, ShieldCheck
@@ -32,7 +32,10 @@ import {
   consultarMotoristaPorCPF,
   validarCNPJ,
   consultarCNPJReceita,
-  verificarConformidadeDocumental
+  verificarConformidadeDocumental,
+  obterStatusConformidadeCNH,
+  obterStatusConformidadeCavalo,
+  obterStatusConformidadeCarreta
 } from '../services/agendamentoService';
 
 export function AgendamentoForm({ onAgendamentoSucesso }) {
@@ -119,6 +122,26 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
   // Configuração dinâmica de placas baseada no tipo de veículo selecionado
   const configPlacas = obterConfigPlacas(formData.tipo_veiculo);
+
+  // Status de conformidade da CNH do motorista
+  const statusCNH = useMemo(() => {
+    return obterStatusConformidadeCNH(formData.motorista_cpf, formData.data_agendamento);
+  }, [formData.motorista_cpf, formData.data_agendamento]);
+
+  // Status de conformidade do Cavalo Mecânico
+  const statusDocCavalo = useMemo(() => {
+    return obterStatusConformidadeCavalo(formData.placa_cavalo, formData.data_agendamento);
+  }, [formData.placa_cavalo, formData.data_agendamento]);
+
+  // Status de conformidade da 1ª Carreta (CRLV + Laudo)
+  const statusDocCarreta1 = useMemo(() => {
+    return obterStatusConformidadeCarreta(formData.placa_carreta, formData.data_agendamento);
+  }, [formData.placa_carreta, formData.data_agendamento]);
+
+  // Status de conformidade da 2ª Carreta (se houver)
+  const statusDocCarreta2 = useMemo(() => {
+    return obterStatusConformidadeCarreta(formData.placa_carreta_2, formData.data_agendamento);
+  }, [formData.placa_carreta_2, formData.data_agendamento]);
 
   // Estado da validação e busca de CPF em tempo real
   const [statusCPF, setStatusCPF] = useState({
@@ -2489,6 +2512,26 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   ⚠️ {statusCPF.erro}
                 </span>
               )}
+
+              {/* Mensagem Discreta de Validade da CNH */}
+              {statusCNH && statusCNH.cadastrado && statusCNH.status !== 'sem_cnh' && (
+                <div className="animate-fade" style={{
+                  marginTop: 5,
+                  padding: '4px 8px',
+                  borderRadius: 6,
+                  background: statusCNH.bg || 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${statusCNH.cor}40`,
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  color: statusCNH.cor,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <span>{statusCNH.status === 'valido' ? '🟢' : statusCNH.status === 'avencer' ? '🟡' : '🔴'}</span>
+                  <span>{statusCNH.label}</span>
+                </div>
+              )}
             </div>
 
             {/* Nome do Motorista */}
@@ -2564,6 +2607,25 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 required
                 style={{ textTransform: 'uppercase', fontFamily: 'monospace', fontSize: '1rem', letterSpacing: '0.08em' }}
               />
+              {/* Mensagem Discreta de Validade do CRLV do Cavalo */}
+              {statusDocCavalo && statusDocCavalo.cadastrado && (
+                <div className="animate-fade" style={{
+                  marginTop: 5,
+                  padding: '4px 8px',
+                  borderRadius: 6,
+                  background: statusDocCavalo.bg || 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${statusDocCavalo.cor}40`,
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  color: statusDocCavalo.cor,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}>
+                  <span>{statusDocCavalo.status === 'valido' ? '🟢' : statusDocCavalo.status === 'avencer' ? '🟡' : '🔴'}</span>
+                  <span>{statusDocCavalo.label}</span>
+                </div>
+              )}
             </div>
 
             {/* 1ª Carreta */}
@@ -2580,6 +2642,25 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   required
                   style={{ textTransform: 'uppercase', fontFamily: 'monospace', fontSize: '1rem', letterSpacing: '0.08em' }}
                 />
+                {/* Mensagem Discreta de Validade da Carreta 1 (CRLV + Laudo) */}
+                {statusDocCarreta1 && statusDocCarreta1.cadastrado && (
+                  <div className="animate-fade" style={{
+                    marginTop: 5,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    background: statusDocCarreta1.bg || 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${statusDocCarreta1.cor}40`,
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    color: statusDocCarreta1.cor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}>
+                    <span>{statusDocCarreta1.status === 'valido' ? '🟢' : statusDocCarreta1.status === 'avencer' ? '🟡' : '🔴'}</span>
+                    <span>{statusDocCarreta1.label}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2597,6 +2678,25 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   required
                   style={{ textTransform: 'uppercase', fontFamily: 'monospace', fontSize: '1rem', letterSpacing: '0.08em' }}
                 />
+                {/* Mensagem Discreta de Validade da Carreta 2 */}
+                {statusDocCarreta2 && statusDocCarreta2.cadastrado && (
+                  <div className="animate-fade" style={{
+                    marginTop: 5,
+                    padding: '4px 8px',
+                    borderRadius: 6,
+                    background: statusDocCarreta2.bg || 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${statusDocCarreta2.cor}40`,
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    color: statusDocCarreta2.cor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}>
+                    <span>{statusDocCarreta2.status === 'valido' ? '🟢' : statusDocCarreta2.status === 'avencer' ? '🟡' : '🔴'}</span>
+                    <span>{statusDocCarreta2.label}</span>
+                  </div>
+                )}
               </div>
             )}
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Save, Edit3, Truck, Calendar, Clock, MapPin, AlertCircle, CheckCircle2, History, User, ArrowRight } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
@@ -12,7 +12,10 @@ import {
   resolverCnpjCliente,
   resolverCnpjTransportadora,
   limparNomeEmpresa,
-  sanitizarNumeroBloco
+  sanitizarNumeroBloco,
+  obterStatusConformidadeCNH,
+  obterStatusConformidadeCavalo,
+  obterStatusConformidadeCarreta
 } from '../services/agendamentoService';
 
 export function ModalEditarAgendamento({ 
@@ -57,6 +60,23 @@ export function ModalEditarAgendamento({
   }, [formData.pedreira]);
 
   const configPlacas = obterConfigPlacas(formData.tipo_veiculo);
+
+  // Status de conformidade em tempo real para edição
+  const statusCNH = useMemo(() => {
+    return obterStatusConformidadeCNH(formData.motorista_cpf, formData.data_agendamento);
+  }, [formData.motorista_cpf, formData.data_agendamento]);
+
+  const statusDocCavalo = useMemo(() => {
+    return obterStatusConformidadeCavalo(formData.placa_cavalo, formData.data_agendamento);
+  }, [formData.placa_cavalo, formData.data_agendamento]);
+
+  const statusDocCarreta1 = useMemo(() => {
+    return obterStatusConformidadeCarreta(formData.placa_carreta, formData.data_agendamento);
+  }, [formData.placa_carreta, formData.data_agendamento]);
+
+  const statusDocCarreta2 = useMemo(() => {
+    return obterStatusConformidadeCarreta(formData.placa_carreta_2, formData.data_agendamento);
+  }, [formData.placa_carreta_2, formData.data_agendamento]);
 
   const handleChange = (campo, valor) => {
     setFormData(prev => {
@@ -452,6 +472,24 @@ export function ModalEditarAgendamento({
                   value={formData.motorista_cpf}
                   onChange={(e) => handleChange('motorista_cpf', e.target.value)}
                 />
+                {statusCNH && statusCNH.cadastrado && statusCNH.status !== 'sem_cnh' && (
+                  <div className="animate-fade" style={{
+                    marginTop: 4,
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    background: statusCNH.bg || 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${statusCNH.cor}40`,
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: statusCNH.cor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}>
+                    <span>{statusCNH.status === 'valido' ? '🟢' : statusCNH.status === 'avencer' ? '🟡' : '🔴'}</span>
+                    <span>{statusCNH.label}</span>
+                  </div>
+                )}
               </div>
 
               <div className="form-group">
@@ -486,6 +524,24 @@ export function ModalEditarAgendamento({
                   value={formData.placa_cavalo}
                   onChange={(e) => handleChange('placa_cavalo', e.target.value.toUpperCase())}
                 />
+                {statusDocCavalo && statusDocCavalo.cadastrado && (
+                  <div className="animate-fade" style={{
+                    marginTop: 4,
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    background: statusDocCavalo.bg || 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${statusDocCavalo.cor}40`,
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: statusDocCavalo.cor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}>
+                    <span>{statusDocCavalo.status === 'valido' ? '🟢' : statusDocCavalo.status === 'avencer' ? '🟡' : '🔴'}</span>
+                    <span>{statusDocCavalo.label}</span>
+                  </div>
+                )}
               </div>
 
               {configPlacas.exigeCarreta1 && (
@@ -498,6 +554,24 @@ export function ModalEditarAgendamento({
                     value={formData.placa_carreta}
                     onChange={(e) => handleChange('placa_carreta', e.target.value.toUpperCase())}
                   />
+                  {statusDocCarreta1 && statusDocCarreta1.cadastrado && (
+                    <div className="animate-fade" style={{
+                      marginTop: 4,
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      background: statusDocCarreta1.bg || 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${statusDocCarreta1.cor}40`,
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: statusDocCarreta1.cor,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6
+                    }}>
+                      <span>{statusDocCarreta1.status === 'valido' ? '🟢' : statusDocCarreta1.status === 'avencer' ? '🟡' : '🔴'}</span>
+                      <span>{statusDocCarreta1.label}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -511,6 +585,24 @@ export function ModalEditarAgendamento({
                     value={formData.placa_carreta_2}
                     onChange={(e) => handleChange('placa_carreta_2', e.target.value.toUpperCase())}
                   />
+                  {statusDocCarreta2 && statusDocCarreta2.cadastrado && (
+                    <div className="animate-fade" style={{
+                      marginTop: 4,
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      background: statusDocCarreta2.bg || 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${statusDocCarreta2.cor}40`,
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: statusDocCarreta2.cor,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6
+                    }}>
+                      <span>{statusDocCarreta2.status === 'valido' ? '🟢' : statusDocCarreta2.status === 'avencer' ? '🟡' : '🔴'}</span>
+                      <span>{statusDocCarreta2.label}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
