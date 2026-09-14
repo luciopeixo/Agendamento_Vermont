@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Search, Plus, Edit3, ShieldCheck, ShieldAlert, AlertTriangle, AlertCircle, 
-  Truck, User, Calendar, CheckCircle2, RefreshCw, FileText, Download, Filter
+  Truck, User, Calendar, CheckCircle2, RefreshCw, FileText, Download, Filter, Trash2
 } from 'lucide-react';
 import { 
   obterBaseMotoristasCompleta, 
   carregarBaseMotoristasUnificada,
+  excluirMotoristaFrota,
+  validarCPF,
   formatarCPF, 
   formatarCNPJ, 
-  verificarConformidadeDocumental,
-  calcularVencimentoUmAno
+  verificarConformidadeDocumental
 } from '../services/agendamentoService';
 import { ModalConformidadeMotorista } from './ModalConformidadeMotorista';
 import * as XLSX from 'xlsx';
@@ -443,7 +444,14 @@ export function ModalGestaoMotoristasFrota({
                         {/* Motorista */}
                         <td style={{ padding: '10px 14px', color: '#f8fafc' }}>
                           <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{item.nome || 'NÃO INFORMADO'}</div>
-                          <div style={{ fontSize: '0.76rem', color: '#94a3b8' }}>CPF: {formatarCPF(item.cpf)}</div>
+                          <div style={{ fontSize: '0.76rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span>CPF: {formatarCPF(item.cpf)}</span>
+                            {!validarCPF(item.cpf) && (
+                              <span style={{ color: '#f87171', fontSize: '0.70rem', background: 'rgba(239, 68, 68, 0.15)', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                                ⚠️ CPF Inválido / Erro
+                              </span>
+                            )}
+                          </div>
                           {item.telefone && <div style={{ fontSize: '0.74rem', color: '#38bdf8' }}>📞 {item.telefone}</div>}
                         </td>
 
@@ -527,16 +535,40 @@ export function ModalGestaoMotoristasFrota({
 
                         {/* Ações */}
                         <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                          <button
-                            type="button"
-                            onClick={() => abrirEdicao(item)}
-                            className="btn btn-secondary"
-                            style={{ padding: '6px 10px', fontSize: '0.78rem' }}
-                            title="Editar dados e validades deste motorista/frota"
-                          >
-                            <Edit3 size={14} />
-                            <span>Editar</span>
-                          </button>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              type="button"
+                              onClick={() => abrirEdicao(item)}
+                              className="btn btn-secondary"
+                              style={{ padding: '6px 10px', fontSize: '0.78rem' }}
+                              title="Editar dados e validades deste motorista/frota"
+                            >
+                              <Edit3 size={14} />
+                              <span>Editar</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const nome = item.nome || 'este motorista';
+                                const cpfFmt = formatarCPF(item.cpf);
+                                if (window.confirm(`Deseja realmente remover o cadastro de ${nome} (${cpfFmt}) da base?`)) {
+                                  await excluirMotoristaFrota(item.cpf);
+                                  carregarDados();
+                                }
+                              }}
+                              className="btn-icon btn-ghost"
+                              style={{ 
+                                color: '#f87171', 
+                                padding: 6,
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                                background: 'rgba(239, 68, 68, 0.1)'
+                              }}
+                              title="Excluir este cadastro (útil para duplicados ou CPFs digitados errados)"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

@@ -291,18 +291,35 @@ export function obterBaseMotoristasCompleta() {
   return lista.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
 }
 
+export const MOTORISTAS_EXCLUIDOS_KEY = 'vermont_motoristas_excluidos_cpfs';
+
+/**
+ * Retorna o conjunto de CPFs de motoristas excluídos definitivamente
+ */
+export function obterCpfsMotoristasExcluidos() {
+  try {
+    const raw = localStorage.getItem(MOTORISTAS_EXCLUIDOS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? new Set(arr.map(c => String(c).replace(/\D/g, '')).filter(Boolean)) : new Set();
+  } catch (e) {
+    return new Set();
+  }
+}
+
 /**
  * Carrega a base unificada e consolidada de todos os motoristas cadastrados
  * Unifica: Base de Conformidade (localStorage / Supabase) + Histórico completo de agendamentos
  */
 export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
   const mapaMotoristas = new Map();
+  const cpfsExcluidos = obterCpfsMotoristasExcluidos();
 
   // 1. Carrega o que já está na base local de conformidade
   const baseLocal = obterBaseMotoristas();
   baseLocal.forEach(m => {
     const rawC = String(m.cpf || '').replace(/\D/g, '');
-    if (rawC.length === 11) {
+    if (rawC.length === 11 && !cpfsExcluidos.has(rawC)) {
       mapaMotoristas.set(rawC, {
         ...m,
         cpf: rawC,
@@ -315,7 +332,7 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
   if (Array.isArray(agendamentosProp) && agendamentosProp.length > 0) {
     agendamentosProp.forEach(ag => {
       const rawC = String(ag.motorista_cpf || '').replace(/\D/g, '');
-      if (rawC.length === 11 && ag.motorista_nome) {
+      if (rawC.length === 11 && !cpfsExcluidos.has(rawC) && ag.motorista_nome) {
         const existente = mapaMotoristas.get(rawC) || {};
         mapaMotoristas.set(rawC, {
           cpf: rawC,
@@ -353,7 +370,7 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
       if (!errBase && Array.isArray(dataBase)) {
         dataBase.forEach(item => {
           const rawC = String(item.cpf || '').replace(/\D/g, '');
-          if (rawC.length === 11) {
+          if (rawC.length === 11 && !cpfsExcluidos.has(rawC)) {
             const existente = mapaMotoristas.get(rawC) || {};
             mapaMotoristas.set(rawC, {
               ...existente,
@@ -374,7 +391,7 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
       if (!errAgs && Array.isArray(dataAgs)) {
         dataAgs.forEach(ag => {
           const rawC = String(ag.motorista_cpf || '').replace(/\D/g, '');
-          if (rawC.length === 11 && ag.motorista_nome) {
+          if (rawC.length === 11 && !cpfsExcluidos.has(rawC) && ag.motorista_nome) {
             const existente = mapaMotoristas.get(rawC) || {};
             mapaMotoristas.set(rawC, {
               cpf: rawC,
@@ -409,7 +426,7 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
   const agsLocais = obterAgendamentosLocais();
   agsLocais.forEach(ag => {
     const rawC = String(ag.motorista_cpf || '').replace(/\D/g, '');
-    if (rawC.length === 11 && ag.motorista_nome) {
+    if (rawC.length === 11 && !cpfsExcluidos.has(rawC) && ag.motorista_nome) {
       const existente = mapaMotoristas.get(rawC) || {};
       mapaMotoristas.set(rawC, {
         cpf: rawC,
@@ -554,6 +571,14 @@ export async function salvarMotoristaFrotaConformidade(dados = {}) {
       atualizado_por: dados.atualizado_por || 'PEDREIRA/ADMIN'
     };
 
+    const excluidos = obterCpfsMotoristasExcluidos();
+    if (excluidos.has(cpfLimpo)) {
+      excluidos.delete(cpfLimpo);
+      try {
+        localStorage.setItem(MOTORISTAS_EXCLUIDOS_KEY, JSON.stringify([...excluidos]));
+      } catch (_e) {}
+    }
+
     if (index !== -1) {
       base[index] = registroAtualizado;
     } else {
@@ -594,12 +619,19 @@ export async function salvarMotoristaFrotaConformidade(dados = {}) {
 }
 
 /**
- * Exclui um motorista/veículo da base de conformidade
+ * Exclui um motorista/veículo da base de conformidade (e impede reimportação de agendamentos antigos)
  */
 export async function excluirMotoristaFrota(cpf = '') {
   try {
     const cpfLimpo = String(cpf).replace(/\D/g, '');
     if (!cpfLimpo) return false;
+
+    // Registra na lista negra de CPFs excluídos
+    const excluidos = obterCpfsMotoristasExcluidos();
+    excluidos.add(cpfLimpo);
+    try {
+      localStorage.setItem(MOTORISTAS_EXCLUIDOS_KEY, JSON.stringify([...excluidos]));
+    } catch (_e) {}
 
     const base = obterBaseMotoristas();
     const filtrada = base.filter(m => String(m.cpf).replace(/\D/g, '') !== cpfLimpo);
