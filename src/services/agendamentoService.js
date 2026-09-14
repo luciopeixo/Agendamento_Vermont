@@ -650,18 +650,137 @@ export async function excluirMotoristaFrota(cpf = '') {
 }
 
 /**
- * Retorna as informações oficiais do Detran-ES para o final da placa (Instrução de Serviço Nº 43 / Detran-ES)
- * @param {string} placa 
+ * Lista dos 27 Estados da Federação
  */
-export function obterInfoLicenciamentoPorPlaca(placa = '') {
-  if (!placa) return null;
-  const limpa = String(placa).replace(/[^A-Z0-9]/gi, '').toUpperCase();
-  const digitos = limpa.replace(/\D/g, '');
-  if (!digitos) return null;
-  const finalDigito = digitos.slice(-1);
+export const ESTADOS_BRASIL = [
+  { sigla: 'ES', nome: 'Espírito Santo' },
+  { sigla: 'MG', nome: 'Minas Gerais' },
+  { sigla: 'SP', nome: 'São Paulo' },
+  { sigla: 'RJ', nome: 'Rio de Janeiro' },
+  { sigla: 'BA', nome: 'Bahia' },
+  { sigla: 'PR', nome: 'Paraná' },
+  { sigla: 'SC', nome: 'Santa Catarina' },
+  { sigla: 'RS', nome: 'Rio Grande do Sul' },
+  { sigla: 'GO', nome: 'Goiás' },
+  { sigla: 'DF', nome: 'Distrito Federal' },
+  { sigla: 'MT', nome: 'Mato Grosso' },
+  { sigla: 'MS', nome: 'Mato Grosso do Sul' },
+  { sigla: 'CE', nome: 'Ceará' },
+  { sigla: 'PE', nome: 'Pernambuco' },
+  { sigla: 'PA', nome: 'Pará' },
+  { sigla: 'MA', nome: 'Maranhão' },
+  { sigla: 'PB', nome: 'Paraíba' },
+  { sigla: 'RN', nome: 'Rio Grande do Norte' },
+  { sigla: 'AL', nome: 'Alagoas' },
+  { sigla: 'SE', nome: 'Sergipe' },
+  { sigla: 'PI', nome: 'Piauí' },
+  { sigla: 'TO', nome: 'Tocantins' },
+  { sigla: 'RO', nome: 'Rondônia' },
+  { sigla: 'AC', nome: 'Acre' },
+  { sigla: 'AM', nome: 'Amazonas' },
+  { sigla: 'RR', nome: 'Roraima' },
+  { sigla: 'AP', nome: 'Amapá' }
+];
 
-  // Calendário Oficial Detran-ES (Setembro)
-  const mesesPorFinal = {
+/**
+ * Tabela Oficial SENATRAN de Faixas de Placas por Estado da Federação
+ */
+const FAIXAS_SENATRAN = [
+  { uf: 'PR', de: 'AAA', ate: 'BEZ' },
+  { uf: 'SP', de: 'BFA', ate: 'GKI' },
+  { uf: 'MG', de: 'GKX', ate: 'HOK' },
+  { uf: 'MA', de: 'HOL', ate: 'HQE' },
+  { uf: 'PI', de: 'HQF', ate: 'HTI' },
+  { uf: 'MS', de: 'HQI', ate: 'HTW' },
+  { uf: 'CE', de: 'HTX', ate: 'HZA' },
+  { uf: 'SE', de: 'IAA', ate: 'IAP' },
+  { uf: 'RS', de: 'IAQ', ate: 'JDO' },
+  { uf: 'DF', de: 'JDP', ate: 'JKR' },
+  { uf: 'BA', de: 'JKA', ate: 'JSI' },
+  { uf: 'PA', de: 'JTA', ate: 'JWE' },
+  { uf: 'AM', de: 'JWP', ate: 'JYZ' },
+  { uf: 'MT', de: 'JXD', ate: 'JXZ' },
+  { uf: 'GO', de: 'KAV', ate: 'KFC' },
+  { uf: 'PE', de: 'KFA', ate: 'KME' },
+  { uf: 'RJ', de: 'KMF', ate: 'LVE' },
+  { uf: 'RN', de: 'MXH', ate: 'MZM' },
+  { uf: 'SC', de: 'LXP', ate: 'LZZ' },
+  { uf: 'SC', de: 'MCI', ate: 'MKO' },
+  { uf: 'SC', de: 'MLV', ate: 'MMG' },
+  { uf: 'PB', de: 'MMN', ate: 'MOW' },
+  { uf: 'ES', de: 'MOX', ate: 'MTZ' },
+  { uf: 'AL', de: 'MUA', ate: 'MVK' },
+  { uf: 'TO', de: 'MVL', ate: 'MXG' },
+  { uf: 'AC', de: 'MZN', ate: 'MZZ' },
+  { uf: 'RR', de: 'NAH', ate: 'NBM' },
+  { uf: 'RO', de: 'NBB', ate: 'NEH' },
+  { uf: 'AP', de: 'NEI', ate: 'NFB' },
+  { uf: 'GO', de: 'NFC', ate: 'NGZ' },
+  { uf: 'MA', de: 'NHA', ate: 'NHT' },
+  { uf: 'PI', de: 'NIX', ate: 'NIZ' },
+  { uf: 'AM', de: 'NOI', ate: 'NPB' },
+  { uf: 'PB', de: 'NPR', ate: 'NQK' },
+  { uf: 'CE', de: 'NQL', ate: 'NRE' },
+  { uf: 'MS', de: 'NRF', ate: 'NSD' },
+  { uf: 'PA', de: 'NSE', ate: 'NTC' },
+  { uf: 'BA', de: 'NTD', ate: 'NTW' },
+  { uf: 'BA', de: 'NYH', ate: 'NZZ' },
+  { uf: 'MG', de: 'NXX', ate: 'NYG' },
+  { uf: 'PE', de: 'NXU', ate: 'NXW' },
+  { uf: 'ES', de: 'OCV', ate: 'ODT' },
+  { uf: 'ES', de: 'OVE', ate: 'OVF' },
+  { uf: 'ES', de: 'OVH', ate: 'OVL' },
+  { uf: 'ES', de: 'OYD', ate: 'OYK' },
+  { uf: 'ES', de: 'PPA', ate: 'PPZ' },
+  { uf: 'ES', de: 'QRB', ate: 'QUZ' },
+  { uf: 'ES', de: 'RBA', ate: 'RBJ' },
+  { uf: 'ES', de: 'RFA', ate: 'RGD' },
+  { uf: 'ES', de: 'RQM', ate: 'RRM' },
+  { uf: 'ES', de: 'SGA', ate: 'SGL' },
+  { uf: 'MG', de: 'OLO', ate: 'OMH' },
+  { uf: 'MG', de: 'OOR', ate: 'OQV' },
+  { uf: 'MG', de: 'OWH', ate: 'OXK' },
+  { uf: 'MG', de: 'PUA', ate: 'PZZ' },
+  { uf: 'MG', de: 'QMQ', ate: 'QQZ' },
+  { uf: 'MG', de: 'QUA', ate: 'QUZ' },
+  { uf: 'MG', de: 'RER', ate: 'RHZ' },
+  { uf: 'MG', de: 'RMD', ate: 'RNZ' },
+  { uf: 'SP', de: 'QSN', ate: 'QSZ' },
+  { uf: 'SP', de: 'SAV', ate: 'SCS' },
+  { uf: 'RJ', de: 'RIO', ate: 'RIO' },
+  { uf: 'RJ', de: 'RIP', ate: 'RKV' },
+  { uf: 'BA', de: 'PKB', ate: 'PKZ' },
+  { uf: 'BA', de: 'QMA', ate: 'QMP' },
+  { uf: 'BA', de: 'RCO', ate: 'RDR' },
+  { uf: 'BA', de: 'SSA', ate: 'SSZ' },
+  { uf: 'PE', de: 'OYL', ate: 'OYZ' },
+  { uf: 'PE', de: 'PCA', ate: 'PGZ' },
+  { uf: 'PE', de: 'QYA', ate: 'QYZ' },
+  { uf: 'PE', de: 'RDE', ate: 'RDS' },
+  { uf: 'PE', de: 'RJA', ate: 'RJZ' }
+];
+
+/**
+ * Identifica o Estado (UF) de origem do veículo com base no prefixo de 3 letras da placa
+ * @param {string} placa 
+ * @returns {string} Sigla UF (ex: 'ES', 'MG', 'SP', 'RJ', 'BA')
+ */
+export function identificarUFPelaPlaca(placa = '') {
+  if (!placa) return 'ES';
+  const limpa = String(placa).replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const prefixo = limpa.slice(0, 3);
+  if (prefixo.length !== 3 || !/^[A-Z]{3}$/.test(prefixo)) return 'ES';
+
+  const match = FAIXAS_SENATRAN.find(f => prefixo >= f.de && prefixo <= f.ate);
+  return match ? match.uf : 'ES';
+}
+
+/**
+ * Calendários Oficiais dos DETRANs por Estado da Federação
+ */
+export const CALENDARIOS_DETRAN_POR_UF = {
+  // Espírito Santo (Instrução de Serviço Nº 43 / Detran-ES)
+  'ES': {
     '1': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 9, labelPar: '1 e 2' },
     '2': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 9, labelPar: '1 e 2' },
     '3': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 10, labelPar: '3 e 4' },
@@ -672,25 +791,119 @@ export function obterInfoLicenciamentoPorPlaca(placa = '') {
     '8': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 14, labelPar: '7 e 8' },
     '9': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 15, labelPar: '9 e 0' },
     '0': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 15, labelPar: '9 e 0' }
-  };
+  },
+  // Minas Gerais (Portaria Detran-MG)
+  'MG': {
+    '1': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 31, labelPar: '1, 2 e 3' },
+    '2': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 31, labelPar: '1, 2 e 3' },
+    '3': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 31, labelPar: '1, 2 e 3' },
+    '4': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '4, 5 e 6' },
+    '5': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '4, 5 e 6' },
+    '6': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '4, 5 e 6' },
+    '7': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '7, 8, 9 e 0' },
+    '8': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '7, 8, 9 e 0' },
+    '9': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '7, 8, 9 e 0' },
+    '0': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '7, 8, 9 e 0' }
+  },
+  // São Paulo (Detran-SP - Caminhões / Veículos de Carga e Articulados)
+  'SP': {
+    '1': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '1 e 2' },
+    '2': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '1 e 2' },
+    '3': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '3, 4 e 5' },
+    '4': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '3, 4 e 5' },
+    '5': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '3, 4 e 5' },
+    '6': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '6, 7 e 8' },
+    '7': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '6, 7 e 8' },
+    '8': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '6, 7 e 8' },
+    '9': { mesNumero: 12, mesNome: 'Dezembro', diaLimite: 31, labelPar: '9 e 0' },
+    '0': { mesNumero: 12, mesNome: 'Dezembro', diaLimite: 31, labelPar: '9 e 0' }
+  },
+  // Rio de Janeiro (Detran-RJ)
+  'RJ': {
+    '1': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 31, labelPar: '0, 1 e 2' },
+    '2': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 31, labelPar: '0, 1 e 2' },
+    '0': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 31, labelPar: '0, 1 e 2' },
+    '3': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '3, 4 e 5' },
+    '4': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '3, 4 e 5' },
+    '5': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '3, 4 e 5' },
+    '6': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '6 e 7' },
+    '7': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '6 e 7' },
+    '8': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '8 e 9' },
+    '9': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '8 e 9' }
+  },
+  // Bahia (Detran-BA)
+  'BA': {
+    '1': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 30, labelPar: '1 e 2' },
+    '2': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 30, labelPar: '1 e 2' },
+    '3': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '3 e 4' },
+    '4': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '3 e 4' },
+    '5': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '5 e 6' },
+    '6': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '5 e 6' },
+    '7': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '7 e 8' },
+    '8': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '7 e 8' },
+    '9': { mesNumero: 12, mesNome: 'Dezembro', diaLimite: 30, labelPar: '9 e 0' },
+    '0': { mesNumero: 12, mesNome: 'Dezembro', diaLimite: 30, labelPar: '9 e 0' }
+  },
+  // Paraná (Detran-PR)
+  'PR': {
+    '1': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 31, labelPar: '1 e 2' },
+    '2': { mesNumero: 8, mesNome: 'Agosto', diaLimite: 31, labelPar: '1 e 2' },
+    '3': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '3, 4 e 5' },
+    '4': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '3, 4 e 5' },
+    '5': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '3, 4 e 5' },
+    '6': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '6, 7 e 8' },
+    '7': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '6, 7 e 8' },
+    '8': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '6, 7 e 8' },
+    '9': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '9 e 0' },
+    '0': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '9 e 0' }
+  },
+  // Padrão Geral SENATRAN
+  'PADRAO': {
+    '1': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '1 e 2' },
+    '2': { mesNumero: 9, mesNome: 'Setembro', diaLimite: 30, labelPar: '1 e 2' },
+    '3': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '3, 4 e 5' },
+    '4': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '3, 4 e 5' },
+    '5': { mesNumero: 10, mesNome: 'Outubro', diaLimite: 31, labelPar: '3, 4 e 5' },
+    '6': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '6, 7 e 8' },
+    '7': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '6, 7 e 8' },
+    '8': { mesNumero: 11, mesNome: 'Novembro', diaLimite: 30, labelPar: '6, 7 e 8' },
+    '9': { mesNumero: 12, mesNome: 'Dezembro', diaLimite: 31, labelPar: '9 e 0' },
+    '0': { mesNumero: 12, mesNome: 'Dezembro', diaLimite: 31, labelPar: '9 e 0' }
+  }
+};
 
-  const info = mesesPorFinal[finalDigito];
+/**
+ * Retorna as informações oficiais do Detran para o final da placa e Estado (UF)
+ * @param {string} placa 
+ * @param {string} ufInformada (Opcional, detecta automaticamente caso omitido)
+ */
+export function obterInfoLicenciamentoPorPlaca(placa = '', ufInformada = '') {
+  if (!placa) return null;
+  const limpa = String(placa).replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const digitos = limpa.replace(/\D/g, '');
+  if (!digitos) return null;
+  const finalDigito = digitos.slice(-1);
+  const uf = (ufInformada || identificarUFPelaPlaca(placa) || 'ES').toUpperCase().trim();
+
+  const calEstado = CALENDARIOS_DETRAN_POR_UF[uf] || CALENDARIOS_DETRAN_POR_UF['PADRAO'];
+  const info = calEstado[finalDigito] || CALENDARIOS_DETRAN_POR_UF['PADRAO'][finalDigito];
   if (!info) return null;
 
   return {
+    uf,
     finalDigito,
     mesNumero: info.mesNumero,
     mesNome: info.mesNome,
     diaLimite: info.diaLimite,
-    labelPar: info.labelPar
+    labelPar: info.labelPar || finalDigito
   };
 }
 
 /**
  * Calcula a data de vencimento sugerida do CRLV para a placa em um ano específico
  */
-export function calcularVencimentoCRLVPorPlaca(placa = '', anoRef = null) {
-  const info = obterInfoLicenciamentoPorPlaca(placa);
+export function calcularVencimentoCRLVPorPlaca(placa = '', anoRef = null, uf = '') {
+  const info = obterInfoLicenciamentoPorPlaca(placa, uf);
   if (!info) return null;
   const ano = anoRef || new Date().getFullYear();
   const mesStr = String(info.mesNumero).padStart(2, '0');
@@ -719,12 +932,13 @@ export function calcularVencimentoUmAno(dataStr) {
 }
 
 /**
- * Avalia o status de conformidade do CRLV baseado na Data do Último Registro e o calendário do Detran-ES para o final da placa.
+ * Avalia o status de conformidade do CRLV baseado na Data do Último Registro e o calendário do Detran do Estado (UF) para o final da placa.
  * @param {string} dataUltimoRegistro YYYY-MM-DD
  * @param {string} placa Placa do veículo
  * @param {string} dataReferenciaStr Data de referência (hoje ou data do agendamento)
+ * @param {string} ufInformada Sigla do Estado (opcional)
  */
-export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferenciaStr = '') {
+export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferenciaStr = '', ufInformada = '') {
   if (!dataUltimoRegistro) {
     return { status: 'vazio', label: 'Não informado', cor: '#94a3b8' };
   }
@@ -739,7 +953,7 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
     dataRef.setHours(0, 0, 0, 0);
     const anoRef = dataRef.getFullYear();
 
-    const info = obterInfoLicenciamentoPorPlaca(placa);
+    const info = obterInfoLicenciamentoPorPlaca(placa, ufInformada);
     const dataRegFormatada = `${String(diaReg).padStart(2, '0')}/${String(mesReg).padStart(2, '0')}/${anoReg}`;
 
     // Sem regra de placa específica -> utiliza regra padrão de 1 ano
@@ -780,7 +994,7 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
       }
     }
 
-    // Datas do calendário Detran-ES
+    // Datas do calendário do Detran do Estado
     const limiteDetranEsteAno = new Date(anoRef, info.mesNumero - 1, info.diaLimite, 23, 59, 59);
     const dataLimiteEsteAnoStr = `${anoRef}-${String(info.mesNumero).padStart(2, '0')}-${String(info.diaLimite).padStart(2, '0')}`;
     const labelLimiteEsteAno = `${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}/${anoRef}`;
@@ -797,7 +1011,7 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
 
       return {
         status: 'valido',
-        label: `Último registro: ${dataRegFormatada} → Válido até ${labelLimiteProxAno} (Detran-ES Final ${info.finalDigito})`,
+        label: `Último registro: ${dataRegFormatada} → Válido até ${labelLimiteProxAno} (Detran-${info.uf} Final ${info.finalDigito})`,
         cor: '#22c55e',
         dataVencimento: dataLimiteProxAnoStr,
         labelDataVencimento: labelLimiteProxAno,
@@ -807,7 +1021,7 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
     }
 
     // CASO 2: O veículo possui registro do ANO ANTERIOR (anoReg === anoRef - 1)
-    // Ex: Em 2026, o último registro é de 2025. O veículo precisa renovar até a data do Detran-ES em 2026.
+    // Ex: Em 2026, o último registro é de 2025. O veículo precisa renovar até a data do Detran em 2026.
     if (anoReg === anoRef - 1) {
       const diffMs = limiteDetranEsteAno.getTime() - dataRef.getTime();
       const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
@@ -815,7 +1029,7 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
       if (diffDias > 30) {
         return {
           status: 'valido',
-          label: `Último registro: ${dataRegFormatada} → Válido até ${labelLimiteEsteAno} (Detran-ES Final ${info.finalDigito})`,
+          label: `Último registro: ${dataRegFormatada} → Válido até ${labelLimiteEsteAno} (Detran-${info.uf} Final ${info.finalDigito})`,
           cor: '#22c55e',
           dataVencimento: dataLimiteEsteAnoStr,
           labelDataVencimento: labelLimiteEsteAno,
@@ -825,7 +1039,7 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
       } else if (diffDias >= 0) {
         return {
           status: 'avencer',
-          label: `Último registro: ${dataRegFormatada} → Vence em ${diffDias} dias (Detran-ES: ${labelLimiteEsteAno})`,
+          label: `Último registro: ${dataRegFormatada} → Vence em ${diffDias} dias (Detran-${info.uf}: ${labelLimiteEsteAno})`,
           cor: '#f59e0b',
           dataVencimento: dataLimiteEsteAnoStr,
           labelDataVencimento: labelLimiteEsteAno,
@@ -835,7 +1049,7 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
       } else {
         return {
           status: 'vencido',
-          label: `Último registro: ${dataRegFormatada} → Vencido em ${labelLimiteEsteAno} há ${Math.abs(diffDias)} dias (Detran-ES Final ${info.finalDigito})`,
+          label: `Último registro: ${dataRegFormatada} → Vencido em ${labelLimiteEsteAno} há ${Math.abs(diffDias)} dias (Detran-${info.uf} Final ${info.finalDigito})`,
           cor: '#ef4444',
           dataVencimento: dataLimiteEsteAnoStr,
           labelDataVencimento: labelLimiteEsteAno,
@@ -850,7 +1064,7 @@ export function avaliarCRLVComDetran(dataUltimoRegistro, placa = '', dataReferen
     const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
     return {
       status: 'vencido',
-      label: `Último registro: ${dataRegFormatada} → Vencido (Exige renovação Detran-ES ${anoRef})`,
+      label: `Último registro: ${dataRegFormatada} → Vencido (Exige renovação Detran-${info.uf} ${anoRef})`,
       cor: '#ef4444',
       dataVencimento: dataLimiteEsteAnoStr,
       labelDataVencimento: labelLimiteEsteAno,
@@ -1028,10 +1242,10 @@ export function verificarConformidadeDocumental({
     } catch (_e) {}
   };
 
-  // Checagem de CRLV (Data do Último Registro comparada com o calendário do Detran)
-  const checarCRLVComDetran = (campoNome, label, dataUltimoReg, placa) => {
+  // Checagem de CRLV (Data do Último Registro comparada com o calendário do Detran do Estado)
+  const checarCRLVComDetran = (campoNome, label, dataUltimoReg, placa, uf) => {
     if (!dataUltimoReg) return;
-    const res = avaliarCRLVComDetran(dataUltimoReg, placa, refDataStr);
+    const res = avaliarCRLVComDetran(dataUltimoReg, placa, refDataStr, uf);
     if (res.status === 'vencido') {
       itensVencidos.push({
         campo: campoNome,
@@ -1082,9 +1296,14 @@ export function verificarConformidadeDocumental({
   const cnhValidade = motorista?.cnh_validade;
   const cnhCategoria = motorista?.cnh_categoria;
   const crlvCavalo = veiculoCavalo?.crlv_validade_cavalo || motorista?.crlv_validade_cavalo;
+  const ufCavalo = veiculoCavalo?.uf_cavalo || motorista?.uf_cavalo || identificarUFPelaPlaca(limpaCavalo) || 'ES';
+
   const crlvCarreta = veiculoCarreta?.crlv_validade_carreta || motorista?.crlv_validade_carreta;
+  const ufCarreta = veiculoCarreta?.uf_carreta || motorista?.uf_carreta || identificarUFPelaPlaca(limpaCarreta) || 'ES';
   const laudoRocha = veiculoCarreta?.validade_laudo_rocha || motorista?.validade_laudo_rocha;
+
   const crlvCarreta2 = veiculoCarreta2?.crlv_validade_carreta_2 || veiculoCarreta2?.crlv_validade_carreta || motorista?.crlv_validade_carreta_2;
+  const ufCarreta2 = veiculoCarreta2?.uf_carreta_2 || motorista?.uf_carreta_2 || identificarUFPelaPlaca(limpaCarreta2) || 'ES';
   const laudoRocha2 = veiculoCarreta2?.validade_laudo_rocha_2 || veiculoCarreta2?.validade_laudo_rocha || motorista?.validade_laudo_rocha_2;
 
   // 1. CNH Validade (Validade impressa na CNH do Motorista)
@@ -1102,18 +1321,18 @@ export function verificarConformidadeDocumental({
     }
   }
 
-  // 3. CRLV Cavalo (Último Registro vs Detran)
-  checarCRLVComDetran('crlv_validade_cavalo', `Último Registro CRLV Cavalo${limpaCavalo ? ` (${limpaCavalo})` : ''}`, crlvCavalo, limpaCavalo);
+  // 3. CRLV Cavalo (Último Registro vs Detran-UF)
+  checarCRLVComDetran('crlv_validade_cavalo', `Último Registro CRLV Cavalo${limpaCavalo ? ` (${limpaCavalo} - ${ufCavalo})` : ''}`, crlvCavalo, limpaCavalo, ufCavalo);
 
-  // 4. CRLV Carreta (Último Registro vs Detran)
-  checarCRLVComDetran('crlv_validade_carreta', `Último Registro CRLV Carreta 1${limpaCarreta ? ` (${limpaCarreta})` : ''}`, crlvCarreta, limpaCarreta);
+  // 4. CRLV Carreta (Último Registro vs Detran-UF)
+  checarCRLVComDetran('crlv_validade_carreta', `Último Registro CRLV Carreta 1${limpaCarreta ? ` (${limpaCarreta} - ${ufCarreta})` : ''}`, crlvCarreta, limpaCarreta, ufCarreta);
 
   // 5. Laudo de Inspeção de Rocha / CSV (Data do Último Laudo + 1 Ano)
   checarLaudoRocha('validade_laudo_rocha', `Último Registro Laudo de Rocha / CSV (Carreta ${limpaCarreta || '1'})`, laudoRocha);
 
   // 6. Carreta 2 (se houver)
   if (limpaCarreta2) {
-    checarCRLVComDetran('crlv_validade_carreta_2', `Último Registro CRLV Carreta 2 (${limpaCarreta2})`, crlvCarreta2, limpaCarreta2);
+    checarCRLVComDetran('crlv_validade_carreta_2', `Último Registro CRLV Carreta 2 (${limpaCarreta2} - ${ufCarreta2})`, crlvCarreta2, limpaCarreta2, ufCarreta2);
     checarLaudoRocha('validade_laudo_rocha_2', `Último Registro Laudo de Rocha / CSV (Carreta 2 - ${limpaCarreta2})`, laudoRocha2);
   }
 

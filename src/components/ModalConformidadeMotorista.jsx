@@ -13,7 +13,9 @@ import {
   obterInfoLicenciamentoPorPlaca,
   calcularVencimentoCRLVPorPlaca,
   avaliarCRLVComDetran,
-  avaliarLaudoRocha
+  avaliarLaudoRocha,
+  ESTADOS_BRASIL,
+  identificarUFPelaPlaca
 } from '../services/agendamentoService';
 
 export function ModalConformidadeMotorista({ 
@@ -30,11 +32,14 @@ export function ModalConformidadeMotorista({
     transportadora_cnpj: '',
     tipo_veiculo: 'Carreta / Bitrem',
     placa_cavalo: '',
+    uf_cavalo: 'ES',
     crlv_validade_cavalo: '',
     placa_carreta: '',
+    uf_carreta: 'ES',
     crlv_validade_carreta: '',
     validade_laudo_rocha: '',
     placa_carreta_2: '',
+    uf_carreta_2: 'ES',
     crlv_validade_carreta_2: '',
     validade_laudo_rocha_2: '',
     cnh_categoria: 'E',
@@ -76,6 +81,10 @@ export function ModalConformidadeMotorista({
       const crlvCarr2 = motoristaInicial.crlv_validade_carreta_2 || motBase?.crlv_validade_carreta_2 || veicCarr2?.crlv_validade_carreta_2 || '';
       const laudoR2 = motoristaInicial.validade_laudo_rocha_2 || motBase?.validade_laudo_rocha_2 || veicCarr2?.validade_laudo_rocha_2 || '';
 
+      const ufCav = motoristaInicial.uf_cavalo || motBase?.uf_cavalo || veicCav?.uf_cavalo || identificarUFPelaPlaca(limpaCav) || 'ES';
+      const ufCarr = motoristaInicial.uf_carreta || motBase?.uf_carreta || veicCarr?.uf_carreta || identificarUFPelaPlaca(limpaCarr) || 'ES';
+      const ufCarr2 = motoristaInicial.uf_carreta_2 || motBase?.uf_carreta_2 || veicCarr2?.uf_carreta_2 || identificarUFPelaPlaca(limpaCarr2) || 'ES';
+
       setFormData({
         cpf: motoristaInicial.cpf || motBase?.cpf || '',
         nome: motoristaInicial.nome || motBase?.nome || '',
@@ -84,11 +93,14 @@ export function ModalConformidadeMotorista({
         transportadora_cnpj: motoristaInicial.transportadora_cnpj || motBase?.transportadora_cnpj || '',
         tipo_veiculo: motoristaInicial.tipo_veiculo || motBase?.tipo_veiculo || 'Carreta / Bitrem',
         placa_cavalo: motoristaInicial.placa_cavalo || motBase?.placa_cavalo || '',
+        uf_cavalo: ufCav,
         crlv_validade_cavalo: crlvCav,
         placa_carreta: motoristaInicial.placa_carreta || motBase?.placa_carreta || '',
+        uf_carreta: ufCarr,
         crlv_validade_carreta: crlvCarr,
         validade_laudo_rocha: laudoR,
         placa_carreta_2: motoristaInicial.placa_carreta_2 || motBase?.placa_carreta_2 || '',
+        uf_carreta_2: ufCarr2,
         crlv_validade_carreta_2: crlvCarr2,
         validade_laudo_rocha_2: laudoR2,
         cnh_categoria: motoristaInicial.cnh_categoria || motBase?.cnh_categoria || 'E',
@@ -104,6 +116,42 @@ export function ModalConformidadeMotorista({
 
   const handleChange = (campo, valor) => {
     setFormData(prev => ({ ...prev, [campo]: valor }));
+    setErro('');
+  };
+
+  const handlePlacaCavaloChange = (valor) => {
+    const fmt = formatarPlaca(valor);
+    const limpa = fmt.replace(/[^A-Z0-9]/gi, '');
+    const uf = identificarUFPelaPlaca(limpa);
+    setFormData(prev => ({
+      ...prev,
+      placa_cavalo: fmt,
+      uf_cavalo: uf || prev.uf_cavalo || 'ES'
+    }));
+    setErro('');
+  };
+
+  const handlePlacaCarretaChange = (valor) => {
+    const fmt = formatarPlaca(valor);
+    const limpa = fmt.replace(/[^A-Z0-9]/gi, '');
+    const uf = identificarUFPelaPlaca(limpa);
+    setFormData(prev => ({
+      ...prev,
+      placa_carreta: fmt,
+      uf_carreta: uf || prev.uf_carreta || 'ES'
+    }));
+    setErro('');
+  };
+
+  const handlePlacaCarreta2Change = (valor) => {
+    const fmt = formatarPlaca(valor);
+    const limpa = fmt.replace(/[^A-Z0-9]/gi, '');
+    const uf = identificarUFPelaPlaca(limpa);
+    setFormData(prev => ({
+      ...prev,
+      placa_carreta_2: fmt,
+      uf_carreta_2: uf || prev.uf_carreta_2 || 'ES'
+    }));
     setErro('');
   };
 
@@ -165,8 +213,8 @@ export function ModalConformidadeMotorista({
   };
 
   // Avalia visualmente o status do CRLV baseado na Data do Último Registro e o calendário Detran
-  const calcularStatusValidadeCRLV = (dataUltimoDoc, placa) => {
-    return avaliarCRLVComDetran(dataUltimoDoc, placa);
+  const calcularStatusValidadeCRLV = (dataUltimoDoc, placa, uf) => {
+    return avaliarCRLVComDetran(dataUltimoDoc, placa, '', uf);
   };
 
   const handleSubmeter = async (e) => {
@@ -478,14 +526,14 @@ export function ModalConformidadeMotorista({
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-              {/* PLACA CAVALO */}
+              {/* PLACA CAVALO & UF */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
-                    Placa do Cavalo
+                    Placa do Cavalo & Estado (UF)
                   </label>
                   {(() => {
-                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_cavalo);
+                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_cavalo, formData.uf_cavalo);
                     if (!info) return null;
                     return (
                       <span style={{ fontSize: '0.70rem', color: '#38bdf8', fontWeight: 600 }}>
@@ -494,14 +542,27 @@ export function ModalConformidadeMotorista({
                     );
                   })()}
                 </div>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="ABC-1234 / ABC1D23"
-                  value={formData.placa_cavalo}
-                  onChange={(e) => handleChange('placa_cavalo', formatarPlaca(e.target.value))}
-                  style={{ width: '100%' }}
-                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="ABC-1234 / ABC1D23"
+                    value={formData.placa_cavalo}
+                    onChange={(e) => handlePlacaCavaloChange(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  <select
+                    className="form-select"
+                    value={formData.uf_cavalo || 'ES'}
+                    onChange={(e) => handleChange('uf_cavalo', e.target.value)}
+                    style={{ width: '80px', fontSize: '0.8rem', padding: '6px 8px' }}
+                    title="Estado (UF) do Detran do veículo"
+                  >
+                    {ESTADOS_BRASIL.map(est => (
+                      <option key={est.sigla} value={est.sigla}>{est.sigla}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* DATA DO ÚLTIMO REGISTRO DO CRLV CAVALO */}
@@ -511,7 +572,7 @@ export function ModalConformidadeMotorista({
                     Data do Último Registro (CRLV Cavalo) *
                   </label>
                   {(() => {
-                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_cavalo);
+                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_cavalo, formData.uf_cavalo);
                     if (!info) return null;
                     return (
                       <span 
@@ -524,9 +585,9 @@ export function ModalConformidadeMotorista({
                           padding: '2px 6px',
                           fontWeight: 700
                         }}
-                        title={`Vencimento oficial pelo Detran-ES para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/09`}
+                        title={`Vencimento oficial pelo Detran-${formData.uf_cavalo || 'ES'} para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}`}
                       >
-                        ⚡ Detran-ES: {String(info.diaLimite).padStart(2, '0')}/09 (Final {info.labelPar || info.finalDigito})
+                        ⚡ Detran-{formData.uf_cavalo || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
                       </span>
                     );
                   })()}
@@ -541,7 +602,7 @@ export function ModalConformidadeMotorista({
                 {formData.crlv_validade_cavalo && (
                   <div style={{ marginTop: 4 }}>
                     {(() => {
-                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_cavalo, formData.placa_cavalo);
+                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_cavalo, formData.placa_cavalo, formData.uf_cavalo);
                       return (
                         <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
                           ● {res.label}
@@ -576,14 +637,14 @@ export function ModalConformidadeMotorista({
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-              {/* PLACA CARRETA */}
+              {/* PLACA CARRETA & UF */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
-                    Placa da Carreta 1
+                    Placa da Carreta 1 & Estado (UF)
                   </label>
                   {(() => {
-                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta);
+                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta, formData.uf_carreta);
                     if (!info) return null;
                     return (
                       <span style={{ fontSize: '0.70rem', color: '#c084fc', fontWeight: 600 }}>
@@ -592,14 +653,27 @@ export function ModalConformidadeMotorista({
                     );
                   })()}
                 </div>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="ABC-1234 / ABC1D23"
-                  value={formData.placa_carreta}
-                  onChange={(e) => handleChange('placa_carreta', formatarPlaca(e.target.value))}
-                  style={{ width: '100%' }}
-                />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="ABC-1234 / ABC1D23"
+                    value={formData.placa_carreta}
+                    onChange={(e) => handlePlacaCarretaChange(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  <select
+                    className="form-select"
+                    value={formData.uf_carreta || 'ES'}
+                    onChange={(e) => handleChange('uf_carreta', e.target.value)}
+                    style={{ width: '80px', fontSize: '0.8rem', padding: '6px 8px' }}
+                    title="Estado (UF) do Detran do semirreboque"
+                  >
+                    {ESTADOS_BRASIL.map(est => (
+                      <option key={est.sigla} value={est.sigla}>{est.sigla}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* DATA DO ÚLTIMO REGISTRO DO CRLV CARRETA 1 */}
@@ -609,7 +683,7 @@ export function ModalConformidadeMotorista({
                     Data do Último Registro (CRLV Carreta 1) *
                   </label>
                   {(() => {
-                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta);
+                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta, formData.uf_carreta);
                     if (!info) return null;
                     return (
                       <span 
@@ -622,9 +696,9 @@ export function ModalConformidadeMotorista({
                           padding: '2px 6px',
                           fontWeight: 700
                         }}
-                        title={`Vencimento oficial pelo Detran-ES para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/09`}
+                        title={`Vencimento oficial pelo Detran-${formData.uf_carreta || 'ES'} para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}`}
                       >
-                        ⚡ Detran-ES: {String(info.diaLimite).padStart(2, '0')}/09 (Final {info.labelPar || info.finalDigito})
+                        ⚡ Detran-{formData.uf_carreta || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
                       </span>
                     );
                   })()}
@@ -639,7 +713,7 @@ export function ModalConformidadeMotorista({
                 {formData.crlv_validade_carreta && (
                   <div style={{ marginTop: 4 }}>
                     {(() => {
-                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta, formData.placa_carreta);
+                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta, formData.placa_carreta, formData.uf_carreta);
                       return (
                         <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
                           ● {res.label}
@@ -691,14 +765,28 @@ export function ModalConformidadeMotorista({
               {temCarreta2 && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
                   <div>
-                    <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Placa Carreta 2</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="ABC-1234"
-                      value={formData.placa_carreta_2}
-                      onChange={(e) => handleChange('placa_carreta_2', formatarPlaca(e.target.value))}
-                    />
+                    <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Placa Carreta 2 & Estado (UF)</label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="ABC-1234"
+                        value={formData.placa_carreta_2}
+                        onChange={(e) => handlePlacaCarreta2Change(e.target.value)}
+                        style={{ flex: 1 }}
+                      />
+                      <select
+                        className="form-select"
+                        value={formData.uf_carreta_2 || 'ES'}
+                        onChange={(e) => handleChange('uf_carreta_2', e.target.value)}
+                        style={{ width: '80px', fontSize: '0.8rem', padding: '6px 8px' }}
+                        title="Estado (UF) do Detran da 2ª carreta"
+                      >
+                        {ESTADOS_BRASIL.map(est => (
+                          <option key={est.sigla} value={est.sigla}>{est.sigla}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -706,7 +794,7 @@ export function ModalConformidadeMotorista({
                         Data do Último Registro (CRLV Carreta 2)
                       </label>
                       {(() => {
-                        const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta_2);
+                        const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta_2, formData.uf_carreta_2);
                         if (!info) return null;
                         return (
                           <span 
@@ -719,9 +807,9 @@ export function ModalConformidadeMotorista({
                               padding: '2px 5px',
                               fontWeight: 700
                             }}
-                            title={`Vencimento oficial pelo Detran-ES para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/09`}
+                            title={`Vencimento oficial pelo Detran-${formData.uf_carreta_2 || 'ES'} para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}`}
                           >
-                            ⚡ Detran-ES: {String(info.diaLimite).padStart(2, '0')}/09 (Final {info.labelPar || info.finalDigito})
+                            ⚡ Detran-{formData.uf_carreta_2 || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
                           </span>
                         );
                       })()}
@@ -735,7 +823,7 @@ export function ModalConformidadeMotorista({
                     {formData.crlv_validade_carreta_2 && (
                       <div style={{ marginTop: 2 }}>
                         {(() => {
-                          const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta_2, formData.placa_carreta_2);
+                          const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta_2, formData.placa_carreta_2, formData.uf_carreta_2);
                           return (
                             <span style={{ fontSize: '0.68rem', color: res.cor, fontWeight: 700 }}>
                               ● {res.label}

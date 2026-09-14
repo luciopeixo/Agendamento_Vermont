@@ -13,7 +13,8 @@ import {
   verificarConformidadeDocumental,
   obterInfoLicenciamentoPorPlaca,
   avaliarCRLVComDetran,
-  avaliarLaudoRocha
+  avaliarLaudoRocha,
+  identificarUFPelaPlaca
 } from '../services/agendamentoService';
 import { ModalConformidadeMotorista } from './ModalConformidadeMotorista';
 import * as XLSX from 'xlsx';
@@ -133,21 +134,25 @@ export function ModalGestaoMotoristasFrota({
   };
 
   const exportarExcel = () => {
-    const dadosExport = listaProcessada.map(m => ({
-      'CPF': formatarCPF(m.cpf),
-      'Nome do Motorista': m.nome || '-',
-      'Telefone': m.telefone || '-',
-      'Categoria CNH': m.cnh_categoria || '-',
-      'Validade CNH': m.cnh_validade || '-',
-      'Placa Cavalo': m.placa_cavalo || '-',
-      'Último Registro CRLV Cavalo': m.crlv_validade_cavalo || '-',
-      'Placa Carreta': m.placa_carreta || '-',
-      'Último Registro CRLV Carreta': m.crlv_validade_carreta || '-',
-      'Último Registro Laudo Rocha / CSV': m.validade_laudo_rocha || '-',
-      'Transportadora': m.transportadora || '-',
-      'Status Geral': m.conformidade.statusGeral,
-      'Pendências / Vencidos': m.conformidade.itensVencidos.map(i => i.titulo).join(', ') || 'Nenhuma'
-    }));
+    const dadosExport = listaProcessada.map(m => {
+      const ufCav = m.uf_cavalo || identificarUFPelaPlaca(m.placa_cavalo);
+      const ufCarr = m.uf_carreta || identificarUFPelaPlaca(m.placa_carreta);
+      return {
+        'CPF': formatarCPF(m.cpf),
+        'Nome do Motorista': m.nome || '-',
+        'Telefone': m.telefone || '-',
+        'Categoria CNH': m.cnh_categoria || '-',
+        'Validade CNH': m.cnh_validade || '-',
+        'Placa Cavalo': m.placa_cavalo ? `${m.placa_cavalo} (${ufCav})` : '-',
+        'Último Registro CRLV Cavalo': m.crlv_validade_cavalo || '-',
+        'Placa Carreta': m.placa_carreta ? `${m.placa_carreta} (${ufCarr})` : '-',
+        'Último Registro CRLV Carreta': m.crlv_validade_carreta || '-',
+        'Último Registro Laudo Rocha / CSV': m.validade_laudo_rocha || '-',
+        'Transportadora': m.transportadora || '-',
+        'Status Geral': m.conformidade.statusGeral,
+        'Pendências / Vencidos': m.conformidade.itensVencidos.map(i => i.titulo).join(', ') || 'Nenhuma'
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(dadosExport);
     const wb = XLSX.utils.book_new();
@@ -433,8 +438,10 @@ export function ModalGestaoMotoristasFrota({
                     const isVencido = st === 'VENCIDO';
                     const isAvencer = st === 'AVENCER';
                     const isRegular = st === 'REGULAR';
-                    const detranCavalo = item.crlv_validade_cavalo ? avaliarCRLVComDetran(item.crlv_validade_cavalo, item.placa_cavalo) : null;
-                    const detranCarreta = item.crlv_validade_carreta ? avaliarCRLVComDetran(item.crlv_validade_carreta, item.placa_carreta) : null;
+                    const ufCav = item.uf_cavalo || identificarUFPelaPlaca(item.placa_cavalo);
+                    const ufCarr = item.uf_carreta || identificarUFPelaPlaca(item.placa_carreta);
+                    const detranCavalo = item.crlv_validade_cavalo ? avaliarCRLVComDetran(item.crlv_validade_cavalo, item.placa_cavalo, '', ufCav) : null;
+                    const detranCarreta = item.crlv_validade_carreta ? avaliarCRLVComDetran(item.crlv_validade_carreta, item.placa_carreta, '', ufCarr) : null;
                     const laudoEval = item.validade_laudo_rocha ? avaliarLaudoRocha(item.validade_laudo_rocha) : null;
 
                     return (
@@ -473,31 +480,43 @@ export function ModalGestaoMotoristasFrota({
 
                         {/* Cavalo Mecânico */}
                         <td style={{ padding: '10px 14px' }}>
-                          <div style={{ fontWeight: 700, color: '#38bdf8' }}>
-                            {item.placa_cavalo || '-'}
+                          <div style={{ fontWeight: 700, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span>{item.placa_cavalo || '-'}</span>
+                            {item.placa_cavalo && (
+                              <span style={{ fontSize: '0.68rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                                {ufCav}
+                              </span>
+                            )}
                           </div>
                           <div style={{ fontSize: '0.76rem', color: item.crlv_validade_cavalo ? '#cbd5e1' : '#64748b' }}>
                             Último Reg: <strong>{formatarDataBR(item.crlv_validade_cavalo)}</strong>
                           </div>
                           {detranCavalo?.labelDataVencimento && (
                             <div style={{ fontSize: '0.70rem', color: detranCavalo.cor, fontWeight: 600 }}>
-                              Detran: {detranCavalo.labelDataVencimento}
+                              Detran-{ufCav}: {detranCavalo.labelDataVencimento}
                             </div>
                           )}
                         </td>
 
                         {/* Carreta e Laudo de Rocha */}
                         <td style={{ padding: '10px 14px' }}>
-                          <div style={{ fontWeight: 700, color: '#c084fc' }}>
-                            {item.placa_carreta || '-'}
-                            {item.placa_carreta_2 && <span style={{ color: '#94a3b8', fontSize: '0.75rem', marginLeft: 4 }}>+ {item.placa_carreta_2}</span>}
+                          <div style={{ fontWeight: 700, color: '#c084fc', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span>{item.placa_carreta || '-'}</span>
+                            {item.placa_carreta && (
+                              <span style={{ fontSize: '0.68rem', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                                {ufCarr}
+                              </span>
+                            )}
+                            {item.placa_carreta_2 && (
+                              <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>+ {item.placa_carreta_2}</span>
+                            )}
                           </div>
                           <div style={{ fontSize: '0.76rem', color: item.crlv_validade_carreta ? '#cbd5e1' : '#64748b' }}>
                             Último Reg: <strong>{formatarDataBR(item.crlv_validade_carreta)}</strong>
                           </div>
                           {detranCarreta?.labelDataVencimento && (
                             <div style={{ fontSize: '0.70rem', color: detranCarreta.cor, fontWeight: 600 }}>
-                              Detran: {detranCarreta.labelDataVencimento}
+                              Detran-{ufCarr}: {detranCarreta.labelDataVencimento}
                             </div>
                           )}
                           <div style={{ fontSize: '0.76rem', color: item.validade_laudo_rocha ? '#cbd5e1' : '#64748b', marginTop: 4 }}>
