@@ -2257,24 +2257,26 @@ export function PainelGestao({
                             Ver
                           </button>
 
-                          {/* BOTÃO AUTORIZAÇÃO DE CARREGAMENTO (Com suporte a Cargas Mistas) */}
-                          <button
-                            type="button"
-                            onClick={() => setAgendamentoParaAutorizacao(ag)}
-                            className="btn btn-secondary"
-                            style={{ 
-                              padding: '6px 10px', 
-                              fontSize: '0.78rem',
-                              gap: 4,
-                              background: 'rgba(217, 119, 6, 0.15)',
-                              borderColor: 'rgba(217, 119, 6, 0.4)',
-                              color: '#fbbf24'
-                            }}
-                            title="Gerar Autorização de Carregamento oficial da pedreira (Cargas mistas isoladas por pedreira)"
-                          >
-                            <FileCheck size={14} />
-                            Aut.
-                          </button>
+                          {/* BOTÃO AUTORIZAÇÃO DE CARREGAMENTO (Disponível apenas após liberação: Liberado para Carregar e Carregando) */}
+                          {(ag.status === 'Liberado para Carregar' || ag.status === 'Carregando') && (
+                            <button
+                              type="button"
+                              onClick={() => setAgendamentoParaAutorizacao(ag)}
+                              className="btn btn-secondary"
+                              style={{ 
+                                padding: '6px 10px', 
+                                fontSize: '0.78rem',
+                                gap: 4,
+                                background: 'rgba(217, 119, 6, 0.15)',
+                                borderColor: 'rgba(217, 119, 6, 0.4)',
+                                color: '#fbbf24'
+                              }}
+                              title="Gerar Autorização de Carregamento oficial da pedreira (Cargas mistas isoladas por pedreira)"
+                            >
+                              <FileCheck size={14} />
+                              Aut.
+                            </button>
+                          )}
 
                           {/* BOTÃO EXCLUIR AGENDAMENTO (Exclusivo para ADMIN GERAL) */}
                           {isAdmin && (
