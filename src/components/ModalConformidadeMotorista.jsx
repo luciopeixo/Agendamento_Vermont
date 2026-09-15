@@ -15,7 +15,8 @@ import {
   avaliarCRLVComDetran,
   avaliarLaudoRocha,
   ESTADOS_BRASIL,
-  identificarUFPelaPlaca
+  identificarUFPelaPlaca,
+  sanitizarDataIso
 } from '../services/agendamentoService';
 import { ModalHistoricoMotorista } from './ModalHistoricoMotorista';
 
@@ -27,6 +28,7 @@ export function ModalConformidadeMotorista({
   usuarioInfo = null,
   isAdmin = false
 }) {
+  const [motoristaOriginalRef, setMotoristaOriginalRef] = useState(null);
   const [formData, setFormData] = useState({
     cpf: '',
     nome: '',
@@ -59,6 +61,7 @@ export function ModalConformidadeMotorista({
 
   useEffect(() => {
     if (motoristaInicial) {
+      setMotoristaOriginalRef(motoristaInicial);
       const cpfLimpo = String(motoristaInicial.cpf || '').replace(/\D/g, '');
       const base = obterBaseMotoristas();
       const motBase = cpfLimpo ? base.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo) : null;
@@ -78,12 +81,12 @@ export function ModalConformidadeMotorista({
         String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr2
       ) && (m.crlv_validade_carreta_2 || m.crlv_validade_carreta)) : null;
 
-      const cnhVal = motoristaInicial.cnh_validade || motBase?.cnh_validade || '';
-      const crlvCav = motoristaInicial.crlv_validade_cavalo || motBase?.crlv_validade_cavalo || veicCav?.crlv_validade_cavalo || '';
-      const crlvCarr = motoristaInicial.crlv_validade_carreta || motBase?.crlv_validade_carreta || veicCarr?.crlv_validade_carreta || '';
-      const laudoR = motoristaInicial.validade_laudo_rocha || motBase?.validade_laudo_rocha || veicCarr?.validade_laudo_rocha || '';
-      const crlvCarr2 = motoristaInicial.crlv_validade_carreta_2 || motBase?.crlv_validade_carreta_2 || veicCarr2?.crlv_validade_carreta_2 || '';
-      const laudoR2 = motoristaInicial.validade_laudo_rocha_2 || motBase?.validade_laudo_rocha_2 || veicCarr2?.validade_laudo_rocha_2 || '';
+      const cnhVal = sanitizarDataIso(motoristaInicial.cnh_validade || motBase?.cnh_validade) || '';
+      const crlvCav = sanitizarDataIso(motoristaInicial.crlv_validade_cavalo || motBase?.crlv_validade_cavalo || veicCav?.crlv_validade_cavalo) || '';
+      const crlvCarr = sanitizarDataIso(motoristaInicial.crlv_validade_carreta || motBase?.crlv_validade_carreta || veicCarr?.crlv_validade_carreta) || '';
+      const laudoR = sanitizarDataIso(motoristaInicial.validade_laudo_rocha || motBase?.validade_laudo_rocha || veicCarr?.validade_laudo_rocha) || '';
+      const crlvCarr2 = sanitizarDataIso(motoristaInicial.crlv_validade_carreta_2 || motBase?.crlv_validade_carreta_2 || veicCarr2?.crlv_validade_carreta_2) || '';
+      const laudoR2 = sanitizarDataIso(motoristaInicial.validade_laudo_rocha_2 || motBase?.validade_laudo_rocha_2 || veicCarr2?.validade_laudo_rocha_2) || '';
 
       const ufCav = motoristaInicial.uf_cavalo || motBase?.uf_cavalo || veicCav?.uf_cavalo || identificarUFPelaPlaca(limpaCav) || 'ES';
       const ufCarr = motoristaInicial.uf_carreta || motBase?.uf_carreta || veicCarr?.uf_carreta || identificarUFPelaPlaca(limpaCarr) || 'ES';
@@ -243,6 +246,7 @@ export function ModalConformidadeMotorista({
     const res = await salvarMotoristaFrotaConformidade({
       ...formData,
       cpf: cpfLimpo,
+      motoristaOriginal: motoristaOriginalRef || motoristaInicial,
       atualizado_por: usuarioNome
     }, usuarioInfo || { nome: usuarioNome, isAdmin });
 
@@ -252,7 +256,7 @@ export function ModalConformidadeMotorista({
       setTimeout(() => {
         if (aoSalvar) aoSalvar(res.motorista);
         aoFechar();
-      }, 700);
+      }, 500);
     } else {
       setErro(res.erro || 'Erro ao salvar conformidade.');
     }

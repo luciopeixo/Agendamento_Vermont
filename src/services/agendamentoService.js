@@ -308,13 +308,35 @@ export function obterCpfsMotoristasExcluidos() {
 }
 
 /**
+ * Sanitiza e padroniza qualquer valor de data para o formato padrão ISO (YYYY-MM-DD) ou null
+ * Impede erros de sintaxe no PostgreSQL (ex: 'invalid input syntax for type date: ""')
+ */
+export function sanitizarDataIso(valor) {
+  if (valor === null || valor === undefined) return null;
+  const str = String(valor).trim();
+  if (!str || str === '' || str === 'null' || str === 'undefined' || str === '-' || str === 'Não informado') return null;
+  
+  // Se for ISO com timestamp ou offset (ex: 2026-09-15T00:00:00.000Z)
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    return str.substring(0, 10);
+  }
+  // Se for formato brasileiro DD/MM/YYYY ou DD-MM-YYYY
+  if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(str)) {
+    const separador = str.includes('/') ? '/' : '-';
+    const [d, m, y] = str.split(separador);
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return null;
+}
+
+/**
  * Normaliza o array de histórico de alterações do motorista
  */
 export function normalizarHistoricoMotorista(historico) {
   if (!historico) return [];
   if (Array.isArray(historico)) return historico;
   try {
-    const parsed = JSON.parse(historico);
+    const parsed = typeof historico === 'string' ? JSON.parse(historico) : historico;
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     return [];
@@ -328,9 +350,13 @@ export function registrarHistoricoEdicaoMotorista(motoristaAnterior = {}, motori
   const alteracoes = [];
   const formatarValor = (val, isData = false) => {
     if (val === null || val === undefined || val === '') return 'Não informado';
-    if (isData && typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
-      const [a, m, d] = val.split('-');
-      return `${d}/${m}/${a}`;
+    if (isData) {
+      const dataIso = sanitizarDataIso(val);
+      if (dataIso) {
+        const [a, m, d] = dataIso.split('-');
+        return `${d}/${m}/${a}`;
+      }
+      return 'Não informado';
     }
     return String(val).trim();
   };
@@ -344,20 +370,29 @@ export function registrarHistoricoEdicaoMotorista(motoristaAnterior = {}, motori
     { key: 'cnh_categoria', label: 'Categoria CNH', isData: false },
     { key: 'cnh_validade', label: 'Validade da CNH', isData: true },
     { key: 'placa_cavalo', label: 'Placa do Cavalo', isData: false },
-    { key: 'crlv_validade_cavalo', label: 'Último CRLV Cavalo', isData: true },
+    { key: 'uf_cavalo', label: 'Estado (UF) Cavalo', isData: false },
+    { key: 'crlv_validade_cavalo', label: 'Último Registro CRLV Cavalo', isData: true },
     { key: 'placa_carreta', label: 'Placa da Carreta 1', isData: false },
-    { key: 'crlv_validade_carreta', label: 'Último CRLV Carreta 1', isData: true },
+    { key: 'uf_carreta', label: 'Estado (UF) Carreta 1', isData: false },
+    { key: 'crlv_validade_carreta', label: 'Último Registro CRLV Carreta 1', isData: true },
     { key: 'validade_laudo_rocha', label: 'Vencimento Laudo Rocha / CSV', isData: true },
     { key: 'placa_carreta_2', label: 'Placa da Carreta 2', isData: false },
-    { key: 'crlv_validade_carreta_2', label: 'Último CRLV Carreta 2', isData: true },
+    { key: 'uf_carreta_2', label: 'Estado (UF) Carreta 2', isData: false },
+    { key: 'crlv_validade_carreta_2', label: 'Último Registro CRLV Carreta 2', isData: true },
     { key: 'validade_laudo_rocha_2', label: 'Vencimento Laudo Rocha (Carreta 2)', isData: true },
     { key: 'status_documental', label: 'Status Documental', isData: false },
     { key: 'observacoes', label: 'Observações Internas', isData: false }
   ];
 
   camposParaMonitorar.forEach(({ key, label, isData }) => {
-    const valAnt = motoristaAnterior ? (motoristaAnterior[key] || '') : '';
-    const valNov = motoristaNovo ? (motoristaNovo[key] || '') : '';
+    let valAnt = motoristaAnterior ? (motoristaAnterior[key] ?? '') : '';
+    let valNov = motoristaNovo ? (motoristaNovo[key] ?? '') : '';
+
+    if (isData) {
+      valAnt = sanitizarDataIso(valAnt) || '';
+      valNov = sanitizarDataIso(valNov) || '';
+    }
+
     const strAnt = String(valAnt).trim().toUpperCase();
     const strNov = String(valNov).trim().toUpperCase();
 
@@ -375,7 +410,7 @@ export function registrarHistoricoEdicaoMotorista(motoristaAnterior = {}, motori
     motoristaNovo.historico_edicoes || motoristaAnterior?.historico_edicoes || []
   );
 
-  const isNovoCadastro = !motoristaAnterior || !motoristaAnterior.cpf || !motoristaAnterior.nome;
+  const isNovoCadastro = (!motoristaAnterior || !motoristaAnterior.cpf || !motoristaAnterior.nome) && historicoExistente.length === 0;
 
   const nomeUsuario = usuarioInfo?.nome || usuarioInfo?.email || (usuarioInfo?.isAdmin ? 'Administrador Geral' : 'Operador Pedreira');
   const roleUsuario = usuarioInfo?.role || (usuarioInfo?.isAdmin ? 'Administrador Geral' : 'Operador Pedreira');
@@ -390,13 +425,11 @@ export function registrarHistoricoEdicaoMotorista(motoristaAnterior = {}, motori
     tipo: isNovoCadastro ? 'cadastro_inicial' : 'edicao_dados',
     descricao: isNovoCadastro 
       ? `Cadastro inicial do motorista e frota realizado por ${nomeUsuario}` 
-      : `Atualização cadastral (${alteracoes.length} ${alteracoes.length === 1 ? 'campo alterado' : 'campos alterados'}) realizada por ${nomeUsuario}`,
+      : alteracoes.length > 0
+        ? `Atualização cadastral (${alteracoes.length} ${alteracoes.length === 1 ? 'campo alterado' : 'campos alterados'}) realizada por ${nomeUsuario}`
+        : `Revisão cadastral / dados confirmados por ${nomeUsuario}`,
     alteracoes: alteracoes
   };
-
-  if (!isNovoCadastro && alteracoes.length === 0) {
-    novoEvento.descricao = `Revisão cadastral / salvamento confirmado por ${nomeUsuario}`;
-  }
 
   return [novoEvento, ...historicoExistente];
 }
@@ -435,17 +468,24 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
           const rawC = String(item.cpf || '').replace(/\D/g, '');
           if (rawC.length === 11 && !cpfsExcluidos.has(rawC)) {
             const existente = mapaMotoristas.get(rawC) || {};
-            const itemLimpo = {};
-            Object.keys(item).forEach(k => {
-              if (item[k] !== null && item[k] !== undefined && item[k] !== '') {
-                itemLimpo[k] = item[k];
-              }
-            });
+            const cnhVal = sanitizarDataIso(item.cnh_validade !== undefined ? item.cnh_validade : existente.cnh_validade);
+            const crlvCav = sanitizarDataIso(item.crlv_validade_cavalo !== undefined ? item.crlv_validade_cavalo : existente.crlv_validade_cavalo);
+            const crlvCarr = sanitizarDataIso(item.crlv_validade_carreta !== undefined ? item.crlv_validade_carreta : existente.crlv_validade_carreta);
+            const laudoR = sanitizarDataIso(item.validade_laudo_rocha !== undefined ? item.validade_laudo_rocha : existente.validade_laudo_rocha);
+            const crlvCarr2 = sanitizarDataIso(item.crlv_validade_carreta_2 !== undefined ? item.crlv_validade_carreta_2 : existente.crlv_validade_carreta_2);
+            const laudoR2 = sanitizarDataIso(item.validade_laudo_rocha_2 !== undefined ? item.validade_laudo_rocha_2 : existente.validade_laudo_rocha_2);
+
             mapaMotoristas.set(rawC, {
               ...existente,
-              ...itemLimpo,
+              ...item,
               cpf: rawC,
               nome: (item.nome || existente.nome || '').trim().toUpperCase(),
+              cnh_validade: cnhVal,
+              crlv_validade_cavalo: crlvCav,
+              crlv_validade_carreta: crlvCarr,
+              validade_laudo_rocha: laudoR,
+              crlv_validade_carreta_2: crlvCarr2,
+              validade_laudo_rocha_2: laudoR2,
               historico_edicoes: normalizarHistoricoMotorista(item.historico_edicoes || existente.historico_edicoes)
             });
           }
@@ -524,6 +564,13 @@ export async function salvarMotoristaNaBase(dadosMotorista = {}) {
     const nomeLimpo = (dadosMotorista.motorista_nome || dadosMotorista.nome || existente.nome || '').trim().toUpperCase();
     const telLimpo = dadosMotorista.motorista_telefone || dadosMotorista.telefone || existente.telefone || null;
 
+    const cnhVal = sanitizarDataIso(dadosMotorista.cnh_validade || existente.cnh_validade);
+    const crlvCav = sanitizarDataIso(dadosMotorista.crlv_validade_cavalo || existente.crlv_validade_cavalo);
+    const crlvCarr = sanitizarDataIso(dadosMotorista.crlv_validade_carreta || existente.crlv_validade_carreta);
+    const laudoR = sanitizarDataIso(dadosMotorista.validade_laudo_rocha || existente.validade_laudo_rocha);
+    const crlvCarr2 = sanitizarDataIso(dadosMotorista.crlv_validade_carreta_2 || existente.crlv_validade_carreta_2);
+    const laudoR2 = sanitizarDataIso(dadosMotorista.validade_laudo_rocha_2 || existente.validade_laudo_rocha_2);
+
     const novoRegistro = {
       ...existente,
       cpf: cpfLimpo,
@@ -531,20 +578,23 @@ export async function salvarMotoristaNaBase(dadosMotorista = {}) {
       telefone: telLimpo,
       transportadora: transpLimpa,
       transportadora_cnpj: transpCnpj,
-      tipo_veiculo: dadosMotorista.tipo_veiculo || existente.tipo_veiculo || null,
-      placa_cavalo: (dadosMotorista.placa_cavalo || existente.placa_cavalo || '').toUpperCase() || null,
-      placa_carreta: (dadosMotorista.placa_carreta || existente.placa_carreta || '').toUpperCase() || null,
-      placa_carreta_2: (dadosMotorista.placa_carreta_2 || existente.placa_carreta_2 || '').toUpperCase() || null,
-      // Conformidade Documental (Preserva se já preenchido)
-      cnh_categoria: dadosMotorista.cnh_categoria || existente.cnh_categoria || 'E',
-      cnh_validade: dadosMotorista.cnh_validade || existente.cnh_validade || null,
-      crlv_validade_cavalo: dadosMotorista.crlv_validade_cavalo || existente.crlv_validade_cavalo || null,
-      crlv_validade_carreta: dadosMotorista.crlv_validade_carreta || existente.crlv_validade_carreta || null,
-      validade_laudo_rocha: dadosMotorista.validade_laudo_rocha || existente.validade_laudo_rocha || null,
-      crlv_validade_carreta_2: dadosMotorista.crlv_validade_carreta_2 || existente.crlv_validade_carreta_2 || null,
-      validade_laudo_rocha_2: dadosMotorista.validade_laudo_rocha_2 || existente.validade_laudo_rocha_2 || null,
+      tipo_veiculo: dadosMotorista.tipo_veiculo || existente.tipo_veiculo || 'Carreta / Bitrem',
+      placa_cavalo: (dadosMotorista.placa_cavalo || existente.placa_cavalo || '').toUpperCase().trim() || null,
+      uf_cavalo: dadosMotorista.uf_cavalo || existente.uf_cavalo || identificarUFPelaPlaca(dadosMotorista.placa_cavalo) || 'ES',
+      crlv_validade_cavalo: crlvCav,
+      placa_carreta: (dadosMotorista.placa_carreta || existente.placa_carreta || '').toUpperCase().trim() || null,
+      uf_carreta: dadosMotorista.uf_carreta || existente.uf_carreta || identificarUFPelaPlaca(dadosMotorista.placa_carreta) || 'ES',
+      crlv_validade_carreta: crlvCarr,
+      validade_laudo_rocha: laudoR,
+      placa_carreta_2: (dadosMotorista.placa_carreta_2 || existente.placa_carreta_2 || '').toUpperCase().trim() || null,
+      uf_carreta_2: dadosMotorista.uf_carreta_2 || existente.uf_carreta_2 || identificarUFPelaPlaca(dadosMotorista.placa_carreta_2) || 'ES',
+      crlv_validade_carreta_2: crlvCarr2,
+      validade_laudo_rocha_2: laudoR2,
+      cnh_categoria: (dadosMotorista.cnh_categoria || existente.cnh_categoria || 'E').toUpperCase().trim(),
+      cnh_validade: cnhVal,
       status_documental: dadosMotorista.status_documental || existente.status_documental || 'REGULAR',
       observacoes: dadosMotorista.observacoes || existente.observacoes || '',
+      historico_edicoes: normalizarHistoricoMotorista(dadosMotorista.historico_edicoes || existente.historico_edicoes),
       atualizado_em: new Date().toISOString(),
       atualizado_por: dadosMotorista.atualizado_por || existente.atualizado_por || 'SISTEMA'
     };
@@ -560,15 +610,26 @@ export async function salvarMotoristaNaBase(dadosMotorista = {}) {
     // Sincroniza no Supabase se configurado
     if (isSupabaseConfigurado() && nomeLimpo) {
       try {
-        await supabase.rpc('salvar_motorista', {
-          p_cpf: cpfLimpo,
-          p_nome: nomeLimpo,
-          p_telefone: telLimpo || '',
-          p_transportadora: transpLimpa || ''
-        });
-      } catch (_errRpc) {
-        // Fallback silencioso
-      }
+        const payload = {
+          cpf: cpfLimpo,
+          nome: nomeLimpo,
+          telefone: telLimpo || '',
+          transportadora: transpLimpa || '',
+          cnh_categoria: novoRegistro.cnh_categoria,
+          cnh_validade: cnhVal,
+          placa_cavalo: novoRegistro.placa_cavalo,
+          crlv_validade_cavalo: crlvCav,
+          placa_carreta: novoRegistro.placa_carreta,
+          crlv_validade_carreta: crlvCarr,
+          validade_laudo_rocha: laudoR,
+          placa_carreta_2: novoRegistro.placa_carreta_2,
+          crlv_validade_carreta_2: crlvCarr2,
+          validade_laudo_rocha_2: laudoR2,
+          observacoes: novoRegistro.observacoes,
+          atualizado_em: novoRegistro.atualizado_em
+        };
+        await supabase.from('base_motoristas').upsert(payload, { onConflict: 'cpf' });
+      } catch (_e) {}
     }
   } catch (e) {
     console.warn('Erro ao salvar motorista na base:', e);
@@ -587,11 +648,30 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
 
     const base = obterBaseMotoristas();
     const index = base.findIndex(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
-    const existente = index !== -1 ? base[index] : {};
+    const existente = dados.motoristaOriginal || (index !== -1 ? base[index] : {});
 
-    const nomeUsuario = usuarioInfo?.nome || usuarioInfo?.email || dados.atualizado_por || (usuarioInfo?.isAdmin ? 'ADMIN' : 'PEDREIRA');
+    const nomeUsuario = usuarioInfo?.nome || usuarioInfo?.email || dados.atualizado_por || (usuarioInfo?.isAdmin ? 'ADMINISTRADOR GERAL' : 'OPERADOR PEDREIRA');
 
-    const historicoAtualizado = registrarHistoricoEdicaoMotorista(existente, dados, usuarioInfo);
+    // Sanitiza rigorosamente todas as datas (ISO YYYY-MM-DD ou null, nunca strings vazias "")
+    const cnhValidade = sanitizarDataIso(dados.cnh_validade);
+    const crlvValidadeCavalo = sanitizarDataIso(dados.crlv_validade_cavalo);
+    const crlvValidadeCarreta = sanitizarDataIso(dados.crlv_validade_carreta);
+    const validadeLaudoRocha = sanitizarDataIso(dados.validade_laudo_rocha);
+    const crlvValidadeCarreta2 = sanitizarDataIso(dados.crlv_validade_carreta_2);
+    const validadeLaudoRocha2 = sanitizarDataIso(dados.validade_laudo_rocha_2);
+
+    const dadosNormalizados = {
+      ...dados,
+      cpf: cpfLimpo,
+      cnh_validade: cnhValidade,
+      crlv_validade_cavalo: crlvValidadeCavalo,
+      crlv_validade_carreta: crlvValidadeCarreta,
+      validade_laudo_rocha: validadeLaudoRocha,
+      crlv_validade_carreta_2: crlvValidadeCarreta2,
+      validade_laudo_rocha_2: validadeLaudoRocha2
+    };
+
+    const historicoAtualizado = registrarHistoricoEdicaoMotorista(existente, dadosNormalizados, usuarioInfo);
 
     const registroAtualizado = {
       ...existente,
@@ -603,18 +683,18 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
       tipo_veiculo: dados.tipo_veiculo || existente.tipo_veiculo || 'Carreta / Bitrem',
       placa_cavalo: (dados.placa_cavalo || existente.placa_cavalo || '').toUpperCase().trim(),
       uf_cavalo: dados.uf_cavalo || existente.uf_cavalo || identificarUFPelaPlaca(dados.placa_cavalo) || 'ES',
-      crlv_validade_cavalo: dados.crlv_validade_cavalo || null,
+      crlv_validade_cavalo: crlvValidadeCavalo,
       placa_carreta: (dados.placa_carreta || existente.placa_carreta || '').toUpperCase().trim(),
       uf_carreta: dados.uf_carreta || existente.uf_carreta || identificarUFPelaPlaca(dados.placa_carreta) || 'ES',
-      crlv_validade_carreta: dados.crlv_validade_carreta || null,
-      validade_laudo_rocha: dados.validade_laudo_rocha || null,
+      crlv_validade_carreta: crlvValidadeCarreta,
+      validade_laudo_rocha: validadeLaudoRocha,
       placa_carreta_2: (dados.placa_carreta_2 || existente.placa_carreta_2 || '').toUpperCase().trim(),
       uf_carreta_2: dados.uf_carreta_2 || existente.uf_carreta_2 || identificarUFPelaPlaca(dados.placa_carreta_2) || 'ES',
-      crlv_validade_carreta_2: dados.crlv_validade_carreta_2 || null,
-      validade_laudo_rocha_2: dados.validade_laudo_rocha_2 || null,
+      crlv_validade_carreta_2: crlvValidadeCarreta2,
+      validade_laudo_rocha_2: validadeLaudoRocha2,
       // Documentação
       cnh_categoria: (dados.cnh_categoria || existente.cnh_categoria || 'E').toUpperCase().trim(),
-      cnh_validade: dados.cnh_validade || null,
+      cnh_validade: cnhValidade,
       status_documental: dados.status_documental || 'REGULAR',
       observacoes: (dados.observacoes || '').trim(),
       historico_edicoes: historicoAtualizado,
@@ -640,6 +720,7 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
 
     if (isSupabaseConfigurado()) {
       try {
+        // Tentativa 1: Payload Completo com todas as colunas
         const payloadCompleto = {
           cpf: cpfLimpo,
           nome: registroAtualizado.nome,
@@ -670,29 +751,41 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
         const { error: errUpsert } = await supabase.from('base_motoristas').upsert(payloadCompleto, { onConflict: 'cpf' });
 
         if (errUpsert) {
-          // Fallback para schema reduzido se algumas colunas opcionais não existirem no Supabase
-          const payloadReduzido = {
-            cpf: cpfLimpo,
-            nome: registroAtualizado.nome,
-            telefone: registroAtualizado.telefone,
-            transportadora: registroAtualizado.transportadora,
-            cnh_categoria: registroAtualizado.cnh_categoria,
-            cnh_validade: registroAtualizado.cnh_validade,
-            placa_cavalo: registroAtualizado.placa_cavalo,
-            crlv_validade_cavalo: registroAtualizado.crlv_validade_cavalo,
-            placa_carreta: registroAtualizado.placa_carreta,
-            crlv_validade_carreta: registroAtualizado.crlv_validade_carreta,
-            validade_laudo_rocha: registroAtualizado.validade_laudo_rocha,
-            placa_carreta_2: registroAtualizado.placa_carreta_2,
-            crlv_validade_carreta_2: registroAtualizado.crlv_validade_carreta_2,
-            validade_laudo_rocha_2: registroAtualizado.validade_laudo_rocha_2,
-            observacoes: registroAtualizado.observacoes,
-            atualizado_em: registroAtualizado.atualizado_em
+          console.warn('Upsert completo com array falhou, tentando serializar historico_edicoes:', errUpsert.message);
+          
+          // Tentativa 2: Payload com historico_edicoes serializado como string JSON
+          const payloadJsonStr = {
+            ...payloadCompleto,
+            historico_edicoes: JSON.stringify(historicoAtualizado)
           };
-          await supabase.from('base_motoristas').upsert(payloadReduzido, { onConflict: 'cpf' });
+          const res2 = await supabase.from('base_motoristas').upsert(payloadJsonStr, { onConflict: 'cpf' });
+
+          if (res2.error) {
+            console.warn('Upsert 2 falhou, tentando payload essencial de compatibilidade:', res2.error.message);
+            // Tentativa 3: Payload essencial sem colunas opcionais que possam não existir na tabela
+            const payloadEssencial = {
+              cpf: cpfLimpo,
+              nome: registroAtualizado.nome,
+              telefone: registroAtualizado.telefone,
+              transportadora: registroAtualizado.transportadora,
+              cnh_categoria: registroAtualizado.cnh_categoria,
+              cnh_validade: registroAtualizado.cnh_validade,
+              placa_cavalo: registroAtualizado.placa_cavalo,
+              crlv_validade_cavalo: registroAtualizado.crlv_validade_cavalo,
+              placa_carreta: registroAtualizado.placa_carreta,
+              crlv_validade_carreta: registroAtualizado.crlv_validade_carreta,
+              validade_laudo_rocha: registroAtualizado.validade_laudo_rocha,
+              observacoes: registroAtualizado.observacoes,
+              atualizado_em: registroAtualizado.atualizado_em
+            };
+            const res3 = await supabase.from('base_motoristas').upsert(payloadEssencial, { onConflict: 'cpf' });
+            if (res3.error) {
+              console.error('Erro final no upsert do Supabase:', res3.error);
+            }
+          }
         }
-      } catch (_e) {
-        // Fallback
+      } catch (eSup) {
+        console.warn('Exceção ao persistir motorista no Supabase:', eSup);
       }
     }
 
