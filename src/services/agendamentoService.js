@@ -2652,9 +2652,7 @@ export async function verificarBlocoDuplicado({
 
       // Trava se coincidir pedreira E (material OU cliente)
       if (mesmaPedreira && (mesmoMaterial || mesmoCliente)) {
-        const dataFmt = formatarDataBR(ag.data_agendamento);
-        const protocolo = (ag.id || 'VT-' + Date.now()).substring(0, 8).toUpperCase();
-        const mensagem = `⚠️ Já existe um agendamento ativo cadastrado para o Bloco ${blocoCoincidente} (${ag.material || 'Material'}) na pedreira ${ag.pedreira || 'Vermont'} para o cliente "${ag.cliente || 'Cliente'}", agendado para o dia ${dataFmt} às ${ag.horario_agendamento} (Protocolo: #${protocolo}, Status: ${ag.status}).`;
+        const mensagem = `Já existe um agendamento ativo cadastrado para o Bloco ${blocoCoincidente}`;
 
         return {
           duplicado: true,

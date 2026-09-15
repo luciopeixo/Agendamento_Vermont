@@ -1510,15 +1510,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       border: '1px solid rgba(239, 68, 68, 0.45)',
                       borderRadius: 8,
                       color: '#f87171',
-                      fontSize: '0.82rem'
+                      fontSize: '0.82rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontWeight: 600
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontWeight: 700 }}>
-                        <AlertTriangle size={16} color="#ef4444" />
-                        <span>Atenção: Bloco já agendado anteriormente!</span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '0.77rem', color: '#fee2e2', lineHeight: 1.45 }}>
-                        {alertaDuplicidade1.mensagem}
-                      </p>
+                      <AlertTriangle size={16} color="#ef4444" style={{ flexShrink: 0 }} />
+                      <span>{alertaDuplicidade1.mensagem}</span>
                     </div>
                   )}
                 </div>
@@ -1837,15 +1836,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       border: '1px solid rgba(239, 68, 68, 0.45)',
                       borderRadius: 6,
                       color: '#f87171',
-                      fontSize: '0.78rem'
+                      fontSize: '0.78rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 600
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontWeight: 700 }}>
-                        <AlertTriangle size={14} color="#ef4444" />
-                        <span>Bloco 1 já agendado anteriormente!</span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#fee2e2', lineHeight: 1.35 }}>
-                        {alertaDuplicidade1.mensagem}
-                      </p>
+                      <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
+                      <span>{alertaDuplicidade1.mensagem}</span>
                     </div>
                   )}
                 </div>
@@ -2057,15 +2055,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       border: '1px solid rgba(239, 68, 68, 0.45)',
                       borderRadius: 6,
                       color: '#f87171',
-                      fontSize: '0.78rem'
+                      fontSize: '0.78rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 600
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontWeight: 700 }}>
-                        <AlertTriangle size={14} color="#ef4444" />
-                        <span>Bloco 2 já agendado anteriormente!</span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#fee2e2', lineHeight: 1.35 }}>
-                        {alertaDuplicidade2.mensagem}
-                      </p>
+                      <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
+                      <span>{alertaDuplicidade2.mensagem}</span>
                     </div>
                   )}
                 </div>
@@ -2387,15 +2384,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                         border: '1px solid rgba(239, 68, 68, 0.45)',
                         borderRadius: 6,
                         color: '#f87171',
-                        fontSize: '0.78rem'
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontWeight: 600
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontWeight: 700 }}>
-                          <AlertTriangle size={14} color="#ef4444" />
-                          <span>Bloco 3 já agendado anteriormente!</span>
-                        </div>
-                        <p style={{ margin: 0, fontSize: '0.74rem', color: '#fee2e2', lineHeight: 1.35 }}>
-                          {alertaDuplicidade3.mensagem}
-                        </p>
+                        <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
+                        <span>{alertaDuplicidade3.mensagem}</span>
                       </div>
                     )}
                   </div>
