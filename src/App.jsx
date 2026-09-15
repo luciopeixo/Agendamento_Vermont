@@ -46,7 +46,7 @@ export function App() {
             savedUser = raw ? JSON.parse(raw) : null;
           } catch (e) {}
 
-          if (savedUser && savedUser.user_metadata?.role === 'operador') {
+          if (savedUser) {
             setUsuarioAuth(savedUser);
           } else {
             setUsuarioAuth(session.user);
@@ -64,7 +64,7 @@ export function App() {
             savedUser = raw ? JSON.parse(raw) : null;
           } catch (e) {}
 
-          if (savedUser && savedUser.user_metadata?.role === 'operador') {
+          if (savedUser) {
             setUsuarioAuth(savedUser);
           } else {
             setUsuarioAuth(session.user);
@@ -87,29 +87,21 @@ export function App() {
   const userEmail = (usuarioAuth?.email || '').toLowerCase();
   const userRole = (userMeta.role || '').toLowerCase();
 
-  // É Operador de Pedreira se possuir role 'operador', indicação de pedreira ou e-mail correspondente
-  const isOperadorPedreira = userRole === 'operador' || 
-    Boolean(userMeta.pedreira) ||
-    userEmail.includes('pedreira') ||
-    userEmail.includes('uruoca') ||
-    userEmail.includes('tajmahal') ||
-    userEmail.includes('negresco') ||
-    userEmail.includes('delmare') ||
-    userEmail.includes('massape') ||
-    userEmail.includes('jaibaras') ||
-    userEmail.includes('sobral') ||
-    userEmail.includes('serrote') ||
-    userEmail.includes('saogoncalo') ||
-    userEmail.includes('beberibe');
-
-  // É Admin Geral estritamente se não for operador de pedreira e tiver perfil de administrador
-  const isAdmin = isAutenticado && !isOperadorPedreira && (
+  // É Administrador Geral se:
+  // 1. Possui role explícita 'admin'
+  // 2. Ou login de admin/faturamento/diretoria/logística
+  // 3. Ou não possui pedreira específica atribuída
+  const isAdmin = isAutenticado && (
     userRole === 'admin' || 
     userEmail.startsWith('admin') || 
-    userEmail.includes('faturamento') ||
-    userEmail.includes('diretoria') ||
-    userEmail.includes('logistica')
+    userEmail.includes('faturamento') || 
+    userEmail.includes('diretoria') || 
+    userEmail.includes('logistica') ||
+    (!userMeta.pedreira && userRole !== 'operador')
   );
+
+  // É Operador de Pedreira apenas quando NÃO for Admin
+  const isOperadorPedreira = isAutenticado && !isAdmin;
 
   // Pedreira vinculada caso seja operador de campo
   const pedreiraOperador = isOperadorPedreira ? (

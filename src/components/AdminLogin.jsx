@@ -96,7 +96,16 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
               });
 
               if (!authError && data?.session?.user) {
-                const usuarioFinal = isAdminUser ? data.session.user : {
+                const usuarioFinal = isAdminUser ? {
+                  ...data.session.user,
+                  email: login.includes('@') ? login : (data.session.user.email || `${loginFinal}@admin.local`),
+                  user_metadata: {
+                    ...(data.session.user.user_metadata || {}),
+                    role: 'admin',
+                    nome: loginBase.toUpperCase(),
+                    pedreira: null
+                  }
+                } : {
                   ...data.session.user,
                   email: `${loginFinal}@pedreira.local`,
                   user_metadata: {

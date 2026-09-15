@@ -103,26 +103,8 @@ export function PainelGestao({
   const { dataHoje } = obterDataHoraAtualBrasil();
   const hojeStr = dataHoje || new Date().toISOString().split('T')[0];
 
-  // Validação estrita de perfil: Administrador Geral vs Operador de Pedreira
-  const userMetaRole = (usuario?.user_metadata?.role || '').toLowerCase();
-  const userEmailStr = (usuario?.email || '').toLowerCase();
-  const isOperadorPedreira = Boolean(
-    pedreiraOperador || 
-    userMetaRole === 'operador' || 
-    userEmailStr.includes('pedreira') ||
-    userEmailStr.includes('uruoca') ||
-    userEmailStr.includes('tajmahal') ||
-    userEmailStr.includes('negresco') ||
-    userEmailStr.includes('delmare') ||
-    userEmailStr.includes('massape') ||
-    userEmailStr.includes('jaibaras') ||
-    userEmailStr.includes('sobral') ||
-    userEmailStr.includes('serrote') ||
-    userEmailStr.includes('saogoncalo') ||
-    userEmailStr.includes('beberibe')
-  );
-
-  const isAcessoAdminGeral = Boolean(isAdmin && !isOperadorPedreira);
+  // Validação de perfil: Administrador Geral vs Operador de Pedreira
+  const isAcessoAdminGeral = Boolean(isAdmin);
 
   const usuarioInfo = {
     nome: usuario?.user_metadata?.nome || (usuario?.email ? usuario.email.split('@')[0].toUpperCase() : (isAcessoAdminGeral ? 'ADMINISTRADOR GERAL' : 'OPERADOR PEDREIRA')),
