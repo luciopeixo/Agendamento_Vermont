@@ -343,6 +343,39 @@ export function normalizarHistoricoMotorista(historico) {
   }
 }
 
+const HISTORICO_TAG_START = '<!-- VERMONT_HIST:';
+const HISTORICO_TAG_END = ':VERMONT_HIST -->';
+
+/**
+ * Embute o histórico de auditoria de forma invisível/estruturada dentro do campo de observações
+ * para garantir 100% de persistência no Supabase mesmo sem alteração estrutural no banco
+ */
+export function embutirHistoricoNasObservacoes(observacoesTexto = '', historicoArr = []) {
+  const textoLimpo = (observacoesTexto || '').replace(/<!-- VERMONT_HIST:[\s\S]*?:VERMONT_HIST -->/g, '').trim();
+  const hist = normalizarHistoricoMotorista(historicoArr);
+  if (hist.length === 0) {
+    return textoLimpo;
+  }
+  const jsonStr = JSON.stringify(hist);
+  return `${textoLimpo}${textoLimpo ? '\n\n' : ''}${HISTORICO_TAG_START}${jsonStr}${HISTORICO_TAG_END}`;
+}
+
+/**
+ * Extrai o texto limpo de observações e o array de histórico de auditoria
+ */
+export function extrairHistoricoDasObservacoes(observacoesTexto = '') {
+  if (!observacoesTexto || typeof observacoesTexto !== 'string') return { textoVisivel: '', historico: [] };
+  const match = observacoesTexto.match(/<!-- VERMONT_HIST:([\s\S]*?):VERMONT_HIST -->/);
+  const textoVisivel = observacoesTexto.replace(/<!-- VERMONT_HIST:[\s\S]*?:VERMONT_HIST -->/g, '').trim();
+  if (match && match[1]) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      return { textoVisivel, historico: Array.isArray(parsed) ? parsed : [] };
+    } catch (e) {}
+  }
+  return { textoVisivel, historico: [] };
+}
+
 /**
  * Registra uma entrada na auditoria de edições do motorista (quem alterou, quando e quais campos)
  */
@@ -475,6 +508,25 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
             const crlvCarr2 = sanitizarDataIso(item.crlv_validade_carreta_2 !== undefined ? item.crlv_validade_carreta_2 : existente.crlv_validade_carreta_2);
             const laudoR2 = sanitizarDataIso(item.validade_laudo_rocha_2 !== undefined ? item.validade_laudo_rocha_2 : existente.validade_laudo_rocha_2);
 
+            const extraidoItem = extrairHistoricoDasObservacoes(item.observacoes);
+            const extraidoExistente = extrairHistoricoDasObservacoes(existente.observacoes);
+
+            const histCombinado = [
+              ...normalizarHistoricoMotorista(item.historico_edicoes),
+              ...extraidoItem.historico,
+              ...normalizarHistoricoMotorista(existente.historico_edicoes),
+              ...extraidoExistente.historico
+            ];
+
+            const mapaHist = new Map();
+            histCombinado.forEach(h => {
+              if (h && h.id) mapaHist.set(h.id, h);
+            });
+            const historicoFinal = Array.from(mapaHist.values());
+            historicoFinal.sort((a, b) => new Date(b.data_hora || 0) - new Date(a.data_hora || 0));
+
+            const obsFinal = extraidoItem.textoVisivel || extraidoExistente.textoVisivel || (item.observacoes || '').replace(/<!-- VERMONT_HIST:[\s\S]*?:VERMONT_HIST -->/g, '').trim();
+
             mapaMotoristas.set(rawC, {
               ...existente,
               ...item,
@@ -486,7 +538,8 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
               validade_laudo_rocha: laudoR,
               crlv_validade_carreta_2: crlvCarr2,
               validade_laudo_rocha_2: laudoR2,
-              historico_edicoes: normalizarHistoricoMotorista(item.historico_edicoes || existente.historico_edicoes)
+              observacoes: obsFinal,
+              historico_edicoes: historicoFinal
             });
           }
         });
@@ -673,6 +726,9 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
 
     const historicoAtualizado = registrarHistoricoEdicaoMotorista(existente, dadosNormalizados, usuarioInfo);
 
+    const obsTextoLimpo = (dados.observacoes || '').replace(/<!-- VERMONT_HIST:[\s\S]*?:VERMONT_HIST -->/g, '').trim();
+    const obsComHistorico = embutirHistoricoNasObservacoes(obsTextoLimpo, historicoAtualizado);
+
     const registroAtualizado = {
       ...existente,
       cpf: cpfLimpo,
@@ -696,7 +752,7 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
       cnh_categoria: (dados.cnh_categoria || existente.cnh_categoria || 'E').toUpperCase().trim(),
       cnh_validade: cnhValidade,
       status_documental: dados.status_documental || 'REGULAR',
-      observacoes: (dados.observacoes || '').trim(),
+      observacoes: obsTextoLimpo,
       historico_edicoes: historicoAtualizado,
       atualizado_em: new Date().toISOString(),
       atualizado_por: nomeUsuario
@@ -742,7 +798,7 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
           crlv_validade_carreta_2: registroAtualizado.crlv_validade_carreta_2,
           validade_laudo_rocha_2: registroAtualizado.validade_laudo_rocha_2,
           status_documental: registroAtualizado.status_documental,
-          observacoes: registroAtualizado.observacoes,
+          observacoes: obsComHistorico,
           historico_edicoes: historicoAtualizado,
           atualizado_por: registroAtualizado.atualizado_por,
           atualizado_em: registroAtualizado.atualizado_em
@@ -756,6 +812,7 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
           // Tentativa 2: Payload com historico_edicoes serializado como string JSON
           const payloadJsonStr = {
             ...payloadCompleto,
+            observacoes: obsComHistorico,
             historico_edicoes: JSON.stringify(historicoAtualizado)
           };
           const res2 = await supabase.from('base_motoristas').upsert(payloadJsonStr, { onConflict: 'cpf' });
@@ -775,7 +832,7 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
               placa_carreta: registroAtualizado.placa_carreta,
               crlv_validade_carreta: registroAtualizado.crlv_validade_carreta,
               validade_laudo_rocha: registroAtualizado.validade_laudo_rocha,
-              observacoes: registroAtualizado.observacoes,
+              observacoes: obsComHistorico,
               atualizado_em: registroAtualizado.atualizado_em
             };
             const res3 = await supabase.from('base_motoristas').upsert(payloadEssencial, { onConflict: 'cpf' });

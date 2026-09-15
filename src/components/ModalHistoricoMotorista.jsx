@@ -1,12 +1,49 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { History, X, User, Clock, ArrowRight, AlertCircle, ShieldCheck, Truck } from 'lucide-react';
-import { formatarCPF, normalizarHistoricoMotorista } from '../services/agendamentoService';
+import { 
+  formatarCPF, 
+  normalizarHistoricoMotorista, 
+  obterBaseMotoristas, 
+  extrairHistoricoDasObservacoes 
+} from '../services/agendamentoService';
 
 export function ModalHistoricoMotorista({ motorista, onFechar }) {
   if (!motorista) return null;
 
-  const historico = normalizarHistoricoMotorista(motorista.historico_edicoes);
-  const cpfFmt = formatarCPF(motorista.cpf);
+  const cpfLimpo = String(motorista.cpf || '').replace(/\D/g, '');
+
+  const { historico, motoristaAtual } = useMemo(() => {
+    const base = obterBaseMotoristas();
+    const motBase = cpfLimpo ? base.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo) : null;
+
+    const extraidoProps = extrairHistoricoDasObservacoes(motorista.observacoes);
+    const extraidoBase = extrairHistoricoDasObservacoes(motBase?.observacoes);
+
+    const lista = [
+      ...normalizarHistoricoMotorista(motorista.historico_edicoes),
+      ...extraidoProps.historico,
+      ...normalizarHistoricoMotorista(motBase?.historico_edicoes),
+      ...extraidoBase.historico
+    ];
+
+    const mapa = new Map();
+    lista.forEach(item => {
+      if (item && (item.id || item.data_hora)) {
+        const chave = item.id || `${item.data_hora}_${item.usuario_nome || ''}`;
+        mapa.set(chave, item);
+      }
+    });
+
+    const ordenado = Array.from(mapa.values());
+    ordenado.sort((a, b) => new Date(b.data_hora || 0) - new Date(a.data_hora || 0));
+
+    return {
+      historico: ordenado,
+      motoristaAtual: { ...motBase, ...motorista }
+    };
+  }, [motorista, cpfLimpo]);
+
+  const cpfFmt = formatarCPF(motoristaAtual.cpf || motorista.cpf);
 
   const formatarDataHoraCompleta = (isoString) => {
     if (!isoString) return '-';
@@ -87,7 +124,7 @@ export function ModalHistoricoMotorista({ motorista, onFechar }) {
                 Histórico de Alterações • Motorista & Frota
               </h2>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--slate-400)' }}>
-                Auditoria de edições, documentos e ações de usuários • {motorista.nome || 'Motorista'} ({cpfFmt})
+                Auditoria de edições, documentos e ações de usuários • {motoristaAtual.nome || 'Motorista'} ({cpfFmt})
               </p>
             </div>
           </div>
@@ -118,11 +155,11 @@ export function ModalHistoricoMotorista({ motorista, onFechar }) {
           gap: 10,
           fontSize: '0.84rem'
         }}>
-          <div><span style={{ color: 'var(--slate-400)' }}>Nome:</span> <strong style={{ color: '#fff' }}>{motorista.nome || '-'}</strong></div>
+          <div><span style={{ color: 'var(--slate-400)' }}>Nome:</span> <strong style={{ color: '#fff' }}>{motoristaAtual.nome || '-'}</strong></div>
           <div><span style={{ color: 'var(--slate-400)' }}>CPF:</span> <strong style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{cpfFmt}</strong></div>
-          <div><span style={{ color: 'var(--slate-400)' }}>Transportadora:</span> <strong style={{ color: '#e2e8f0' }}>{motorista.transportadora || '-'}</strong></div>
-          <div><span style={{ color: 'var(--slate-400)' }}>Cavalo:</span> <strong style={{ color: '#38bdf8' }}>{motorista.placa_cavalo || '-'}</strong></div>
-          <div><span style={{ color: 'var(--slate-400)' }}>Carreta:</span> <strong style={{ color: '#c084fc' }}>{motorista.placa_carreta || '-'}</strong></div>
+          <div><span style={{ color: 'var(--slate-400)' }}>Transportadora:</span> <strong style={{ color: '#e2e8f0' }}>{motoristaAtual.transportadora || '-'}</strong></div>
+          <div><span style={{ color: 'var(--slate-400)' }}>Cavalo:</span> <strong style={{ color: '#38bdf8' }}>{motoristaAtual.placa_cavalo || '-'}</strong></div>
+          <div><span style={{ color: 'var(--slate-400)' }}>Carreta:</span> <strong style={{ color: '#c084fc' }}>{motoristaAtual.placa_carreta || '-'}</strong></div>
         </div>
 
         {/* Linha do Tempo / Timeline */}
@@ -144,8 +181,8 @@ export function ModalHistoricoMotorista({ motorista, onFechar }) {
               <AlertCircle size={36} color="var(--slate-500)" style={{ margin: '0 auto 10px auto', display: 'block' }} />
               Nenhum histórico detalhado de edições registrado anteriormente para este motorista.
               <div style={{ marginTop: 8, fontSize: '0.78rem', color: '#86efac' }}>
-                {motorista.atualizado_em ? (
-                  <>Último registro/atualização em: <strong>{formatarDataHoraCompleta(motorista.atualizado_em)}</strong> por <strong>{motorista.atualizado_por || 'Sistema'}</strong></>
+                {motoristaAtual.atualizado_em ? (
+                  <>Último registro/atualização em: <strong>{formatarDataHoraCompleta(motoristaAtual.atualizado_em)}</strong> por <strong>{motoristaAtual.atualizado_por || 'Sistema'}</strong></>
                 ) : (
                   'Todas as novas edições a partir de agora serão registradas com auditoria completa.'
                 )}
