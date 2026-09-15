@@ -40,16 +40,36 @@ export function App() {
     if (isSupabaseConfigurado()) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
-          setUsuarioAuth(session.user);
-          localStorage.setItem('vermont_auth_session', JSON.stringify(session.user));
+          const raw = localStorage.getItem('vermont_auth_session');
+          let savedUser = null;
+          try {
+            savedUser = raw ? JSON.parse(raw) : null;
+          } catch (e) {}
+
+          if (savedUser && savedUser.user_metadata?.role === 'operador') {
+            setUsuarioAuth(savedUser);
+          } else {
+            setUsuarioAuth(session.user);
+            localStorage.setItem('vermont_auth_session', JSON.stringify(session.user));
+          }
         }
       }).catch(() => {});
 
       // Escuta alterações de estado de autenticação em tempo real
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
         if (session?.user) {
-          setUsuarioAuth(session.user);
-          localStorage.setItem('vermont_auth_session', JSON.stringify(session.user));
+          const raw = localStorage.getItem('vermont_auth_session');
+          let savedUser = null;
+          try {
+            savedUser = raw ? JSON.parse(raw) : null;
+          } catch (e) {}
+
+          if (savedUser && savedUser.user_metadata?.role === 'operador') {
+            setUsuarioAuth(savedUser);
+          } else {
+            setUsuarioAuth(session.user);
+            localStorage.setItem('vermont_auth_session', JSON.stringify(session.user));
+          }
         } else if (_event === 'SIGNED_OUT') {
           setUsuarioAuth(null);
           localStorage.removeItem('vermont_auth_session');
@@ -65,10 +85,26 @@ export function App() {
   const isAutenticado = !!usuarioAuth;
   const userMeta = usuarioAuth?.user_metadata || {};
   const userEmail = (usuarioAuth?.email || '').toLowerCase();
+  const userRole = (userMeta.role || '').toLowerCase();
 
-  // É Admin Geral se possuir role 'admin' ou e-mail de admin/faturamento
-  const isAdmin = isAutenticado && (
-    userMeta.role === 'admin' || 
+  // É Operador de Pedreira se possuir role 'operador', indicação de pedreira ou e-mail correspondente
+  const isOperadorPedreira = userRole === 'operador' || 
+    Boolean(userMeta.pedreira) ||
+    userEmail.includes('pedreira') ||
+    userEmail.includes('uruoca') ||
+    userEmail.includes('tajmahal') ||
+    userEmail.includes('negresco') ||
+    userEmail.includes('delmare') ||
+    userEmail.includes('massape') ||
+    userEmail.includes('jaibaras') ||
+    userEmail.includes('sobral') ||
+    userEmail.includes('serrote') ||
+    userEmail.includes('saogoncalo') ||
+    userEmail.includes('beberibe');
+
+  // É Admin Geral estritamente se não for operador de pedreira e tiver perfil de administrador
+  const isAdmin = isAutenticado && !isOperadorPedreira && (
+    userRole === 'admin' || 
     userEmail.startsWith('admin') || 
     userEmail.includes('faturamento') ||
     userEmail.includes('diretoria') ||
@@ -76,28 +112,22 @@ export function App() {
   );
 
   // Pedreira vinculada caso seja operador de campo
-  const pedreiraOperador = isAdmin ? null : (
+  const pedreiraOperador = isOperadorPedreira ? (
     userMeta.pedreira || (
-      userEmail.includes('uruoca') ? 'Uruoca - CE (Taj Mahal)' :
+      userEmail.includes('uruoca') || userEmail.includes('tajmahal') ? 'Uruoca - CE (Taj Mahal)' :
       userEmail.includes('negresco') ? 'Massapê - CE (Negresco)' :
       userEmail.includes('delmare') ? 'Massapê - CE (Del Mare)' :
-      userEmail.includes('jaibaras') ? 'Sobral - CE (Jaibaras)' :
-      userEmail.includes('serrote') ? 'São Gonçalo do Amarante - CE (Serrote)' :
+      userEmail.includes('massape') ? 'Massapê - CE (Negresco)' :
+      userEmail.includes('jaibaras') || userEmail.includes('sobral') ? 'Sobral - CE (Jaibaras)' :
+      userEmail.includes('serrote') || userEmail.includes('saogoncalo') ? 'São Gonçalo do Amarante - CE (Serrote)' :
       userEmail.includes('beberibe') ? 'Beberibe - CE' : null
     )
-  );
+  ) : null;
 
   const handleLoginSucesso = (user) => {
     if (user) {
       setUsuarioAuth(user);
       localStorage.setItem('vermont_auth_session', JSON.stringify(user));
-    } else if (isSupabaseConfigurado()) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          setUsuarioAuth(session.user);
-          localStorage.setItem('vermont_auth_session', JSON.stringify(session.user));
-        }
-      });
     }
   };
 
@@ -119,6 +149,8 @@ export function App() {
   };
 
   const handleVisualizarComprovante = (agendamento) => {
+    // Comprovante oficial só pode ser aberto por Administradores Gerais
+    if (!isAdmin) return;
     setAgendamentoConcluido(agendamento);
   };
 

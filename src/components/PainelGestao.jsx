@@ -28,8 +28,10 @@ import {
   limparNomeEmpresa,
   verificarConformidadeDocumental,
   obterBaseMotoristas,
-  carregarBaseMotoristasUnificada
+  carregarBaseMotoristasUnificada,
+  isSupabaseConfigurado
 } from '../services/agendamentoService';
+import { supabase } from '../lib/supabase';
 import { ModalEditarAgendamento } from './ModalEditarAgendamento';
 import { ModalHistoricoStatus } from './ModalHistoricoStatus';
 import { ModalConfirmarStatus } from './ModalConfirmarStatus';
@@ -101,11 +103,32 @@ export function PainelGestao({
   const { dataHoje } = obterDataHoraAtualBrasil();
   const hojeStr = dataHoje || new Date().toISOString().split('T')[0];
 
+  // Validação estrita de perfil: Administrador Geral vs Operador de Pedreira
+  const userMetaRole = (usuario?.user_metadata?.role || '').toLowerCase();
+  const userEmailStr = (usuario?.email || '').toLowerCase();
+  const isOperadorPedreira = Boolean(
+    pedreiraOperador || 
+    userMetaRole === 'operador' || 
+    userEmailStr.includes('pedreira') ||
+    userEmailStr.includes('uruoca') ||
+    userEmailStr.includes('tajmahal') ||
+    userEmailStr.includes('negresco') ||
+    userEmailStr.includes('delmare') ||
+    userEmailStr.includes('massape') ||
+    userEmailStr.includes('jaibaras') ||
+    userEmailStr.includes('sobral') ||
+    userEmailStr.includes('serrote') ||
+    userEmailStr.includes('saogoncalo') ||
+    userEmailStr.includes('beberibe')
+  );
+
+  const isAcessoAdminGeral = Boolean(isAdmin && !isOperadorPedreira);
+
   const usuarioInfo = {
-    nome: usuario?.user_metadata?.nome || (usuario?.email ? usuario.email.split('@')[0].toUpperCase() : (isAdmin ? 'ADMINISTRADOR GERAL' : 'OPERADOR PEDREIRA')),
+    nome: usuario?.user_metadata?.nome || (usuario?.email ? usuario.email.split('@')[0].toUpperCase() : (isAcessoAdminGeral ? 'ADMINISTRADOR GERAL' : 'OPERADOR PEDREIRA')),
     email: usuario?.email || '',
-    role: isAdmin ? 'Administrador Geral' : `Operador (${pedreiraOperador || 'Pedreira'})`,
-    isAdmin
+    role: isAcessoAdminGeral ? 'Administrador Geral' : `Operador (${pedreiraOperador || 'Pedreira'})`,
+    isAdmin: isAcessoAdminGeral
   };
 
   const [agendamentos, setAgendamentos] = useState([]);
@@ -224,6 +247,7 @@ export function PainelGestao({
   // Estados para Gestão de Conformidade de Motoristas & Frota (Exclusivo Pedreiras & Admin)
   const [modalGestaoFrotaAberto, setModalGestaoFrotaAberto] = useState(false);
   const [motoristaParaConformidade, setMotoristaParaConformidade] = useState(null);
+  const [versaoBaseMotoristas, setVersaoBaseMotoristas] = useState(0);
 
   const handleAbrirConformidadeDireta = (ag) => {
     const cpfLimpo = String(ag.motorista_cpf || '').replace(/\D/g, '');
@@ -305,7 +329,12 @@ export function PainelGestao({
       setTodosAgendamentos(listaCompletaGeral);
 
       // Sincroniza a base de motoristas em segundo plano com o Supabase e histórico de agendamentos
-      carregarBaseMotoristasUnificada(listaCompletaGeral).catch(e => console.warn('Sync motoristas:', e));
+      try {
+        await carregarBaseMotoristasUnificada(listaCompletaGeral);
+        setVersaoBaseMotoristas(v => v + 1);
+      } catch (e) {
+        console.warn('Sync motoristas:', e);
+      }
 
       const mapaAnterior = statusAnterioresMapRef.current;
       const novosCarregamentos = [];
@@ -370,6 +399,35 @@ export function PainelGestao({
   useEffect(() => {
     carregarDados(true);
   }, [filtroPedreira, filtroStatus, filtroData]);
+
+  // Sincronização em tempo real via Supabase Realtime para agendamentos e base de motoristas
+  useEffect(() => {
+    if (isSupabaseConfigurado()) {
+      const channel = supabase
+        .channel('realtime_painel_gestao_sync')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'base_motoristas' },
+          () => {
+            carregarBaseMotoristasUnificada()
+              .then(() => setVersaoBaseMotoristas(v => v + 1))
+              .catch(() => {});
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'agendamentos_pedreira' },
+          () => {
+            carregarDados(false);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, []);
 
   // Intervalo de Auto-Atualização a cada 1 minuto (60 segundos) com contador em tempo real
   useEffect(() => {
@@ -515,6 +573,11 @@ export function PainelGestao({
 
     if (!isAdmin && agendamento.status === 'Aguardando Liberação') {
       alert('Acesso restrito: Agendamentos com status "Aguardando Liberação" só podem ser liberados ou alterados pelo Administrador Geral.');
+      return;
+    }
+
+    if (!isAdmin && (agendamento.status === 'Finalizado' || agendamento.status === 'Carregado')) {
+      alert('Acesso restrito: Agendamentos com status "Finalizado" estão concluídos e bloqueados para alteração pelas pedreiras. Apenas o Administrador Geral pode alterar ou reverter.');
       return;
     }
 
@@ -999,10 +1062,10 @@ export function PainelGestao({
                           </span>
                         </div>
                         <p style={{ margin: '0 0 6px 0', color: '#e2e8f0', lineHeight: '1.3' }}>{n.mensagem}</p>
-                        {n.agendamento && (
+                        {isAcessoAdminGeral && n.agendamento && (
                           <button
                             onClick={() => {
-                              onVisualizarComprovante(n.agendamento);
+                              if (onVisualizarComprovante) onVisualizarComprovante(n.agendamento);
                               setPainelNotificacoesAberto(false);
                             }}
                             style={{ background: 'transparent', border: 'none', color: '#86efac', fontSize: '0.72rem', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
@@ -1139,11 +1202,11 @@ export function PainelGestao({
             <p style={{ margin: 0, fontSize: '0.82rem', color: '#e2e8f0', lineHeight: '1.4' }}>
               {bannerAlerta.mensagem}
             </p>
-            {bannerAlerta.agendamento && (
+            {isAcessoAdminGeral && bannerAlerta.agendamento && (
               <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
                 <button
                   onClick={() => {
-                    onVisualizarComprovante(bannerAlerta.agendamento);
+                    if (onVisualizarComprovante) onVisualizarComprovante(bannerAlerta.agendamento);
                     setBannerAlerta(null);
                   }}
                   className="btn btn-secondary"
@@ -2277,11 +2340,11 @@ export function PainelGestao({
                             display: 'flex',
                             alignItems: 'center',
                             gap: 4,
-                            background: !isAdmin && ag.status === 'Aguardando Liberação' ? 'rgba(15, 23, 42, 0.45)' : 'rgba(15, 23, 42, 0.85)',
-                            border: !isAdmin && ag.status === 'Aguardando Liberação' ? '1px solid rgba(245, 158, 11, 0.25)' : '1px solid rgba(255, 255, 255, 0.12)',
+                            background: !isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'rgba(15, 23, 42, 0.45)' : 'rgba(15, 23, 42, 0.85)',
+                            border: !isAdmin && ag.status === 'Aguardando Liberação' ? '1px solid rgba(245, 158, 11, 0.25)' : !isAdmin && (ag.status === 'Finalizado' || ag.status === 'Carregado') ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid rgba(255, 255, 255, 0.12)',
                             borderRadius: 8,
                             padding: '2px 6px',
-                            opacity: !isAdmin && ag.status === 'Aguardando Liberação' ? 0.75 : 1
+                            opacity: !isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado') ? 0.75 : 1
                           }}>
                             <span style={{ fontSize: '0.68rem', color: 'var(--slate-400)', fontWeight: 600, textTransform: 'uppercase' }}>
                               Mudar:
@@ -2289,8 +2352,8 @@ export function PainelGestao({
                             <select
                               value={ag.status === 'Carregado' ? 'Finalizado' : ag.status}
                               onChange={(e) => solicitarMudancaStatus(ag, e.target.value)}
-                              disabled={!isAdmin && ag.status === 'Aguardando Liberação'}
-                              title={!isAdmin && ag.status === 'Aguardando Liberação' ? 'Apenas o Administrador Geral pode liberar ou alterar agendamentos em Aguardando Liberação' : 'Alterar status operacional'}
+                              disabled={!isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado')}
+                              title={!isAdmin && (ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'Agendamentos Finalizados estão concluídos e bloqueados para alteração' : (!isAdmin && ag.status === 'Aguardando Liberação' ? 'Apenas o Administrador Geral pode liberar ou alterar agendamentos em Aguardando Liberação' : 'Alterar status operacional')}
                               style={{
                                 flex: 1,
                                 padding: '4px 6px',
@@ -2300,7 +2363,7 @@ export function PainelGestao({
                                 background: '#111915',
                                 border: '1px solid rgba(255, 255, 255, 0.08)',
                                 color: '#f1f5f9',
-                                cursor: !isAdmin && ag.status === 'Aguardando Liberação' ? 'not-allowed' : 'pointer',
+                                cursor: !isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'not-allowed' : 'pointer',
                                 outline: 'none'
                               }}
                             >
@@ -2331,6 +2394,11 @@ export function PainelGestao({
                           {!isAdmin && ag.status === 'Aguardando Liberação' && (
                             <span style={{ fontSize: '0.67rem', color: '#fde68a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 3 }}>
                               🔒 Liberação exclusiva do Admin
+                            </span>
+                          )}
+                          {!isAdmin && (ag.status === 'Finalizado' || ag.status === 'Carregado') && (
+                            <span style={{ fontSize: '0.67rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 3 }}>
+                              🔒 Finalizado (Bloqueado)
                             </span>
                           )}
                         </div>
@@ -2422,16 +2490,19 @@ export function PainelGestao({
                             Editar
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={() => onVisualizarComprovante(ag)}
-                            className="btn btn-secondary"
-                            style={{ padding: '6px 10px', fontSize: '0.78rem' }}
-                            title="Ver Comprovante Oficial de Agendamento"
-                          >
-                            <FileText size={14} />
-                            Ver
-                          </button>
+                          {/* BOTÃO VER COMPROVANTE (Exclusivo Administrador Geral) */}
+                          {isAcessoAdminGeral && onVisualizarComprovante && (
+                            <button
+                              type="button"
+                              onClick={() => onVisualizarComprovante(ag)}
+                              className="btn btn-secondary"
+                              style={{ padding: '6px 10px', fontSize: '0.78rem' }}
+                              title="Ver Comprovante Oficial de Agendamento (Apenas Administrador Geral)"
+                            >
+                              <FileText size={14} />
+                              Ver
+                            </button>
+                          )}
 
                           {/* BOTÃO AUTORIZAÇÃO DE CARREGAMENTO (Disponível apenas após liberação: Liberado para Carregar e Carregando) */}
                           {(ag.status === 'Liberado para Carregar' || ag.status === 'Carregando') && (
@@ -2455,7 +2526,7 @@ export function PainelGestao({
                           )}
 
                           {/* BOTÃO EXCLUIR AGENDAMENTO (Exclusivo para ADMIN GERAL) */}
-                          {isAdmin && (
+                          {isAcessoAdminGeral && (
                             <button
                               type="button"
                               onClick={() => handleExcluir(ag)}
@@ -2538,6 +2609,7 @@ export function PainelGestao({
       {modalGestaoFrotaAberto && (
         <ModalGestaoMotoristasFrota
           usuarioNome={usuarioInfo.nome}
+          usuarioInfo={usuarioInfo}
           isAdmin={isAdmin}
           todosAgendamentos={todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos}
           aoFechar={() => setModalGestaoFrotaAberto(false)}
@@ -2549,6 +2621,8 @@ export function PainelGestao({
         <ModalConformidadeMotorista
           motoristaInicial={motoristaParaConformidade}
           usuarioNome={usuarioInfo.nome}
+          usuarioInfo={usuarioInfo}
+          isAdmin={isAdmin}
           aoFechar={() => setMotoristaParaConformidade(null)}
           aoSalvar={() => {
             setMotoristaParaConformidade(null);

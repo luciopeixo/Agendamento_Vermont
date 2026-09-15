@@ -96,8 +96,18 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
               });
 
               if (!authError && data?.session?.user) {
+                const usuarioFinal = isAdminUser ? data.session.user : {
+                  ...data.session.user,
+                  email: `${loginFinal}@pedreira.local`,
+                  user_metadata: {
+                    ...(data.session.user.user_metadata || {}),
+                    role: 'operador',
+                    nome: loginBase.toUpperCase(),
+                    pedreira: pedreiraNomeMap[loginFinal] || loginBase
+                  }
+                };
                 setCarregando(false);
-                onLoginSucesso(data.session.user);
+                onLoginSucesso(usuarioFinal);
                 return;
               }
             } catch (innerErr) {
@@ -113,10 +123,17 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
       // Protegido por hash criptográfico e variável de ambiente (sem expor senhas no código)
       const pedreiraNomeMap = {
         'uruoca': 'Uruoca - CE (Taj Mahal)',
+        'tajmahal': 'Uruoca - CE (Taj Mahal)',
+        'negresco': 'Massapê - CE (Negresco)',
+        'massape': 'Massapê - CE (Negresco)',
         'massape.negresco': 'Massapê - CE (Negresco)',
+        'delmare': 'Massapê - CE (Del Mare)',
         'massape.delmare': 'Massapê - CE (Del Mare)',
+        'sobral': 'Sobral - CE (Jaibaras)',
         'jaibaras': 'Sobral - CE (Jaibaras)',
         'serrote': 'São Gonçalo do Amarante - CE (Serrote)',
+        'saogoncalo': 'São Gonçalo do Amarante - CE (Serrote)',
+        'sao_goncalo': 'São Gonçalo do Amarante - CE (Serrote)',
         'beberibe': 'Beberibe - CE'
       };
 
@@ -134,7 +151,7 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
       if (isSenhaConfiguradaValida || isHashValido || isSenhaOperacionalValida) {
         const mockUser = {
           id: `usr_${loginFinal}_${Date.now()}`,
-          email: login.includes('@') ? login : `${loginFinal}@sistema.local`,
+          email: login.includes('@') ? login : `${loginFinal}@pedreira.local`,
           user_metadata: {
             role: isAdminUser ? 'admin' : 'operador',
             nome: loginBase.toUpperCase(),

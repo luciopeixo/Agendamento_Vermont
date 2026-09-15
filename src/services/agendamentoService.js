@@ -308,6 +308,100 @@ export function obterCpfsMotoristasExcluidos() {
 }
 
 /**
+ * Normaliza o array de histórico de alterações do motorista
+ */
+export function normalizarHistoricoMotorista(historico) {
+  if (!historico) return [];
+  if (Array.isArray(historico)) return historico;
+  try {
+    const parsed = JSON.parse(historico);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Registra uma entrada na auditoria de edições do motorista (quem alterou, quando e quais campos)
+ */
+export function registrarHistoricoEdicaoMotorista(motoristaAnterior = {}, motoristaNovo = {}, usuarioInfo = {}) {
+  const alteracoes = [];
+  const formatarValor = (val, isData = false) => {
+    if (val === null || val === undefined || val === '') return 'Não informado';
+    if (isData && typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      const [a, m, d] = val.split('-');
+      return `${d}/${m}/${a}`;
+    }
+    return String(val).trim();
+  };
+
+  const camposParaMonitorar = [
+    { key: 'nome', label: 'Nome do Motorista', isData: false },
+    { key: 'telefone', label: 'Telefone / WhatsApp', isData: false },
+    { key: 'transportadora', label: 'Transportadora', isData: false },
+    { key: 'transportadora_cnpj', label: 'CNPJ da Transportadora', isData: false },
+    { key: 'tipo_veiculo', label: 'Tipo de Veículo', isData: false },
+    { key: 'cnh_categoria', label: 'Categoria CNH', isData: false },
+    { key: 'cnh_validade', label: 'Validade da CNH', isData: true },
+    { key: 'placa_cavalo', label: 'Placa do Cavalo', isData: false },
+    { key: 'crlv_validade_cavalo', label: 'Último CRLV Cavalo', isData: true },
+    { key: 'placa_carreta', label: 'Placa da Carreta 1', isData: false },
+    { key: 'crlv_validade_carreta', label: 'Último CRLV Carreta 1', isData: true },
+    { key: 'validade_laudo_rocha', label: 'Vencimento Laudo Rocha / CSV', isData: true },
+    { key: 'placa_carreta_2', label: 'Placa da Carreta 2', isData: false },
+    { key: 'crlv_validade_carreta_2', label: 'Último CRLV Carreta 2', isData: true },
+    { key: 'validade_laudo_rocha_2', label: 'Vencimento Laudo Rocha (Carreta 2)', isData: true },
+    { key: 'status_documental', label: 'Status Documental', isData: false },
+    { key: 'observacoes', label: 'Observações Internas', isData: false }
+  ];
+
+  camposParaMonitorar.forEach(({ key, label, isData }) => {
+    const valAnt = motoristaAnterior ? (motoristaAnterior[key] || '') : '';
+    const valNov = motoristaNovo ? (motoristaNovo[key] || '') : '';
+    const strAnt = String(valAnt).trim().toUpperCase();
+    const strNov = String(valNov).trim().toUpperCase();
+
+    if (strAnt !== strNov && (strAnt !== '' || strNov !== '')) {
+      alteracoes.push({
+        campo: key,
+        label,
+        de: formatarValor(valAnt, isData),
+        para: formatarValor(valNov, isData)
+      });
+    }
+  });
+
+  const historicoExistente = normalizarHistoricoMotorista(
+    motoristaNovo.historico_edicoes || motoristaAnterior?.historico_edicoes || []
+  );
+
+  const isNovoCadastro = !motoristaAnterior || !motoristaAnterior.cpf || !motoristaAnterior.nome;
+
+  const nomeUsuario = usuarioInfo?.nome || usuarioInfo?.email || (usuarioInfo?.isAdmin ? 'Administrador Geral' : 'Operador Pedreira');
+  const roleUsuario = usuarioInfo?.role || (usuarioInfo?.isAdmin ? 'Administrador Geral' : 'Operador Pedreira');
+  const emailUsuario = usuarioInfo?.email || '';
+
+  const novoEvento = {
+    id: `hist_mot_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+    data_hora: new Date().toISOString(),
+    usuario_nome: nomeUsuario,
+    usuario_role: roleUsuario,
+    usuario_email: emailUsuario,
+    tipo: isNovoCadastro ? 'cadastro_inicial' : 'edicao_dados',
+    descricao: isNovoCadastro 
+      ? `Cadastro inicial do motorista e frota realizado por ${nomeUsuario}` 
+      : `Atualização cadastral (${alteracoes.length} ${alteracoes.length === 1 ? 'campo alterado' : 'campos alterados'}) realizada por ${nomeUsuario}`,
+    alteracoes: alteracoes
+  };
+
+  if (!isNovoCadastro && alteracoes.length === 0) {
+    novoEvento.descricao = `Revisão cadastral / salvamento confirmado por ${nomeUsuario}`;
+  }
+
+  return [novoEvento, ...historicoExistente];
+}
+
+/**
  * Carrega a base unificada e consolidada de todos os motoristas cadastrados
  * Unifica: Base de Conformidade (localStorage / Supabase) + Histórico completo de agendamentos
  */
@@ -323,7 +417,8 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
       mapaMotoristas.set(rawC, {
         ...m,
         cpf: rawC,
-        nome: (m.nome || '').trim().toUpperCase()
+        nome: (m.nome || '').trim().toUpperCase(),
+        historico_edicoes: normalizarHistoricoMotorista(m.historico_edicoes)
       });
     }
   });
@@ -340,11 +435,18 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
           const rawC = String(item.cpf || '').replace(/\D/g, '');
           if (rawC.length === 11 && !cpfsExcluidos.has(rawC)) {
             const existente = mapaMotoristas.get(rawC) || {};
+            const itemLimpo = {};
+            Object.keys(item).forEach(k => {
+              if (item[k] !== null && item[k] !== undefined && item[k] !== '') {
+                itemLimpo[k] = item[k];
+              }
+            });
             mapaMotoristas.set(rawC, {
               ...existente,
-              ...item,
+              ...itemLimpo,
               cpf: rawC,
-              nome: (item.nome || existente.nome || '').trim().toUpperCase()
+              nome: (item.nome || existente.nome || '').trim().toUpperCase(),
+              historico_edicoes: normalizarHistoricoMotorista(item.historico_edicoes || existente.historico_edicoes)
             });
           }
         });
@@ -379,6 +481,7 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
         validade_laudo_rocha_2: existente.validade_laudo_rocha_2 || null,
         status_documental: existente.status_documental || 'REGULAR',
         observacoes: existente.observacoes || '',
+        historico_edicoes: normalizarHistoricoMotorista(existente.historico_edicoes),
         atualizado_em: existente.atualizado_em || ag.created_at || new Date().toISOString()
       });
     }
@@ -475,7 +578,7 @@ export async function salvarMotoristaNaBase(dadosMotorista = {}) {
 /**
  * Salva ou edita diretamente o cadastro completo de conformidade de motorista e frota (Pedreira / Admin)
  */
-export async function salvarMotoristaFrotaConformidade(dados = {}) {
+export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo = {}) {
   try {
     const rawCpf = dados.cpf || dados.motorista_cpf;
     if (!rawCpf) return { sucesso: false, erro: 'CPF é obrigatório.' };
@@ -486,6 +589,10 @@ export async function salvarMotoristaFrotaConformidade(dados = {}) {
     const index = base.findIndex(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo);
     const existente = index !== -1 ? base[index] : {};
 
+    const nomeUsuario = usuarioInfo?.nome || usuarioInfo?.email || dados.atualizado_por || (usuarioInfo?.isAdmin ? 'ADMIN' : 'PEDREIRA');
+
+    const historicoAtualizado = registrarHistoricoEdicaoMotorista(existente, dados, usuarioInfo);
+
     const registroAtualizado = {
       ...existente,
       cpf: cpfLimpo,
@@ -495,20 +602,24 @@ export async function salvarMotoristaFrotaConformidade(dados = {}) {
       transportadora_cnpj: dados.transportadora_cnpj || existente.transportadora_cnpj || '',
       tipo_veiculo: dados.tipo_veiculo || existente.tipo_veiculo || 'Carreta / Bitrem',
       placa_cavalo: (dados.placa_cavalo || existente.placa_cavalo || '').toUpperCase().trim(),
+      uf_cavalo: dados.uf_cavalo || existente.uf_cavalo || identificarUFPelaPlaca(dados.placa_cavalo) || 'ES',
+      crlv_validade_cavalo: dados.crlv_validade_cavalo || null,
       placa_carreta: (dados.placa_carreta || existente.placa_carreta || '').toUpperCase().trim(),
+      uf_carreta: dados.uf_carreta || existente.uf_carreta || identificarUFPelaPlaca(dados.placa_carreta) || 'ES',
+      crlv_validade_carreta: dados.crlv_validade_carreta || null,
+      validade_laudo_rocha: dados.validade_laudo_rocha || null,
       placa_carreta_2: (dados.placa_carreta_2 || existente.placa_carreta_2 || '').toUpperCase().trim(),
+      uf_carreta_2: dados.uf_carreta_2 || existente.uf_carreta_2 || identificarUFPelaPlaca(dados.placa_carreta_2) || 'ES',
+      crlv_validade_carreta_2: dados.crlv_validade_carreta_2 || null,
+      validade_laudo_rocha_2: dados.validade_laudo_rocha_2 || null,
       // Documentação
       cnh_categoria: (dados.cnh_categoria || existente.cnh_categoria || 'E').toUpperCase().trim(),
       cnh_validade: dados.cnh_validade || null,
-      crlv_validade_cavalo: dados.crlv_validade_cavalo || null,
-      crlv_validade_carreta: dados.crlv_validade_carreta || null,
-      validade_laudo_rocha: dados.validade_laudo_rocha || null,
-      crlv_validade_carreta_2: dados.crlv_validade_carreta_2 || null,
-      validade_laudo_rocha_2: dados.validade_laudo_rocha_2 || null,
       status_documental: dados.status_documental || 'REGULAR',
       observacoes: (dados.observacoes || '').trim(),
+      historico_edicoes: historicoAtualizado,
       atualizado_em: new Date().toISOString(),
-      atualizado_por: dados.atualizado_por || 'PEDREIRA/ADMIN'
+      atualizado_por: nomeUsuario
     };
 
     const excluidos = obterCpfsMotoristasExcluidos();
@@ -529,24 +640,57 @@ export async function salvarMotoristaFrotaConformidade(dados = {}) {
 
     if (isSupabaseConfigurado()) {
       try {
-        await supabase.from('base_motoristas').upsert({
+        const payloadCompleto = {
           cpf: cpfLimpo,
           nome: registroAtualizado.nome,
           telefone: registroAtualizado.telefone,
           transportadora: registroAtualizado.transportadora,
+          transportadora_cnpj: registroAtualizado.transportadora_cnpj,
+          tipo_veiculo: registroAtualizado.tipo_veiculo,
           cnh_categoria: registroAtualizado.cnh_categoria,
           cnh_validade: registroAtualizado.cnh_validade,
           placa_cavalo: registroAtualizado.placa_cavalo,
+          uf_cavalo: registroAtualizado.uf_cavalo,
           crlv_validade_cavalo: registroAtualizado.crlv_validade_cavalo,
           placa_carreta: registroAtualizado.placa_carreta,
+          uf_carreta: registroAtualizado.uf_carreta,
           crlv_validade_carreta: registroAtualizado.crlv_validade_carreta,
           validade_laudo_rocha: registroAtualizado.validade_laudo_rocha,
           placa_carreta_2: registroAtualizado.placa_carreta_2,
+          uf_carreta_2: registroAtualizado.uf_carreta_2,
           crlv_validade_carreta_2: registroAtualizado.crlv_validade_carreta_2,
           validade_laudo_rocha_2: registroAtualizado.validade_laudo_rocha_2,
+          status_documental: registroAtualizado.status_documental,
           observacoes: registroAtualizado.observacoes,
-          atualizado_em: new Date().toISOString()
-        }, { onConflict: 'cpf' });
+          historico_edicoes: historicoAtualizado,
+          atualizado_por: registroAtualizado.atualizado_por,
+          atualizado_em: registroAtualizado.atualizado_em
+        };
+
+        const { error: errUpsert } = await supabase.from('base_motoristas').upsert(payloadCompleto, { onConflict: 'cpf' });
+
+        if (errUpsert) {
+          // Fallback para schema reduzido se algumas colunas opcionais não existirem no Supabase
+          const payloadReduzido = {
+            cpf: cpfLimpo,
+            nome: registroAtualizado.nome,
+            telefone: registroAtualizado.telefone,
+            transportadora: registroAtualizado.transportadora,
+            cnh_categoria: registroAtualizado.cnh_categoria,
+            cnh_validade: registroAtualizado.cnh_validade,
+            placa_cavalo: registroAtualizado.placa_cavalo,
+            crlv_validade_cavalo: registroAtualizado.crlv_validade_cavalo,
+            placa_carreta: registroAtualizado.placa_carreta,
+            crlv_validade_carreta: registroAtualizado.crlv_validade_carreta,
+            validade_laudo_rocha: registroAtualizado.validade_laudo_rocha,
+            placa_carreta_2: registroAtualizado.placa_carreta_2,
+            crlv_validade_carreta_2: registroAtualizado.crlv_validade_carreta_2,
+            validade_laudo_rocha_2: registroAtualizado.validade_laudo_rocha_2,
+            observacoes: registroAtualizado.observacoes,
+            atualizado_em: registroAtualizado.atualizado_em
+          };
+          await supabase.from('base_motoristas').upsert(payloadReduzido, { onConflict: 'cpf' });
+        }
       } catch (_e) {
         // Fallback
       }
@@ -1629,46 +1773,14 @@ export async function consultarMotoristaPorCPF(cpf = '') {
     };
   }
 
-  const cpfFormatado = formatarCPF(cpfLimpo);
-
-  // 2. Busca na base local (cadastros protegidos e conformidade)
-  const baseLocal = obterBaseMotoristas();
-  const encontradoLocal = baseLocal.find(m => {
-    const mCpf = String(m.cpf || '').replace(/\D/g, '');
-    return mCpf === cpfLimpo;
-  });
-
-  if (encontradoLocal && encontradoLocal.nome) {
-    const transpNome = limparNomeEmpresa(encontradoLocal.transportadora || '');
-    const transpCnpj = encontradoLocal.transportadora_cnpj || obterCnpjEmpresaCache(transpNome) || null;
-    return {
-      valido: true,
-      encontrado: true,
-      origem: 'base_local',
-      motorista: {
-        cpf: cpfLimpo,
-        nome: encontradoLocal.nome,
-        telefone: encontradoLocal.telefone || '',
-        transportadora: transpNome,
-        transportadora_cnpj: transpCnpj,
-        tipo_veiculo: encontradoLocal.tipo_veiculo || '',
-        placa_cavalo: encontradoLocal.placa_cavalo || '',
-        placa_carreta: encontradoLocal.placa_carreta || '',
-        placa_carreta_2: encontradoLocal.placa_carreta_2 || '',
-        cnh_categoria: encontradoLocal.cnh_categoria || 'E',
-        cnh_validade: encontradoLocal.cnh_validade || null,
-        crlv_validade_cavalo: encontradoLocal.crlv_validade_cavalo || null,
-        crlv_validade_carreta: encontradoLocal.crlv_validade_carreta || null,
-        validade_laudo_rocha: encontradoLocal.validade_laudo_rocha || null,
-        crlv_validade_carreta_2: encontradoLocal.crlv_validade_carreta_2 || null,
-        validade_laudo_rocha_2: encontradoLocal.validade_laudo_rocha_2 || null,
-        status_documental: encontradoLocal.status_documental || 'REGULAR',
-        observacoes: encontradoLocal.observacoes || ''
-      }
-    };
+  const cpfsExcluidos = obterCpfsMotoristasExcluidos();
+  if (cpfsExcluidos.has(cpfLimpo)) {
+    return { valido: true, encontrado: false, motorista: null, excluido: true };
   }
 
-  // 3. Se Supabase configurado, busca na tabela base_motoristas
+  const cpfFormatado = formatarCPF(cpfLimpo);
+
+  // 2. Se Supabase configurado, busca primeiro na tabela base_motoristas (dados mais recentes de qualquer pedreira/admin)
   if (isSupabaseConfigurado()) {
     try {
       const { data: dataBase, error: errorBase } = await supabase
@@ -1687,19 +1799,37 @@ export async function consultarMotoristaPorCPF(cpf = '') {
           transportadora_cnpj: item.transportadora_cnpj || '',
           tipo_veiculo: item.tipo_veiculo || '',
           placa_cavalo: item.placa_cavalo || '',
-          placa_carreta: item.placa_carreta || '',
-          placa_carreta_2: item.placa_carreta_2 || '',
-          cnh_categoria: item.cnh_categoria || 'E',
-          cnh_validade: item.cnh_validade || null,
+          uf_cavalo: item.uf_cavalo || identificarUFPelaPlaca(item.placa_cavalo) || 'ES',
           crlv_validade_cavalo: item.crlv_validade_cavalo || null,
+          placa_carreta: item.placa_carreta || '',
+          uf_carreta: item.uf_carreta || identificarUFPelaPlaca(item.placa_carreta) || 'ES',
           crlv_validade_carreta: item.crlv_validade_carreta || null,
           validade_laudo_rocha: item.validade_laudo_rocha || null,
+          placa_carreta_2: item.placa_carreta_2 || '',
+          uf_carreta_2: item.uf_carreta_2 || identificarUFPelaPlaca(item.placa_carreta_2) || 'ES',
           crlv_validade_carreta_2: item.crlv_validade_carreta_2 || null,
           validade_laudo_rocha_2: item.validade_laudo_rocha_2 || null,
+          cnh_categoria: item.cnh_categoria || 'E',
+          cnh_validade: item.cnh_validade || null,
           status_documental: item.status_documental || 'REGULAR',
-          observacoes: item.observacoes || ''
+          observacoes: item.observacoes || '',
+          historico_edicoes: normalizarHistoricoMotorista(item.historico_edicoes),
+          atualizado_por: item.atualizado_por || 'PEDREIRA/ADMIN',
+          atualizado_em: item.atualizado_em || null
         };
-        salvarMotoristaFrotaConformidade(mot);
+        
+        // Atualiza cache local
+        try {
+          const base = obterBaseMotoristas();
+          const idx = base.findIndex(m => String(m.cpf || '').replace(/\D/g, '') === cpfLimpo);
+          if (idx !== -1) {
+            base[idx] = { ...base[idx], ...mot };
+          } else {
+            base.push(mot);
+          }
+          localStorage.setItem(MOTORISTAS_BASE_KEY, codificarBaseMotoristasLocal(base));
+        } catch (_e) {}
+
         return { valido: true, encontrado: true, origem: 'base_supabase', motorista: mot };
       }
 
@@ -1725,9 +1855,48 @@ export async function consultarMotoristaPorCPF(cpf = '') {
         salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
         return { valido: true, encontrado: true, origem: 'historico_supabase', motorista: mot };
       }
-    } catch (e) {
-      console.warn('[Supabase Motorista] Erro ao consultar motorista no Supabase:', e);
-    }
+    } catch (_eSup) {}
+  }
+
+  // 3. Busca na base local (fallback offline)
+  const baseLocal = obterBaseMotoristas();
+  const encontradoLocal = baseLocal.find(m => {
+    const mCpf = String(m.cpf || '').replace(/\D/g, '');
+    return mCpf === cpfLimpo;
+  });
+
+  if (encontradoLocal && encontradoLocal.nome) {
+    const transpNome = limparNomeEmpresa(encontradoLocal.transportadora || '');
+    const transpCnpj = encontradoLocal.transportadora_cnpj || obterCnpjEmpresaCache(transpNome) || null;
+    return {
+      valido: true,
+      encontrado: true,
+      origem: 'base_local',
+      motorista: {
+        cpf: cpfLimpo,
+        nome: encontradoLocal.nome,
+        telefone: encontradoLocal.telefone || '',
+        transportadora: transpNome,
+        transportadora_cnpj: transpCnpj,
+        tipo_veiculo: encontradoLocal.tipo_veiculo || '',
+        placa_cavalo: encontradoLocal.placa_cavalo || '',
+        uf_cavalo: encontradoLocal.uf_cavalo || identificarUFPelaPlaca(encontradoLocal.placa_cavalo) || 'ES',
+        crlv_validade_cavalo: encontradoLocal.crlv_validade_cavalo || null,
+        placa_carreta: encontradoLocal.placa_carreta || '',
+        uf_carreta: encontradoLocal.uf_carreta || identificarUFPelaPlaca(encontradoLocal.placa_carreta) || 'ES',
+        crlv_validade_carreta: encontradoLocal.crlv_validade_carreta || null,
+        validade_laudo_rocha: encontradoLocal.validade_laudo_rocha || null,
+        placa_carreta_2: encontradoLocal.placa_carreta_2 || '',
+        uf_carreta_2: encontradoLocal.uf_carreta_2 || identificarUFPelaPlaca(encontradoLocal.placa_carreta_2) || 'ES',
+        crlv_validade_carreta_2: encontradoLocal.crlv_validade_carreta_2 || null,
+        validade_laudo_rocha_2: encontradoLocal.validade_laudo_rocha_2 || null,
+        cnh_categoria: encontradoLocal.cnh_categoria || 'E',
+        cnh_validade: encontradoLocal.cnh_validade || null,
+        status_documental: encontradoLocal.status_documental || 'REGULAR',
+        observacoes: encontradoLocal.observacoes || '',
+        historico_edicoes: normalizarHistoricoMotorista(encontradoLocal.historico_edicoes)
+      }
+    };
   }
 
   // 4. Busca no histórico de agendamentos locais
@@ -2896,12 +3065,18 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
       itemAtual = { ...agendamentoAtualizado };
     }
 
-    // Verificação de permissão para 'Aguardando Liberação'
+    // Verificação de permissão para 'Aguardando Liberação' e 'Finalizado'
     const statusOriginal = (itemAtual.status || 'Aguardando Liberação').trim();
     if (!usuarioInfo?.isAdmin && statusOriginal === 'Aguardando Liberação' && agendamentoAtualizado.status !== 'Aguardando Liberação') {
       return {
         success: false,
         error: 'Acesso restrito: Agendamentos com status "Aguardando Liberação" só podem ser liberados ou alterados pelo Administrador Geral.'
+      };
+    }
+    if (!usuarioInfo?.isAdmin && (statusOriginal === 'Finalizado' || statusOriginal === 'Carregado') && agendamentoAtualizado.status !== statusOriginal) {
+      return {
+        success: false,
+        error: 'Acesso restrito: Agendamentos com status "Finalizado" estão bloqueados para alteração pelas pedreiras. Apenas o Administrador Geral pode reverter.'
       };
     }
 
@@ -3029,6 +3204,21 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
       transportadora_cnpj: transpCnpj || null,
       historico_status: histConsolidado
     };
+
+    if (agendamentoAtualizado.motorista_cpf && agendamentoAtualizado.motorista_nome) {
+      salvarMotoristaNaBase({
+        cpf: agendamentoAtualizado.motorista_cpf,
+        nome: agendamentoAtualizado.motorista_nome,
+        telefone: agendamentoAtualizado.motorista_telefone,
+        transportadora: agendamentoAtualizado.transportadora,
+        transportadora_cnpj: agendamentoAtualizado.transportadora_cnpj,
+        tipo_veiculo: agendamentoAtualizado.tipo_veiculo,
+        placa_cavalo: agendamentoAtualizado.placa_cavalo,
+        placa_carreta: agendamentoAtualizado.placa_carreta,
+        placa_carreta_2: agendamentoAtualizado.placa_carreta_2,
+        atualizado_por: usuarioInfo?.nome || usuarioInfo?.email || 'PEDREIRA/ADMIN'
+      }).catch(() => {});
+    }
 
     const localAtualizado = atualizarAgendamentoLocalCompleto(dadosConsolidados, usuarioInfo);
     return { success: true, data: { ...localAtualizado, ...dadosConsolidados } };
@@ -3622,12 +3812,18 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
 
     itemAtual.historico_status = normalizarHistoricoStatus(itemAtual.historico_status);
 
-    // Verificação de permissão: apenas Admin pode alterar se o status atual for 'Aguardando Liberação'
+    // Verificação de permissão: apenas Admin pode alterar se o status atual for 'Aguardando Liberação' ou 'Finalizado'
     const statusAtualNormal = (itemAtual.status || 'Aguardando Liberação').trim();
     if (!usuarioInfo?.isAdmin && statusAtualNormal === 'Aguardando Liberação' && novoStatus !== 'Aguardando Liberação') {
       return {
         success: false,
         error: 'Acesso restrito: Agendamentos com status "Aguardando Liberação" só podem ser liberados ou alterados pelo Administrador Geral.'
+      };
+    }
+    if (!usuarioInfo?.isAdmin && (statusAtualNormal === 'Finalizado' || statusAtualNormal === 'Carregado') && novoStatus !== statusAtualNormal) {
+      return {
+        success: false,
+        error: 'Acesso restrito: Agendamentos com status "Finalizado" estão bloqueados para alteração pelas pedreiras. Apenas o Administrador Geral pode reverter.'
       };
     }
 

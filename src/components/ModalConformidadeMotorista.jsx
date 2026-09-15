@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Save, ShieldCheck, ShieldAlert, AlertTriangle, AlertCircle, 
-  Truck, User, FileText, Calendar, CheckCircle2, Clock, Info, Trash2
+  Truck, User, FileText, Calendar, CheckCircle2, Clock, Info, Trash2, History
 } from 'lucide-react';
 import { 
   salvarMotoristaFrotaConformidade, 
@@ -17,12 +17,15 @@ import {
   ESTADOS_BRASIL,
   identificarUFPelaPlaca
 } from '../services/agendamentoService';
+import { ModalHistoricoMotorista } from './ModalHistoricoMotorista';
 
 export function ModalConformidadeMotorista({ 
   motoristaInicial = null, 
   aoFechar, 
   aoSalvar,
-  usuarioNome = 'ADMIN'
+  usuarioNome = 'ADMIN',
+  usuarioInfo = null,
+  isAdmin = false
 }) {
   const [formData, setFormData] = useState({
     cpf: '',
@@ -52,6 +55,7 @@ export function ModalConformidadeMotorista({
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState(false);
+  const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
 
   useEffect(() => {
     if (motoristaInicial) {
@@ -240,7 +244,7 @@ export function ModalConformidadeMotorista({
       ...formData,
       cpf: cpfLimpo,
       atualizado_por: usuarioNome
-    });
+    }, usuarioInfo || { nome: usuarioNome, isAdmin });
 
     setSalvando(false);
     if (res.sucesso) {
@@ -950,15 +954,40 @@ export function ModalConformidadeMotorista({
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingTop: 12,
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            flexWrap: 'wrap',
+            gap: 10
           }}>
-            <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Botão de Histórico de Auditoria */}
               {motoristaInicial && (
+                <button
+                  type="button"
+                  onClick={() => setModalHistoricoAberto(true)}
+                  className="btn btn-secondary"
+                  style={{ 
+                    fontSize: '0.82rem', 
+                    padding: '8px 14px',
+                    gap: 6,
+                    background: 'rgba(56, 189, 248, 0.1)',
+                    borderColor: 'rgba(56, 189, 248, 0.3)',
+                    color: '#38bdf8'
+                  }}
+                  title="Ver histórico de edições e auditoria de usuários deste motorista"
+                >
+                  <History size={16} />
+                  <span>Ver Histórico</span>
+                </button>
+              )}
+
+              {/* Botão de Excluir: EXCLUSIVO PARA ADMINISTRADOR GERAL */}
+              {motoristaInicial && isAdmin && (
                 <button
                   type="button"
                   onClick={handleExcluir}
                   className="btn btn-danger"
                   style={{ fontSize: '0.82rem', padding: '8px 14px' }}
+                  title="Excluir cadastro da base (Apenas Administrador Geral)"
                 >
                   <Trash2 size={16} />
                   <span>Excluir Cadastro</span>
@@ -988,6 +1017,14 @@ export function ModalConformidadeMotorista({
           </div>
         </form>
       </div>
+
+      {/* Modal de Histórico de Auditoria */}
+      {modalHistoricoAberto && (
+        <ModalHistoricoMotorista
+          motorista={motoristaInicial || formData}
+          onFechar={() => setModalHistoricoAberto(false)}
+        />
+      )}
     </div>
   );
 }

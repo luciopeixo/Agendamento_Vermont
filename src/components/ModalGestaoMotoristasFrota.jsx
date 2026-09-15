@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Search, Plus, Edit3, ShieldCheck, ShieldAlert, AlertTriangle, AlertCircle, 
-  Truck, User, Calendar, CheckCircle2, RefreshCw, FileText, Download, Filter, Trash2
+  Truck, User, Calendar, CheckCircle2, RefreshCw, FileText, Download, Filter, Trash2, History
 } from 'lucide-react';
 import { 
   obterBaseMotoristasCompleta, 
@@ -17,11 +17,13 @@ import {
   identificarUFPelaPlaca
 } from '../services/agendamentoService';
 import { ModalConformidadeMotorista } from './ModalConformidadeMotorista';
+import { ModalHistoricoMotorista } from './ModalHistoricoMotorista';
 import * as XLSX from 'xlsx';
 
 export function ModalGestaoMotoristasFrota({ 
   aoFechar, 
   usuarioNome = 'ADMIN',
+  usuarioInfo = null,
   isAdmin = false,
   todosAgendamentos = []
 }) {
@@ -31,6 +33,7 @@ export function ModalGestaoMotoristasFrota({
   const [filtroStatus, setFiltroStatus] = useState('todos'); // 'todos' | 'regulares' | 'avencer' | 'vencidos'
   const [motoristaEditando, setMotoristaEditando] = useState(null);
   const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  const [motoristaParaHistorico, setMotoristaParaHistorico] = useState(null);
 
   const carregarDados = async () => {
     setCarregando(true);
@@ -578,34 +581,56 @@ export function ModalGestaoMotoristasFrota({
                               type="button"
                               onClick={() => abrirEdicao(item)}
                               className="btn btn-secondary"
-                              style={{ padding: '6px 10px', fontSize: '0.78rem' }}
+                              style={{ padding: '6px 10px', fontSize: '0.78rem', gap: 4 }}
                               title="Editar dados e validades deste motorista/frota"
                             >
                               <Edit3 size={14} />
                               <span>Editar</span>
                             </button>
+
                             <button
                               type="button"
-                              onClick={async () => {
-                                const nome = item.nome || 'este motorista';
-                                const cpfFmt = formatarCPF(item.cpf);
-                                if (window.confirm(`Deseja realmente remover o cadastro de ${nome} (${cpfFmt}) da base?`)) {
-                                  await excluirMotoristaFrota(item.cpf);
-                                  carregarDados();
-                                }
-                              }}
-                              className="btn-icon btn-ghost"
+                              onClick={() => setMotoristaParaHistorico(item)}
+                              className="btn btn-secondary"
                               style={{ 
-                                color: '#f87171', 
-                                padding: 6,
-                                borderRadius: 6,
-                                cursor: 'pointer',
-                                background: 'rgba(239, 68, 68, 0.1)'
+                                padding: '6px 10px', 
+                                fontSize: '0.78rem', 
+                                gap: 4,
+                                background: 'rgba(56, 189, 248, 0.1)',
+                                borderColor: 'rgba(56, 189, 248, 0.3)',
+                                color: '#38bdf8'
                               }}
-                              title="Excluir este cadastro (útil para duplicados ou CPFs digitados errados)"
+                              title="Ver histórico de alterações e auditoria de ações dos usuários"
                             >
-                              <Trash2 size={15} />
+                              <History size={14} />
+                              <span>Histórico</span>
                             </button>
+
+                            {/* BOTÃO EXCLUIR CADASTRO: EXCLUSIVO PARA ADMINISTRADOR GERAL */}
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const nome = item.nome || 'este motorista';
+                                  const cpfFmt = formatarCPF(item.cpf);
+                                  if (window.confirm(`Deseja realmente remover o cadastro de ${nome} (${cpfFmt}) da base?`)) {
+                                    await excluirMotoristaFrota(item.cpf);
+                                    carregarDados();
+                                  }
+                                }}
+                                className="btn-icon btn-ghost"
+                                style={{ 
+                                  color: '#f87171', 
+                                  padding: 6,
+                                  borderRadius: 6,
+                                  cursor: 'pointer',
+                                  background: 'rgba(239, 68, 68, 0.1)'
+                                }}
+                                title="Excluir este cadastro da base (Apenas Administrador Geral)"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -624,10 +649,20 @@ export function ModalGestaoMotoristasFrota({
         <ModalConformidadeMotorista
           motoristaInicial={motoristaEditando}
           usuarioNome={usuarioNome}
+          usuarioInfo={usuarioInfo || { nome: usuarioNome, isAdmin }}
+          isAdmin={isAdmin}
           aoFechar={() => setModalEdicaoAberto(false)}
           aoSalvar={() => {
             carregarDados();
           }}
+        />
+      )}
+
+      {/* Modal de Histórico de Auditoria do Motorista */}
+      {motoristaParaHistorico && (
+        <ModalHistoricoMotorista
+          motorista={motoristaParaHistorico}
+          onFechar={() => setMotoristaParaHistorico(null)}
         />
       )}
     </div>

@@ -110,6 +110,12 @@ export function ModalEditarAgendamento({
       return;
     }
 
+    if (!isAdmin && (agendamento.status === 'Finalizado' || agendamento.status === 'Carregado') && formData.status !== agendamento.status) {
+      setErro('Acesso restrito: Agendamentos com status "Finalizado" estão concluídos e bloqueados para alteração pelas pedreiras. Apenas o Administrador Geral pode alterar ou reverter.');
+      setSalvando(false);
+      return;
+    }
+
     if (!isAdmin && formData.status === 'Aguardando Liberação' && agendamento.status !== 'Aguardando Liberação') {
       setErro('Acesso restrito: Apenas o Administrador Geral pode reverter o status para "Aguardando Liberação".');
       setSalvando(false);
@@ -297,12 +303,12 @@ export function ModalEditarAgendamento({
                   className="form-select"
                   value={formData.status}
                   onChange={(e) => handleChange('status', e.target.value)}
-                  disabled={!isAdmin && agendamento.status === 'Aguardando Liberação'}
+                  disabled={!isAdmin && (agendamento.status === 'Aguardando Liberação' || agendamento.status === 'Finalizado' || agendamento.status === 'Carregado')}
                   style={{
                     fontWeight: 700,
                     color: formData.status === 'Finalizado' ? '#34d399' : formData.status === 'Carregando' ? '#38bdf8' : formData.status === 'Liberado para Carregar' ? '#c084fc' : formData.status === 'Cancelado' ? '#f87171' : '#fbbf24',
-                    cursor: !isAdmin && agendamento.status === 'Aguardando Liberação' ? 'not-allowed' : undefined,
-                    opacity: !isAdmin && agendamento.status === 'Aguardando Liberação' ? 0.75 : undefined
+                    cursor: !isAdmin && (agendamento.status === 'Aguardando Liberação' || agendamento.status === 'Finalizado' || agendamento.status === 'Carregado') ? 'not-allowed' : undefined,
+                    opacity: !isAdmin && (agendamento.status === 'Aguardando Liberação' || agendamento.status === 'Finalizado' || agendamento.status === 'Carregado') ? 0.75 : undefined
                   }}
                 >
                   {isAdmin ? (
@@ -320,6 +326,10 @@ export function ModalEditarAgendamento({
                 {!isAdmin && agendamento.status === 'Aguardando Liberação' ? (
                   <span style={{ fontSize: '0.72rem', color: '#fde68a', fontWeight: 600, display: 'block', marginTop: 4 }}>
                     🔒 Agendamentos em "Aguardando Liberação" só podem ter o status alterado pelo Administrador Geral.
+                  </span>
+                ) : !isAdmin && (agendamento.status === 'Finalizado' || agendamento.status === 'Carregado') ? (
+                  <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'block', marginTop: 4 }}>
+                    🔒 Agendamentos "Finalizados" estão concluídos e bloqueados para alteração pelas pedreiras. Apenas o Administrador Geral pode reverter.
                   </span>
                 ) : !isAdmin && (
                   <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)', marginTop: 2, display: 'block' }}>
