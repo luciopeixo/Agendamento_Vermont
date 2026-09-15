@@ -1938,7 +1938,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
       const { data: dataBase, error: errorBase } = await supabase
         .from('base_motoristas')
         .select('*')
-        .or(`cpf.eq.${cpfLimpo},cpf.eq.${cpfFormatado}`)
+        .in('cpf', [cpfLimpo, cpfFormatado])
         .limit(1);
 
       if (!errorBase && dataBase && dataBase.length > 0 && dataBase[0].nome) {
@@ -1989,7 +1989,7 @@ export async function consultarMotoristaPorCPF(cpf = '') {
       const { data, error } = await supabase
         .from('agendamentos_pedreira')
         .select('motorista_nome, motorista_telefone, transportadora, tipo_veiculo, placa_cavalo, placa_carreta, placa_carreta_2')
-        .or(`motorista_cpf.eq.${cpfLimpo},motorista_cpf.eq.${cpfFormatado}`)
+        .in('motorista_cpf', [cpfLimpo, cpfFormatado])
         .order('created_at', { ascending: false })
         .limit(1);
 

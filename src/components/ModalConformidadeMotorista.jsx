@@ -10,6 +10,7 @@ import {
   formatarCNPJ, 
   validarCPF,
   obterBaseMotoristas,
+  consultarMotoristaPorCPF,
   obterInfoLicenciamentoPorPlaca,
   calcularVencimentoCRLVPorPlaca,
   avaliarCRLVComDetran,
@@ -60,65 +61,84 @@ export function ModalConformidadeMotorista({
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
 
   useEffect(() => {
-    if (motoristaInicial) {
-      setMotoristaOriginalRef(motoristaInicial);
-      const cpfLimpo = String(motoristaInicial.cpf || '').replace(/\D/g, '');
+    let ativo = true;
+
+    const aplicarDadosMotorista = (mot) => {
+      if (!mot) return;
+      setMotoristaOriginalRef(mot);
+      const cpfLimpo = String(mot.cpf || mot.motorista_cpf || '').replace(/\D/g, '');
       const base = obterBaseMotoristas();
       const motBase = cpfLimpo ? base.find(m => String(m.cpf).replace(/\D/g, '') === cpfLimpo) : null;
       
-      const limpaCav = String(motoristaInicial.placa_cavalo || motBase?.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const limpaCav = String(mot.placa_cavalo || motBase?.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
       const veicCav = limpaCav ? base.find(m => String(m.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCav && m.crlv_validade_cavalo) : null;
 
-      const limpaCarr = String(motoristaInicial.placa_carreta || motBase?.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const limpaCarr = String(mot.placa_carreta || motBase?.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
       const veicCarr = limpaCarr ? base.find(m => (
         String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr ||
         String(m.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr
       ) && (m.crlv_validade_carreta || m.validade_laudo_rocha)) : null;
 
-      const limpaCarr2 = String(motoristaInicial.placa_carreta_2 || motBase?.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const limpaCarr2 = String(mot.placa_carreta_2 || motBase?.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
       const veicCarr2 = limpaCarr2 ? base.find(m => (
         String(m.placa_carreta_2 || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr2 ||
         String(m.placa_carreta || '').replace(/[^A-Z0-9]/gi, '').toUpperCase() === limpaCarr2
       ) && (m.crlv_validade_carreta_2 || m.crlv_validade_carreta)) : null;
 
-      const cnhVal = sanitizarDataIso(motoristaInicial.cnh_validade || motBase?.cnh_validade) || '';
-      const crlvCav = sanitizarDataIso(motoristaInicial.crlv_validade_cavalo || motBase?.crlv_validade_cavalo || veicCav?.crlv_validade_cavalo) || '';
-      const crlvCarr = sanitizarDataIso(motoristaInicial.crlv_validade_carreta || motBase?.crlv_validade_carreta || veicCarr?.crlv_validade_carreta) || '';
-      const laudoR = sanitizarDataIso(motoristaInicial.validade_laudo_rocha || motBase?.validade_laudo_rocha || veicCarr?.validade_laudo_rocha) || '';
-      const crlvCarr2 = sanitizarDataIso(motoristaInicial.crlv_validade_carreta_2 || motBase?.crlv_validade_carreta_2 || veicCarr2?.crlv_validade_carreta_2) || '';
-      const laudoR2 = sanitizarDataIso(motoristaInicial.validade_laudo_rocha_2 || motBase?.validade_laudo_rocha_2 || veicCarr2?.validade_laudo_rocha_2) || '';
+      const cnhVal = sanitizarDataIso(mot.cnh_validade || motBase?.cnh_validade) || '';
+      const crlvCav = sanitizarDataIso(mot.crlv_validade_cavalo || motBase?.crlv_validade_cavalo || veicCav?.crlv_validade_cavalo) || '';
+      const crlvCarr = sanitizarDataIso(mot.crlv_validade_carreta || motBase?.crlv_validade_carreta || veicCarr?.crlv_validade_carreta) || '';
+      const laudoR = sanitizarDataIso(mot.validade_laudo_rocha || motBase?.validade_laudo_rocha || veicCarr?.validade_laudo_rocha) || '';
+      const crlvCarr2 = sanitizarDataIso(mot.crlv_validade_carreta_2 || motBase?.crlv_validade_carreta_2 || veicCarr2?.crlv_validade_carreta_2) || '';
+      const laudoR2 = sanitizarDataIso(mot.validade_laudo_rocha_2 || motBase?.validade_laudo_rocha_2 || veicCarr2?.validade_laudo_rocha_2) || '';
 
-      const ufCav = motoristaInicial.uf_cavalo || motBase?.uf_cavalo || veicCav?.uf_cavalo || identificarUFPelaPlaca(limpaCav) || 'ES';
-      const ufCarr = motoristaInicial.uf_carreta || motBase?.uf_carreta || veicCarr?.uf_carreta || identificarUFPelaPlaca(limpaCarr) || 'ES';
-      const ufCarr2 = motoristaInicial.uf_carreta_2 || motBase?.uf_carreta_2 || veicCarr2?.uf_carreta_2 || identificarUFPelaPlaca(limpaCarr2) || 'ES';
+      const ufCav = mot.uf_cavalo || motBase?.uf_cavalo || veicCav?.uf_cavalo || identificarUFPelaPlaca(limpaCav) || 'ES';
+      const ufCarr = mot.uf_carreta || motBase?.uf_carreta || veicCarr?.uf_carreta || identificarUFPelaPlaca(limpaCarr) || 'ES';
+      const ufCarr2 = mot.uf_carreta_2 || motBase?.uf_carreta_2 || veicCarr2?.uf_carreta_2 || identificarUFPelaPlaca(limpaCarr2) || 'ES';
 
       setFormData({
-        cpf: motoristaInicial.cpf || motBase?.cpf || '',
-        nome: motoristaInicial.nome || motBase?.nome || '',
-        telefone: motoristaInicial.telefone || motBase?.telefone || '',
-        transportadora: motoristaInicial.transportadora || motBase?.transportadora || '',
-        transportadora_cnpj: motoristaInicial.transportadora_cnpj || motBase?.transportadora_cnpj || '',
-        tipo_veiculo: motoristaInicial.tipo_veiculo || motBase?.tipo_veiculo || 'Carreta / Bitrem',
-        placa_cavalo: motoristaInicial.placa_cavalo || motBase?.placa_cavalo || '',
+        cpf: mot.cpf || motBase?.cpf || '',
+        nome: mot.nome || mot.motorista_nome || motBase?.nome || '',
+        telefone: mot.telefone || mot.motorista_telefone || motBase?.telefone || '',
+        transportadora: mot.transportadora || motBase?.transportadora || '',
+        transportadora_cnpj: mot.transportadora_cnpj || motBase?.transportadora_cnpj || '',
+        tipo_veiculo: mot.tipo_veiculo || motBase?.tipo_veiculo || 'Carreta / Bitrem',
+        placa_cavalo: mot.placa_cavalo || motBase?.placa_cavalo || '',
         uf_cavalo: ufCav,
         crlv_validade_cavalo: crlvCav,
-        placa_carreta: motoristaInicial.placa_carreta || motBase?.placa_carreta || '',
+        placa_carreta: mot.placa_carreta || motBase?.placa_carreta || '',
         uf_carreta: ufCarr,
         crlv_validade_carreta: crlvCarr,
         validade_laudo_rocha: laudoR,
-        placa_carreta_2: motoristaInicial.placa_carreta_2 || motBase?.placa_carreta_2 || '',
+        placa_carreta_2: mot.placa_carreta_2 || motBase?.placa_carreta_2 || '',
         uf_carreta_2: ufCarr2,
         crlv_validade_carreta_2: crlvCarr2,
         validade_laudo_rocha_2: laudoR2,
-        cnh_categoria: motoristaInicial.cnh_categoria || motBase?.cnh_categoria || 'E',
+        cnh_categoria: mot.cnh_categoria || motBase?.cnh_categoria || 'E',
         cnh_validade: cnhVal,
-        status_documental: motoristaInicial.status_documental || motBase?.status_documental || 'REGULAR',
-        observacoes: motoristaInicial.observacoes || motBase?.observacoes || ''
+        status_documental: mot.status_documental || motBase?.status_documental || 'REGULAR',
+        observacoes: mot.observacoes || motBase?.observacoes || ''
       });
-      if (motoristaInicial.placa_carreta_2 || motBase?.placa_carreta_2 || crlvCarr2) {
+      if (mot.placa_carreta_2 || motBase?.placa_carreta_2 || crlvCarr2) {
         setTemCarreta2(true);
       }
+    };
+
+    if (motoristaInicial) {
+      aplicarDadosMotorista(motoristaInicial);
+      const cpfLimpo = String(motoristaInicial.cpf || motoristaInicial.motorista_cpf || '').replace(/\D/g, '');
+      if (cpfLimpo.length === 11) {
+        consultarMotoristaPorCPF(cpfLimpo).then(res => {
+          if (ativo && res?.encontrado && res.motorista) {
+            aplicarDadosMotorista(res.motorista);
+          }
+        }).catch(() => {});
+      }
     }
+
+    return () => {
+      ativo = false;
+    };
   }, [motoristaInicial]);
 
   const handleChange = (campo, valor) => {

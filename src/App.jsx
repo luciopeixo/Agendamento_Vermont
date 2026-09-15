@@ -7,7 +7,7 @@ import { ComprovanteModal } from './components/ComprovanteModal';
 import { RegrasModal } from './components/RegrasModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ShieldCheck, Mail, MapPin } from 'lucide-react';
-import { EMAIL_NOTIFICACAO_DESTINO, isSupabaseConfigurado } from './services/agendamentoService';
+import { EMAIL_NOTIFICACAO_DESTINO, isSupabaseConfigurado, carregarBaseMotoristasUnificada } from './services/agendamentoService';
 import { supabase } from './lib/supabase';
 
 export function App() {
@@ -24,6 +24,28 @@ export function App() {
     document.body.className = `fundo-${temaFundo}`;
     localStorage.setItem('vermont_tema_fundo', temaFundo);
   }, [temaFundo]);
+
+  // Sincronização inicial global da base de motoristas de todos os dispositivos
+  useEffect(() => {
+    carregarBaseMotoristasUnificada().catch(() => {});
+
+    if (isSupabaseConfigurado()) {
+      const channel = supabase
+        .channel('realtime_base_motoristas_global')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'base_motoristas' },
+          () => {
+            carregarBaseMotoristasUnificada().catch(() => {});
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, []);
 
   // Estado de autenticação via Supabase Auth com persistência local
   const [usuarioAuth, setUsuarioAuth] = useState(() => {
