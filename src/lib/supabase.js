@@ -8,5 +8,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('[Supabase] Atenção: VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY não foram informados no arquivo .env.');
 }
 
+export const isSupabaseConfigurado = () => {
+  return Boolean(
+    supabaseUrl && 
+    supabaseAnonKey && 
+    !supabaseUrl.includes('placeholder') && 
+    !supabaseAnonKey.includes('placeholder') &&
+    !supabaseUrl.includes('seu-projeto.supabase.co') &&
+    !supabaseAnonKey.includes('sua-chave-anon')
+  );
+};
+
 export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder-anon-key');
+
 

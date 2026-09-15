@@ -1,4 +1,6 @@
-import { supabase } from '../lib/supabase.js';
+import { supabase, isSupabaseConfigurado } from '../lib/supabase.js';
+
+export { isSupabaseConfigurado };
 
 // Nomenclatura oficial formatada
 export const PEDREIRAS_CEARA = [
@@ -2850,11 +2852,7 @@ export function registrarIdExcluido(id) {
   }
 }
 
-export function isSupabaseConfigurado() {
-  const url = _env.VITE_SUPABASE_URL || '';
-  const key = _env.VITE_SUPABASE_ANON_KEY || '';
-  return Boolean(url && key && !url.includes('seu-projeto.supabase.co') && !key.includes('sua-chave-anon'));
-}
+
 
 /**
  * Garante que o histórico de status seja sempre um array válido de objetos,
