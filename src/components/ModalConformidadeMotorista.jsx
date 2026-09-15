@@ -117,7 +117,7 @@ export function ModalConformidadeMotorista({
         cnh_categoria: mot.cnh_categoria || motBase?.cnh_categoria || 'E',
         cnh_validade: cnhVal,
         status_documental: mot.status_documental || motBase?.status_documental || 'REGULAR',
-        observacoes: mot.observacoes || motBase?.observacoes || ''
+        observacoes: (mot.observacoes || motBase?.observacoes || '').replace(/<!-- VERMONT_HIST:[\s\S]*?:VERMONT_HIST -->/g, '').trim()
       });
       if (mot.placa_carreta_2 || motBase?.placa_carreta_2 || crlvCarr2) {
         setTemCarreta2(true);

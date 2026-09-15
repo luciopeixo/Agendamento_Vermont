@@ -800,7 +800,7 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
           crlv_validade_carreta_2: registroAtualizado.crlv_validade_carreta_2,
           validade_laudo_rocha_2: registroAtualizado.validade_laudo_rocha_2,
           status_documental: registroAtualizado.status_documental,
-          observacoes: obsComHistorico,
+          observacoes: obsTextoLimpo,
           historico_edicoes: historicoAtualizado,
           atualizado_por: registroAtualizado.atualizado_por,
           atualizado_em: registroAtualizado.atualizado_em
@@ -809,19 +809,19 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
         const { error: errUpsert } = await supabase.from('base_motoristas').upsert(payloadCompleto, { onConflict: 'cpf' });
 
         if (errUpsert) {
-          console.warn('Upsert completo com array falhou, tentando serializar historico_edicoes:', errUpsert.message);
+          console.warn('Upsert completo falhou, tentando fallback:', errUpsert.message);
           
           // Tentativa 2: Payload com historico_edicoes serializado como string JSON
           const payloadJsonStr = {
             ...payloadCompleto,
-            observacoes: obsComHistorico,
+            observacoes: obsTextoLimpo,
             historico_edicoes: JSON.stringify(historicoAtualizado)
           };
           const res2 = await supabase.from('base_motoristas').upsert(payloadJsonStr, { onConflict: 'cpf' });
 
           if (res2.error) {
-            console.warn('Upsert 2 falhou, tentando payload essencial de compatibilidade:', res2.error.message);
-            // Tentativa 3: Payload essencial sem colunas opcionais que possam não existir na tabela
+            console.warn('Upsert 2 falhou, tentando payload essencial:', res2.error.message);
+            // Tentativa 3: Payload essencial
             const payloadEssencial = {
               cpf: cpfLimpo,
               nome: registroAtualizado.nome,
@@ -834,7 +834,8 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
               placa_carreta: registroAtualizado.placa_carreta,
               crlv_validade_carreta: registroAtualizado.crlv_validade_carreta,
               validade_laudo_rocha: registroAtualizado.validade_laudo_rocha,
-              observacoes: obsComHistorico,
+              observacoes: obsTextoLimpo,
+              historico_edicoes: historicoAtualizado,
               atualizado_em: registroAtualizado.atualizado_em
             };
             const res3 = await supabase.from('base_motoristas').upsert(payloadEssencial, { onConflict: 'cpf' });
