@@ -2577,6 +2577,99 @@ export function detectarMultiplosBlocos(texto = '') {
   };
 }
 
+/**
+ * Verifica se já existe um agendamento ativo cadastrado para o mesmo cliente, número de bloco, pedreira e material
+ * Retorna { duplicado: boolean, agendamentoExistente: object | null, blocoDuplicado: string | null, mensagem: string | null }
+ */
+export async function verificarBlocoDuplicado({
+  pedreira = '',
+  material = '',
+  numero_bloco = '',
+  cliente = '',
+  agendamentoIdIgnorar = null
+}) {
+  if (!numero_bloco || typeof numero_bloco !== 'string') return { duplicado: false };
+
+  const blocosParaVerificar = extrairBlocosDigitados(numero_bloco);
+  if (blocosParaVerificar.length === 0) return { duplicado: false };
+
+  const idsExcluidos = obterIdsExcluidos();
+  const idIgnorarStr = agendamentoIdIgnorar ? String(agendamentoIdIgnorar).trim() : null;
+  const pedreiraLimpa = (pedreira || '').trim();
+  const materialLimpo = (material || '').trim().toUpperCase();
+  const clienteLimpo = limparNomeEmpresa(cliente || '').toUpperCase();
+
+  let listaParaChecar = [];
+  if (isSupabaseConfigurado()) {
+    try {
+      const { data, error } = await supabase
+        .from('agendamentos_pedreira')
+        .select('*')
+        .neq('status', 'Cancelado')
+        .order('data_agendamento', { ascending: false });
+
+      if (!error && Array.isArray(data)) {
+        listaParaChecar = data;
+      }
+    } catch (e) {}
+  }
+
+  const locais = obterAgendamentosLocais().filter(l => l && l.status !== 'Cancelado');
+  const mapaUnificado = new Map();
+  listaParaChecar.forEach(item => {
+    if (item && item.id) mapaUnificado.set(String(item.id).trim(), item);
+  });
+  locais.forEach(item => {
+    if (item && item.id && !mapaUnificado.has(String(item.id).trim())) {
+      mapaUnificado.set(String(item.id).trim(), item);
+    }
+  });
+
+  const todosAtivos = Array.from(mapaUnificado.values()).filter(ag => {
+    const agIdStr = String(ag.id || '').trim();
+    if (idsExcluidos.has(agIdStr)) return false;
+    if (idIgnorarStr && agIdStr === idIgnorarStr) return false;
+    if (ag.status === 'Cancelado') return false;
+    if (typeof ag.observacoes === 'string' && ag.observacoes.includes('[EXCLUÍDO DEFINITIVAMENTE PELO ADMINISTRADOR]')) return false;
+    return true;
+  });
+
+  for (const ag of todosAtivos) {
+    const agBlocos = extrairBlocosDigitados(ag.numero_bloco);
+    const agPedreira = ag.pedreira || '';
+    const agMaterial = (ag.material || '').trim().toUpperCase();
+    const agCliente = limparNomeEmpresa(ag.cliente || '').toUpperCase();
+
+    // Compara cada bloco digitado com os blocos do agendamento existente
+    const blocoCoincidente = blocosParaVerificar.find(bNovo =>
+      agBlocos.some(bAg => bNovo.toUpperCase() === bAg.toUpperCase())
+    );
+
+    if (blocoCoincidente) {
+      const mesmaPedreira = !pedreiraLimpa || saoMesmaPedreira(agPedreira, pedreiraLimpa);
+      const mesmoMaterial = !materialLimpo || agMaterial === materialLimpo || agMaterial.includes(materialLimpo) || materialLimpo.includes(agMaterial);
+      const mesmoCliente = !clienteLimpo || agCliente === clienteLimpo || agCliente.includes(clienteLimpo) || clienteLimpo.includes(agCliente);
+
+      // Trava se coincidir pedreira E (material OU cliente)
+      if (mesmaPedreira && (mesmoMaterial || mesmoCliente)) {
+        const dataFmt = formatarDataBR(ag.data_agendamento);
+        const protocolo = (ag.id || 'VT-' + Date.now()).substring(0, 8).toUpperCase();
+        const mensagem = `⚠️ Já existe um agendamento ativo cadastrado para o Bloco ${blocoCoincidente} (${ag.material || 'Material'}) na pedreira ${ag.pedreira || 'Vermont'} para o cliente "${ag.cliente || 'Cliente'}", agendado para o dia ${dataFmt} às ${ag.horario_agendamento} (Protocolo: #${protocolo}, Status: ${ag.status}).`;
+
+        return {
+          duplicado: true,
+          agendamentoExistente: ag,
+          blocoDuplicado: blocoCoincidente,
+          mensagem
+        };
+      }
+    }
+  }
+
+  return { duplicado: false };
+}
+
+
 export const TIPOS_VEICULO = [
   'Carreta LS (6 Eixos)',
   'LS 7 Eixos (4 Eixos no Cavalo)',
@@ -3227,6 +3320,20 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
         success: false,
         error: 'Acesso restrito: Agendamentos com status "Finalizado" estão bloqueados para alteração pelas pedreiras. Apenas o Administrador Geral pode reverter.'
       };
+    }
+
+    // 1.1 Verificação de duplicidade de bloco ao editar
+    if (agendamentoAtualizado.numero_bloco && agendamentoAtualizado.status !== 'Cancelado') {
+      const checkDuplicado = await verificarBlocoDuplicado({
+        pedreira: agendamentoAtualizado.pedreira,
+        material: agendamentoAtualizado.material,
+        numero_bloco: agendamentoAtualizado.numero_bloco,
+        cliente: agendamentoAtualizado.cliente,
+        agendamentoIdIgnorar: agendamentoAtualizado.id
+      });
+      if (checkDuplicado.duplicado) {
+        return { success: false, error: checkDuplicado.mensagem };
+      }
     }
 
     // 2. Registra o histórico comparando o item anterior com os novos valores
@@ -4410,6 +4517,17 @@ export async function salvarAgendamento(dados) {
       throw new Error(`Detectamos ${analiseBloco.quantidade} blocos digitados no campo 'Numeração do Bloco' (${analiseBloco.blocos.join(', ')}). No agendamento simples é permitido apenas 1 bloco por vez. Para carregar 2 ou 3 blocos no mesmo veículo, utilize a modalidade 'Carga Combinada (2 ou 3 Blocos)'.`);
     }
 
+    // Verificação de agendamento duplicado (mesmo bloco, pedreira, material e cliente)
+    const checkDuplicado = await verificarBlocoDuplicado({
+      pedreira: dados.pedreira,
+      material: dados.material,
+      numero_bloco: dados.numero_bloco,
+      cliente: dados.cliente
+    });
+    if (checkDuplicado.duplicado) {
+      throw new Error(checkDuplicado.mensagem);
+    }
+
     const configPlacas = obterConfigPlacas(dados.tipo_veiculo);
 
     const placaCavaloLimpa = dados.placa_cavalo ? dados.placa_cavalo.toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
@@ -4553,6 +4671,7 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
     const totalPontos = listaPontos.length;
 
     // 1. Validações para cada ponto de carregamento
+    const blocosCombinados = [];
     for (let i = 0; i < totalPontos; i++) {
       const p = listaPontos[i];
       const numPonto = i + 1;
@@ -4572,6 +4691,27 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
         if (ocupados.includes(p.horario_agendamento)) {
           throw new Error(`[${numPonto}º Carregamento] O horário ${p.horario_agendamento} já foi reservado na pedreira ${p.pedreira}. Escolha outro horário.`);
         }
+      }
+
+      // Verificação de bloco duplicado no banco/local
+      const clientePonto = p.cliente || veiculo?.cliente || '';
+      const checkDuplicado = await verificarBlocoDuplicado({
+        pedreira: p.pedreira,
+        material: p.material,
+        numero_bloco: p.numero_bloco,
+        cliente: clientePonto
+      });
+      if (checkDuplicado.duplicado) {
+        throw new Error(`[${numPonto}º Carregamento] ${checkDuplicado.mensagem}`);
+      }
+
+      // Rastreia blocos para checar duplicidade entre os pontos da mesma carga combinada
+      const bExtraidos = extrairBlocosDigitados(p.numero_bloco);
+      for (const b of bExtraidos) {
+        if (blocosCombinados.includes(b.toUpperCase())) {
+          throw new Error(`O bloco "${b}" foi informado mais de uma vez nesta mesma combinação (${numPonto}º Carregamento).`);
+        }
+        blocosCombinados.push(b.toUpperCase());
       }
     }
 

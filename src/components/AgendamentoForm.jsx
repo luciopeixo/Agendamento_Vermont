@@ -28,6 +28,7 @@ import {
   detectarMultiplosBlocos,
   extrairBlocosDigitados,
   sanitizarNumeroBloco,
+  verificarBlocoDuplicado,
   validarCPF,
   consultarMotoristaPorCPF,
   validarCNPJ,
@@ -210,6 +211,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     itensAVencer: [],
     alertas: []
   });
+
+  // Alertas de duplicidade de bloco/cliente/pedreira em tempo real
+  const [alertaDuplicidade1, setAlertaDuplicidade1] = useState(null);
+  const [alertaDuplicidade2, setAlertaDuplicidade2] = useState(null);
+  const [alertaDuplicidade3, setAlertaDuplicidade3] = useState(null);
 
   // Verificação automática de conformidade documental com a base interna da pedreira
   useEffect(() => {
@@ -595,6 +601,89 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       });
     }
   }, [tipoCarregamento, qtdBlocosCombinados, ponto3.data_agendamento, ponto3.pedreira]);
+
+  // Verificação em tempo real de duplicidade para Ponto 1 (ou Simples)
+  useEffect(() => {
+    let cancelado = false;
+    const timer = setTimeout(async () => {
+      if (!formData.numero_bloco || formData.numero_bloco.trim().length < 2) {
+        setAlertaDuplicidade1(null);
+        return;
+      }
+      const resultado = await verificarBlocoDuplicado({
+        pedreira: formData.pedreira,
+        material: formData.material,
+        numero_bloco: formData.numero_bloco,
+        cliente: formData.cliente
+      });
+      if (!cancelado) {
+        setAlertaDuplicidade1(resultado.duplicado ? resultado : null);
+      }
+    }, 400);
+
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+  }, [formData.numero_bloco, formData.pedreira, formData.material, formData.cliente]);
+
+  // Verificação em tempo real de duplicidade para Ponto 2 (Carga Combinada)
+  useEffect(() => {
+    if (tipoCarregamento !== 'combinado') {
+      setAlertaDuplicidade2(null);
+      return;
+    }
+    let cancelado = false;
+    const timer = setTimeout(async () => {
+      if (!ponto2.numero_bloco || ponto2.numero_bloco.trim().length < 2) {
+        setAlertaDuplicidade2(null);
+        return;
+      }
+      const resultado = await verificarBlocoDuplicado({
+        pedreira: ponto2.pedreira,
+        material: ponto2.material,
+        numero_bloco: ponto2.numero_bloco,
+        cliente: ponto2.cliente || formData.cliente
+      });
+      if (!cancelado) {
+        setAlertaDuplicidade2(resultado.duplicado ? resultado : null);
+      }
+    }, 400);
+
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+  }, [tipoCarregamento, ponto2.numero_bloco, ponto2.pedreira, ponto2.material, ponto2.cliente, formData.cliente]);
+
+  // Verificação em tempo real de duplicidade para Ponto 3 (Carga Combinada 3 Blocos)
+  useEffect(() => {
+    if (tipoCarregamento !== 'combinado' || qtdBlocosCombinados !== 3) {
+      setAlertaDuplicidade3(null);
+      return;
+    }
+    let cancelado = false;
+    const timer = setTimeout(async () => {
+      if (!ponto3.numero_bloco || ponto3.numero_bloco.trim().length < 2) {
+        setAlertaDuplicidade3(null);
+        return;
+      }
+      const resultado = await verificarBlocoDuplicado({
+        pedreira: ponto3.pedreira,
+        material: ponto3.material,
+        numero_bloco: ponto3.numero_bloco,
+        cliente: ponto3.cliente || formData.cliente
+      });
+      if (!cancelado) {
+        setAlertaDuplicidade3(resultado.duplicado ? resultado : null);
+      }
+    }, 400);
+
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+  }, [tipoCarregamento, qtdBlocosCombinados, ponto3.numero_bloco, ponto3.pedreira, ponto3.material, ponto3.cliente, formData.cliente]);
 
   const handleChange = (campo, valor) => {
     let valorFinal = valor;
@@ -985,6 +1074,55 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       return;
     }
 
+    // Validação de bloqueio de duplicidade (mesmo cliente, bloco, pedreira e material)
+    if (tipoCarregamento === 'simples') {
+      const checkDuplicado = await verificarBlocoDuplicado({
+        pedreira: formData.pedreira,
+        material: formData.material,
+        numero_bloco: formData.numero_bloco,
+        cliente: formData.cliente
+      });
+      if (checkDuplicado.duplicado) {
+        setMensagemErro(checkDuplicado.mensagem);
+        return;
+      }
+    } else {
+      const checkDuplicado1 = await verificarBlocoDuplicado({
+        pedreira: formData.pedreira,
+        material: formData.material,
+        numero_bloco: formData.numero_bloco,
+        cliente: formData.cliente
+      });
+      if (checkDuplicado1.duplicado) {
+        setMensagemErro(`[1º Carregamento] ${checkDuplicado1.mensagem}`);
+        return;
+      }
+
+      const checkDuplicado2 = await verificarBlocoDuplicado({
+        pedreira: ponto2.pedreira,
+        material: ponto2.material,
+        numero_bloco: ponto2.numero_bloco,
+        cliente: ponto2.cliente || formData.cliente
+      });
+      if (checkDuplicado2.duplicado) {
+        setMensagemErro(`[2º Carregamento] ${checkDuplicado2.mensagem}`);
+        return;
+      }
+
+      if (qtdBlocosCombinados === 3) {
+        const checkDuplicado3 = await verificarBlocoDuplicado({
+          pedreira: ponto3.pedreira,
+          material: ponto3.material,
+          numero_bloco: ponto3.numero_bloco,
+          cliente: ponto3.cliente || formData.cliente
+        });
+        if (checkDuplicado3.duplicado) {
+          setMensagemErro(`[3º Carregamento] ${checkDuplicado3.mensagem}`);
+          return;
+        }
+      }
+    }
+
     setEnviando(true);
 
     let resultado;
@@ -1362,6 +1500,27 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       </button>
                     </div>
                   )}
+
+                  {/* Alerta em tempo real de Agendamento Duplicado / Já Cadastrado */}
+                  {alertaDuplicidade1 && (
+                    <div className="animate-fade" style={{
+                      marginTop: 8,
+                      padding: '10px 12px',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.45)',
+                      borderRadius: 8,
+                      color: '#f87171',
+                      fontSize: '0.82rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontWeight: 700 }}>
+                        <AlertTriangle size={16} color="#ef4444" />
+                        <span>Atenção: Bloco já agendado anteriormente!</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.77rem', color: '#fee2e2', lineHeight: 1.45 }}>
+                        {alertaDuplicidade1.mensagem}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1670,6 +1829,25 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       ⚠️ Digite apenas 1 bloco aqui. O 2º bloco deve ser informado no 2º ponto logo abaixo.
                     </span>
                   )}
+                  {alertaDuplicidade1 && (
+                    <div className="animate-fade" style={{
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.45)',
+                      borderRadius: 6,
+                      color: '#f87171',
+                      fontSize: '0.78rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontWeight: 700 }}>
+                        <AlertTriangle size={14} color="#ef4444" />
+                        <span>Bloco 1 já agendado anteriormente!</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#fee2e2', lineHeight: 1.35 }}>
+                        {alertaDuplicidade1.mensagem}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* CNPJ Cliente 1 */}
@@ -1870,6 +2048,25 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     <span style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
                       ⚠️ Digite apenas 1 bloco aqui. Caso tenha um 3º bloco, selecione '3 Blocos' no topo.
                     </span>
+                  )}
+                  {alertaDuplicidade2 && (
+                    <div className="animate-fade" style={{
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.45)',
+                      borderRadius: 6,
+                      color: '#f87171',
+                      fontSize: '0.78rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontWeight: 700 }}>
+                        <AlertTriangle size={14} color="#ef4444" />
+                        <span>Bloco 2 já agendado anteriormente!</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: '0.74rem', color: '#fee2e2', lineHeight: 1.35 }}>
+                        {alertaDuplicidade2.mensagem}
+                      </p>
+                    </div>
                   )}
                 </div>
 
@@ -2181,6 +2378,25 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       <span style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
                         ⚠️ Digite apenas 1 bloco por campo.
                       </span>
+                    )}
+                    {alertaDuplicidade3 && (
+                      <div className="animate-fade" style={{
+                        marginTop: 8,
+                        padding: '8px 10px',
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.45)',
+                        borderRadius: 6,
+                        color: '#f87171',
+                        fontSize: '0.78rem'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontWeight: 700 }}>
+                          <AlertTriangle size={14} color="#ef4444" />
+                          <span>Bloco 3 já agendado anteriormente!</span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.74rem', color: '#fee2e2', lineHeight: 1.35 }}>
+                          {alertaDuplicidade3.mensagem}
+                        </p>
+                      </div>
                     )}
                   </div>
 
