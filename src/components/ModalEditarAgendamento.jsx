@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, Edit3, Truck, Calendar, Clock, MapPin, AlertCircle, CheckCircle2, History, User, ArrowRight } from 'lucide-react';
+import { X, Save, Edit3, Truck, Calendar, Clock, MapPin, AlertCircle, CheckCircle2, History, User, ArrowRight, Building2 } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
   TIPOS_VEICULO, 
@@ -18,7 +18,10 @@ import {
   limparTagsInternasObservacoes,
   obterStatusConformidadeCNH,
   obterStatusConformidadeCavalo,
-  obterStatusConformidadeCarreta
+  obterStatusConformidadeCarreta,
+  formatarCNPJ,
+  consultarCNPJReceita,
+  obterAgendamentosLocais
 } from '../services/agendamentoService';
 
 export function ModalEditarAgendamento({ 
@@ -35,9 +38,9 @@ export function ModalEditarAgendamento({
     pedreira: agendamento.pedreira || '',
     material: agendamento.material || '',
     numero_bloco: agendamento.numero_bloco || '',
-    cliente_cnpj: agendamento.cliente_cnpj || resolverCnpjCliente(agendamento) || '',
+    cliente_cnpj: formatarCNPJ(agendamento.cliente_cnpj || resolverCnpjCliente(agendamento) || ''),
     cliente: limparNomeEmpresa(agendamento.cliente) || '',
-    transportadora_cnpj: agendamento.transportadora_cnpj || resolverCnpjTransportadora(agendamento) || '',
+    transportadora_cnpj: formatarCNPJ(agendamento.transportadora_cnpj || resolverCnpjTransportadora(agendamento) || ''),
     transportadora: limparNomeEmpresa(agendamento.transportadora) || '',
     motorista_nome: agendamento.motorista_nome || '',
     motorista_cpf: agendamento.motorista_cpf || '',
@@ -56,6 +59,24 @@ export function ModalEditarAgendamento({
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [materiaisDisponiveis, setMateriaisDisponiveis] = useState([]);
+
+  const [statusCNPJCliente, setStatusCNPJCliente] = useState({
+    buscando: false,
+    valido: null,
+    erro: '',
+    encontrado: false,
+    razaoSocial: '',
+    situacao: ''
+  });
+
+  const [statusCNPJTransp, setStatusCNPJTransp] = useState({
+    buscando: false,
+    valido: null,
+    erro: '',
+    encontrado: false,
+    razaoSocial: '',
+    situacao: ''
+  });
 
   useEffect(() => {
     const mats = obterMateriaisPorPedreira(formData.pedreira);
@@ -100,6 +121,166 @@ export function ModalEditarAgendamento({
       }
       return novo;
     });
+  };
+
+  const handleCNPJClienteChange = async (valor) => {
+    const formatado = formatarCNPJ(valor);
+    handleChange('cliente_cnpj', formatado);
+
+    const limpo = formatado.replace(/\D/g, '');
+    if (limpo.length === 14) {
+      // Tenta recuperar nome local rapidamente de outros agendamentos
+      try {
+        const locais = obterAgendamentosLocais();
+        const achadoLocal = locais.find(ag => {
+          const cCNPJ = String(ag.cliente_cnpj || resolverCnpjCliente(ag) || '').replace(/\D/g, '');
+          return cCNPJ === limpo && ag.cliente;
+        });
+        if (achadoLocal && achadoLocal.cliente) {
+          const nomeLocal = limparNomeEmpresa(achadoLocal.cliente);
+          if (nomeLocal) {
+            handleChange('cliente', nomeLocal);
+          }
+        }
+      } catch (e) {
+        // ignora
+      }
+
+      setStatusCNPJCliente(prev => ({ ...prev, buscando: true, erro: '' }));
+      try {
+        const resultado = await consultarCNPJReceita(limpo);
+        if (!resultado.valido) {
+          setStatusCNPJCliente({
+            buscando: false,
+            valido: false,
+            erro: resultado.erro || 'CNPJ inválido (dígitos verificadores incorretos).',
+            encontrado: false,
+            razaoSocial: '',
+            situacao: ''
+          });
+        } else if (resultado.encontrado && resultado.empresa) {
+          const razao = (resultado.empresa.razao_social || resultado.empresa.nome_fantasia || '').toUpperCase().trim();
+          setStatusCNPJCliente({
+            buscando: false,
+            valido: true,
+            erro: '',
+            encontrado: true,
+            razaoSocial: razao,
+            situacao: resultado.empresa.situacao_cadastral || 'ATIVA'
+          });
+          if (razao) {
+            handleChange('cliente', razao);
+          }
+        } else {
+          setStatusCNPJCliente({
+            buscando: false,
+            valido: true,
+            erro: '',
+            encontrado: false,
+            razaoSocial: '',
+            situacao: ''
+          });
+        }
+      } catch (e) {
+        setStatusCNPJCliente({
+          buscando: false,
+          valido: null,
+          erro: '',
+          encontrado: false,
+          razaoSocial: '',
+          situacao: ''
+        });
+      }
+    } else {
+      setStatusCNPJCliente({
+        buscando: false,
+        valido: null,
+        erro: '',
+        encontrado: false,
+        razaoSocial: '',
+        situacao: ''
+      });
+    }
+  };
+
+  const handleCNPJTransportadoraChange = async (valor) => {
+    const formatado = formatarCNPJ(valor);
+    handleChange('transportadora_cnpj', formatado);
+
+    const limpo = formatado.replace(/\D/g, '');
+    if (limpo.length === 14) {
+      // Tenta recuperar nome local rapidamente de outros agendamentos
+      try {
+        const locais = obterAgendamentosLocais();
+        const achadoLocal = locais.find(ag => {
+          const tCNPJ = String(ag.transportadora_cnpj || resolverCnpjTransportadora(ag) || '').replace(/\D/g, '');
+          return tCNPJ === limpo && ag.transportadora;
+        });
+        if (achadoLocal && achadoLocal.transportadora) {
+          const nomeLocal = limparNomeEmpresa(achadoLocal.transportadora);
+          if (nomeLocal) {
+            handleChange('transportadora', nomeLocal);
+          }
+        }
+      } catch (e) {
+        // ignora
+      }
+
+      setStatusCNPJTransp(prev => ({ ...prev, buscando: true, erro: '' }));
+      try {
+        const resultado = await consultarCNPJReceita(limpo);
+        if (!resultado.valido) {
+          setStatusCNPJTransp({
+            buscando: false,
+            valido: false,
+            erro: resultado.erro || 'CNPJ inválido (dígitos verificadores incorretos).',
+            encontrado: false,
+            razaoSocial: '',
+            situacao: ''
+          });
+        } else if (resultado.encontrado && resultado.empresa) {
+          const razao = (resultado.empresa.razao_social || resultado.empresa.nome_fantasia || '').toUpperCase().trim();
+          setStatusCNPJTransp({
+            buscando: false,
+            valido: true,
+            erro: '',
+            encontrado: true,
+            razaoSocial: razao,
+            situacao: resultado.empresa.situacao_cadastral || 'ATIVA'
+          });
+          if (razao) {
+            handleChange('transportadora', razao);
+          }
+        } else {
+          setStatusCNPJTransp({
+            buscando: false,
+            valido: true,
+            erro: '',
+            encontrado: false,
+            razaoSocial: '',
+            situacao: ''
+          });
+        }
+      } catch (e) {
+        setStatusCNPJTransp({
+          buscando: false,
+          valido: null,
+          erro: '',
+          encontrado: false,
+          razaoSocial: '',
+          situacao: ''
+        });
+      }
+    } else {
+      setStatusCNPJTransp({
+        buscando: false,
+        valido: null,
+        erro: '',
+        encontrado: false,
+        razaoSocial: '',
+        situacao: ''
+      });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -386,21 +567,33 @@ export function ModalEditarAgendamento({
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <div className="form-group">
-                <label className="form-label">CNPJ Destinatário</label>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>CNPJ Destinatário</span>
+                  {statusCNPJCliente.buscando && (
+                    <span style={{ fontSize: '0.72rem', color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} /> Consultando Receita...
+                    </span>
+                  )}
+                  {statusCNPJCliente.valido === false && (
+                    <span style={{ fontSize: '0.72rem', color: '#f87171', fontWeight: 600 }}>
+                      ❌ CNPJ Inválido
+                    </span>
+                  )}
+                  {statusCNPJCliente.encontrado && (
+                    <span style={{ fontSize: '0.72rem', color: '#4ade80', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Building2 size={12} /> Receita OK ({statusCNPJCliente.situacao})
+                    </span>
+                  )}
+                </label>
                 <input
                   type="text"
                   className="form-input"
                   placeholder="00.000.000/0000-00"
                   maxLength={18}
                   value={formData.cliente_cnpj}
-                  onChange={(e) => {
-                    const nums = e.target.value.replace(/\D/g, '').slice(0, 14);
-                    let fmt = nums;
-                    if (nums.length > 2) fmt = `${nums.slice(0, 2)}.${nums.slice(2)}`;
-                    if (nums.length > 5) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5)}`;
-                    if (nums.length > 8) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8)}`;
-                    if (nums.length > 12) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8, 12)}-${nums.slice(12)}`;
-                    handleChange('cliente_cnpj', fmt);
+                  onChange={(e) => handleCNPJClienteChange(e.target.value)}
+                  style={{
+                    borderColor: statusCNPJCliente.valido === false ? '#ef4444' : statusCNPJCliente.encontrado ? '#00a83e' : undefined
                   }}
                 />
               </div>
@@ -455,7 +648,7 @@ export function ModalEditarAgendamento({
             </div>
           </div>
 
-          {/* Seção 3: Transporte, Motorista e Placas */}
+          {/* Seção 4: Transporte, Motorista e Placas */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.02)',
             border: '1px solid rgba(255, 255, 255, 0.06)',
@@ -468,21 +661,33 @@ export function ModalEditarAgendamento({
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <div className="form-group">
-                <label className="form-label">CNPJ Transportadora</label>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>CNPJ Transportadora</span>
+                  {statusCNPJTransp.buscando && (
+                    <span style={{ fontSize: '0.72rem', color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} /> Consultando Receita...
+                    </span>
+                  )}
+                  {statusCNPJTransp.valido === false && (
+                    <span style={{ fontSize: '0.72rem', color: '#f87171', fontWeight: 600 }}>
+                      ❌ CNPJ Inválido
+                    </span>
+                  )}
+                  {statusCNPJTransp.encontrado && (
+                    <span style={{ fontSize: '0.72rem', color: '#4ade80', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <Building2 size={12} /> Receita OK ({statusCNPJTransp.situacao})
+                    </span>
+                  )}
+                </label>
                 <input
                   type="text"
                   className="form-input"
                   placeholder="00.000.000/0000-00"
                   maxLength={18}
                   value={formData.transportadora_cnpj}
-                  onChange={(e) => {
-                    const nums = e.target.value.replace(/\D/g, '').slice(0, 14);
-                    let fmt = nums;
-                    if (nums.length > 2) fmt = `${nums.slice(0, 2)}.${nums.slice(2)}`;
-                    if (nums.length > 5) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5)}`;
-                    if (nums.length > 8) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8)}`;
-                    if (nums.length > 12) fmt = `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8, 12)}-${nums.slice(12)}`;
-                    handleChange('transportadora_cnpj', fmt);
+                  onChange={(e) => handleCNPJTransportadoraChange(e.target.value)}
+                  style={{
+                    borderColor: statusCNPJTransp.valido === false ? '#ef4444' : statusCNPJTransp.encontrado ? '#00a83e' : undefined
                   }}
                 />
               </div>
@@ -492,6 +697,7 @@ export function ModalEditarAgendamento({
                 <input
                   type="text"
                   className="form-input"
+                  placeholder="Razão Social da Transportadora"
                   value={formData.transportadora}
                   onChange={(e) => handleChange('transportadora', e.target.value.toUpperCase())}
                 />
