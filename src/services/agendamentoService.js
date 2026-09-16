@@ -2602,10 +2602,10 @@ export function isClienteThorOuArgos(cliente = '') {
 }
 
 /**
- * Valida a regra de formatação de bloco:
- * 1. Proibição universal de '-' (hífen) ou '.' (ponto).
- * 2. Se Material for Taj Mahal e Cliente for THOR ou ARGOS: o número do bloco DEVE conter '/' (ex: 11/26)
- * 3. Em todos os outros casos (outros materiais ou outros clientes): o número do bloco NÃO PODE conter a barra '/'
+ * Valida a regra de formatação de número de bloco:
+ * 1. Proibição universal de '-' (hífen) ou '.' (ponto) para todos os clientes e pedreiras.
+ * 2. Se o Cliente for THOR ou ARGOS (em qualquer pedreira): o número do bloco DEVE conter '/' (ex: 11/26 ou 123/26)
+ * 3. Se for qualquer outro cliente: o número do bloco NÃO PODE conter a barra '/'
  * Retorna { valido: boolean, mensagem: string | null }
  */
 export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numero_bloco = '' }) {
@@ -2623,28 +2623,26 @@ export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numer
   }
 
   const contemBarra = blocoTrim.includes('/');
-  const matUpper = (material || '').toUpperCase().trim();
-  const isTajMahal = matUpper.includes('TAJ MAHAL') || matUpper === 'TAJ MAHAL';
   const isThorArgos = isClienteThorOuArgos(cliente);
 
-  // Se o material for Taj Mahal e o cliente for THOR ou ARGOS: a barra '/' é OBRIGATÓRIA
-  if (isTajMahal && isThorArgos) {
+  // Se o cliente for THOR ou ARGOS (em todas as pedreiras): a barra '/' é OBRIGATÓRIA
+  if (isThorArgos) {
     if (!contemBarra) {
       const nomeCli = cliente ? cliente.toUpperCase().trim() : 'THOR / ARGOS';
       return {
         valido: false,
-        mensagem: `Para o material Taj Mahal com o cliente ${nomeCli}, o número do bloco deve conter a barra com o ano (ex: 11/26 ou 123/26).`
+        mensagem: `Para o cliente ${nomeCli}, o número do bloco deve conter a barra com o ano (ex: 11/26 ou 123/26).`
       };
     }
     return { valido: true };
   }
 
-  // Se for Taj Mahal e o cliente ainda não foi informado, aguarda o cliente ser informado antes de bloquear barra
-  if (isTajMahal && (!cliente || !cliente.trim())) {
+  // Se o cliente ainda não foi informado, não bloqueia a barra preventivamente em tempo real
+  if (!cliente || !cliente.trim()) {
     return { valido: true };
   }
 
-  // Em todos os outros casos: a barra '/' é PROIBIDA
+  // Para qualquer outro cliente: a barra '/' é PROIBIDA
   if (contemBarra) {
     return {
       valido: false,
