@@ -55,6 +55,7 @@ export function ModalConformidadeMotorista({
   });
 
   const [temCarreta2, setTemCarreta2] = useState(false);
+  const [isBitruck, setIsBitruck] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState(false);
@@ -88,7 +89,7 @@ export function ModalConformidadeMotorista({
       const cnhVal = sanitizarDataIso(mot.cnh_validade || motBase?.cnh_validade) || '';
       const crlvCav = sanitizarDataIso(mot.crlv_validade_cavalo || motBase?.crlv_validade_cavalo || veicCav?.crlv_validade_cavalo) || '';
       const crlvCarr = sanitizarDataIso(mot.crlv_validade_carreta || motBase?.crlv_validade_carreta || veicCarr?.crlv_validade_carreta) || '';
-      const laudoR = sanitizarDataIso(mot.validade_laudo_rocha || motBase?.validade_laudo_rocha || veicCarr?.validade_laudo_rocha) || '';
+      const laudoR = sanitizarDataIso(mot.validade_laudo_rocha || motBase?.validade_laudo_rocha || veicCarr?.validade_laudo_rocha || veicCav?.validade_laudo_rocha) || '';
       const crlvCarr2 = sanitizarDataIso(mot.crlv_validade_carreta_2 || motBase?.crlv_validade_carreta_2 || veicCarr2?.crlv_validade_carreta_2) || '';
       const laudoR2 = sanitizarDataIso(mot.validade_laudo_rocha_2 || motBase?.validade_laudo_rocha_2 || veicCarr2?.validade_laudo_rocha_2) || '';
 
@@ -96,30 +97,42 @@ export function ModalConformidadeMotorista({
       const ufCarr = mot.uf_carreta || motBase?.uf_carreta || veicCarr?.uf_carreta || identificarUFPelaPlaca(limpaCarr) || 'ES';
       const ufCarr2 = mot.uf_carreta_2 || motBase?.uf_carreta_2 || veicCarr2?.uf_carreta_2 || identificarUFPelaPlaca(limpaCarr2) || 'ES';
 
+      const ehBitruck = Boolean(
+        mot.is_bitruck || 
+        mot.tipo_veiculo === 'Bitruck (4 Eixos)' || 
+        mot.tipo_veiculo === 'Truck (3 Eixos)' || 
+        motBase?.is_bitruck ||
+        motBase?.tipo_veiculo === 'Bitruck (4 Eixos)' ||
+        motBase?.tipo_veiculo === 'Truck (3 Eixos)' ||
+        (!mot.placa_carreta && !motBase?.placa_carreta && (mot.validade_laudo_rocha || motBase?.validade_laudo_rocha))
+      );
+      setIsBitruck(ehBitruck);
+
       setFormData({
         cpf: mot.cpf || motBase?.cpf || '',
         nome: mot.nome || mot.motorista_nome || motBase?.nome || '',
         telefone: mot.telefone || mot.motorista_telefone || motBase?.telefone || '',
         transportadora: mot.transportadora || motBase?.transportadora || '',
         transportadora_cnpj: mot.transportadora_cnpj || motBase?.transportadora_cnpj || '',
-        tipo_veiculo: mot.tipo_veiculo || motBase?.tipo_veiculo || 'Carreta / Bitrem',
+        tipo_veiculo: mot.tipo_veiculo || motBase?.tipo_veiculo || (ehBitruck ? 'Bitruck (4 Eixos)' : 'Carreta / Bitrem'),
+        is_bitruck: ehBitruck,
         placa_cavalo: mot.placa_cavalo || motBase?.placa_cavalo || '',
         uf_cavalo: ufCav,
         crlv_validade_cavalo: crlvCav,
-        placa_carreta: mot.placa_carreta || motBase?.placa_carreta || '',
+        placa_carreta: ehBitruck ? '' : (mot.placa_carreta || motBase?.placa_carreta || ''),
         uf_carreta: ufCarr,
-        crlv_validade_carreta: crlvCarr,
+        crlv_validade_carreta: ehBitruck ? '' : crlvCarr,
         validade_laudo_rocha: laudoR,
-        placa_carreta_2: mot.placa_carreta_2 || motBase?.placa_carreta_2 || '',
+        placa_carreta_2: ehBitruck ? '' : (mot.placa_carreta_2 || motBase?.placa_carreta_2 || ''),
         uf_carreta_2: ufCarr2,
-        crlv_validade_carreta_2: crlvCarr2,
-        validade_laudo_rocha_2: laudoR2,
-        cnh_categoria: mot.cnh_categoria || motBase?.cnh_categoria || 'E',
+        crlv_validade_carreta_2: ehBitruck ? '' : crlvCarr2,
+        validade_laudo_rocha_2: ehBitruck ? '' : laudoR2,
+        cnh_categoria: mot.cnh_categoria || motBase?.cnh_categoria || (ehBitruck ? 'C' : 'E'),
         cnh_validade: cnhVal,
         status_documental: mot.status_documental || motBase?.status_documental || 'REGULAR',
         observacoes: (mot.observacoes || motBase?.observacoes || '').replace(/<!-- VERMONT_HIST:[\s\S]*?:VERMONT_HIST -->/g, '').trim()
       });
-      if (mot.placa_carreta_2 || motBase?.placa_carreta_2 || crlvCarr2) {
+      if (!ehBitruck && (mot.placa_carreta_2 || motBase?.placa_carreta_2 || crlvCarr2)) {
         setTemCarreta2(true);
       }
     };
@@ -266,6 +279,13 @@ export function ModalConformidadeMotorista({
     const res = await salvarMotoristaFrotaConformidade({
       ...formData,
       cpf: cpfLimpo,
+      is_bitruck: isBitruck,
+      tipo_veiculo: isBitruck ? (formData.tipo_veiculo?.includes('Truck') ? formData.tipo_veiculo : 'Bitruck (4 Eixos)') : formData.tipo_veiculo,
+      placa_carreta: isBitruck ? '' : formData.placa_carreta,
+      crlv_validade_carreta: isBitruck ? '' : formData.crlv_validade_carreta,
+      placa_carreta_2: isBitruck ? '' : formData.placa_carreta_2,
+      crlv_validade_carreta_2: isBitruck ? '' : formData.crlv_validade_carreta_2,
+      validade_laudo_rocha_2: isBitruck ? '' : formData.validade_laudo_rocha_2,
       motoristaOriginal: motoristaOriginalRef || motoristaInicial,
       atualizado_por: usuarioNome
     }, usuarioInfo || { nome: usuarioNome, isAdmin });
@@ -532,7 +552,57 @@ export function ModalConformidadeMotorista({
             </div>
           </div>
 
-          {/* SEÇÃO 2: CAVALO MECÂNICO */}
+          {/* SELETOR/CHECK: VEÍCULO BITRUCK / TRUCK (CHASSI RÍGIDO) */}
+          <div style={{
+            marginBottom: 16,
+            padding: '12px 16px',
+            background: isBitruck ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.03)',
+            border: isBitruck ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            transition: 'all 0.2s'
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', margin: 0, flex: 1 }}>
+              <input
+                type="checkbox"
+                checked={isBitruck}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setIsBitruck(checked);
+                  if (checked) {
+                    handleChange('tipo_veiculo', 'Bitruck (4 Eixos)');
+                    handleChange('placa_carreta', '');
+                    handleChange('crlv_validade_carreta', '');
+                    handleChange('placa_carreta_2', '');
+                    handleChange('crlv_validade_carreta_2', '');
+                    handleChange('validade_laudo_rocha_2', '');
+                    setTemCarreta2(false);
+                  } else {
+                    handleChange('tipo_veiculo', 'Carreta / Bitrem');
+                  }
+                }}
+                style={{ width: 18, height: 18, accentColor: '#38bdf8', cursor: 'pointer' }}
+              />
+              <div>
+                <div style={{ fontWeight: 700, color: isBitruck ? '#38bdf8' : '#e2e8f0', fontSize: '0.88rem' }}>
+                  🚛 Veículo é Bitruck / Caminhão Truck (Chassi Rígido - Placa Única com Laudo de Rocha)
+                </div>
+                <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                  Habilita o Laudo de Rocha / CSV diretamente na placa única do caminhão (sem necessidade de cadastrar carreta).
+                </div>
+              </div>
+            </label>
+            {isBitruck && (
+              <span style={{ fontSize: '0.74rem', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
+                Placa Única Ativa
+              </span>
+            )}
+          </div>
+
+          {/* SEÇÃO 2: CAVALO MECÂNICO OU CAMINHÃO BITRUCK */}
           <div style={{
             marginBottom: 20,
             background: 'rgba(255, 255, 255, 0.02)',
@@ -550,15 +620,15 @@ export function ModalConformidadeMotorista({
               fontSize: '0.92rem'
             }}>
               <Truck size={18} />
-              <span>2. Cavalo Mecânico (Trator)</span>
+              <span>{isBitruck ? '2. Caminhão Rígido (Bitruck / Truck)' : '2. Cavalo Mecânico (Trator)'}</span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-              {/* PLACA CAVALO & UF */}
+              {/* PLACA & UF */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
-                    Placa do Cavalo & Estado (UF)
+                    {isBitruck ? 'Placa do Caminhão & Estado (UF)' : 'Placa do Cavalo & Estado (UF)'}
                   </label>
                   {(() => {
                     const info = obterInfoLicenciamentoPorPlaca(formData.placa_cavalo, formData.uf_cavalo);
@@ -593,11 +663,11 @@ export function ModalConformidadeMotorista({
                 </div>
               </div>
 
-              {/* DATA DO ÚLTIMO REGISTRO DO CRLV CAVALO */}
+              {/* DATA DO ÚLTIMO REGISTRO DO CRLV */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
-                    Data do Último Registro (CRLV Cavalo) *
+                    {isBitruck ? 'Data do Último Registro (CRLV Caminhão) *' : 'Data do Último Registro (CRLV Cavalo) *'}
                   </label>
                   {(() => {
                     const info = obterInfoLicenciamentoPorPlaca(formData.placa_cavalo, formData.uf_cavalo);
@@ -640,254 +710,301 @@ export function ModalConformidadeMotorista({
                   </div>
                 )}
               </div>
-            </div>
-          </div>
 
-          {/* SEÇÃO 3: IMPLEMENTO / CARRETA 1 & LAUDO DE ROCHA */}
-          <div style={{
-            marginBottom: 20,
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: 12,
-            padding: '16px'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginBottom: 14,
-              color: '#a855f7',
-              fontWeight: 700,
-              fontSize: '0.92rem'
-            }}>
-              <FileText size={18} />
-              <span>3. Carreta / Semirreboque 1 & Laudo de Inspeção de Rocha (CSV)</span>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-              {/* PLACA CARRETA & UF */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
-                    Placa da Carreta 1 & Estado (UF)
+              {/* SE FOR BITRUCK: LAUDO DE ROCHA / CSV DIRETAMENTE NA PLACA ÚNICA */}
+              {isBitruck && (
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                    Data de Vencimento do Laudo de Rocha / CSV *
                   </label>
-                  {(() => {
-                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta, formData.uf_carreta);
-                    if (!info) return null;
-                    return (
-                      <span style={{ fontSize: '0.70rem', color: '#c084fc', fontWeight: 600 }}>
-                        Final {info.finalDigito} ({info.mesNome})
-                      </span>
-                    );
-                  })()}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
                   <input
-                    type="text"
+                    type="date"
                     className="form-input"
-                    placeholder="ABC-1234 / ABC1D23"
-                    value={formData.placa_carreta}
-                    onChange={(e) => handlePlacaCarretaChange(e.target.value)}
-                    style={{ flex: 1 }}
+                    value={formData.validade_laudo_rocha}
+                    onChange={(e) => handleChange('validade_laudo_rocha', e.target.value)}
+                    style={{ width: '100%' }}
                   />
-                  <select
-                    className="form-select"
-                    value={formData.uf_carreta || 'ES'}
-                    onChange={(e) => handleChange('uf_carreta', e.target.value)}
-                    style={{ width: '80px', fontSize: '0.8rem', padding: '6px 8px' }}
-                    title="Estado (UF) do Detran do semirreboque"
-                  >
-                    {ESTADOS_BRASIL.map(est => (
-                      <option key={est.sigla} value={est.sigla}>{est.sigla}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* DATA DO ÚLTIMO REGISTRO DO CRLV CARRETA 1 */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
-                    Data do Último Registro (CRLV Carreta 1) *
-                  </label>
-                  {(() => {
-                    const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta, formData.uf_carreta);
-                    if (!info) return null;
-                    return (
-                      <span 
-                        style={{
-                          background: 'rgba(168, 85, 247, 0.15)',
-                          border: '1px solid rgba(168, 85, 247, 0.3)',
-                          color: '#c084fc',
-                          fontSize: '0.68rem',
-                          borderRadius: 4,
-                          padding: '2px 6px',
-                          fontWeight: 700
-                        }}
-                        title={`Vencimento oficial pelo Detran-${formData.uf_carreta || 'ES'} para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}`}
-                      >
-                        ⚡ Detran-{formData.uf_carreta || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/{String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
-                      </span>
-                    );
-                  })()}
-                </div>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={formData.crlv_validade_carreta}
-                  onChange={(e) => handleChange('crlv_validade_carreta', e.target.value)}
-                  style={{ width: '100%' }}
-                />
-                {formData.crlv_validade_carreta && (
-                  <div style={{ marginTop: 4 }}>
-                    {(() => {
-                      const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta, formData.placa_carreta, formData.uf_carreta);
-                      return (
-                        <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
-                          ● {res.label}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-
-              {/* DATA DE VENCIMENTO DO LAUDO ROCHA / CSV */}
-              <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
-                  Data de Vencimento do Laudo de Rocha / CSV *
-                </label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={formData.validade_laudo_rocha}
-                  onChange={(e) => handleChange('validade_laudo_rocha', e.target.value)}
-                  style={{ width: '100%' }}
-                />
-                {formData.validade_laudo_rocha && (
-                  <div style={{ marginTop: 4 }}>
-                    {(() => {
-                      const res = avaliarLaudoRocha(formData.validade_laudo_rocha);
-                      return (
-                        <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
-                          ● {res.label}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Toggle para Carreta 2 (Bitrem/Rodotrem) */}
-            <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px dashed rgba(255, 255, 255, 0.1)' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.82rem', color: '#cbd5e1' }}>
-                <input
-                  type="checkbox"
-                  checked={temCarreta2}
-                  onChange={(e) => setTemCarreta2(e.target.checked)}
-                />
-                <span>Veículo possui <strong>2ª Carreta (Bitrem / Rodotrem)</strong></span>
-              </label>
-
-              {temCarreta2 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Placa Carreta 2 & Estado (UF)</label>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="ABC-1234"
-                        value={formData.placa_carreta_2}
-                        onChange={(e) => handlePlacaCarreta2Change(e.target.value)}
-                        style={{ flex: 1 }}
-                      />
-                      <select
-                        className="form-select"
-                        value={formData.uf_carreta_2 || 'ES'}
-                        onChange={(e) => handleChange('uf_carreta_2', e.target.value)}
-                        style={{ width: '80px', fontSize: '0.8rem', padding: '6px 8px' }}
-                        title="Estado (UF) do Detran da 2ª carreta"
-                      >
-                        {ESTADOS_BRASIL.map(est => (
-                          <option key={est.sigla} value={est.sigla}>{est.sigla}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                      <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0 }}>
-                        Data do Último Registro (CRLV Carreta 2)
-                      </label>
+                  {formData.validade_laudo_rocha && (
+                    <div style={{ marginTop: 4 }}>
                       {(() => {
-                        const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta_2, formData.uf_carreta_2);
-                        if (!info) return null;
+                        const res = avaliarLaudoRocha(formData.validade_laudo_rocha);
                         return (
-                          <span 
-                            style={{
-                              background: 'rgba(168, 85, 247, 0.15)',
-                              border: '1px solid rgba(168, 85, 247, 0.3)',
-                              color: '#c084fc',
-                              fontSize: '0.65rem',
-                              borderRadius: 4,
-                              padding: '2px 5px',
-                              fontWeight: 700
-                            }}
-                            title={`Vencimento oficial pelo Detran-${formData.uf_carreta_2 || 'ES'} para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}`}
-                          >
-                            ⚡ Detran-{formData.uf_carreta_2 || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/{String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
+                          <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
+                            ● {res.label}
                           </span>
                         );
                       })()}
                     </div>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={formData.crlv_validade_carreta_2}
-                      onChange={(e) => handleChange('crlv_validade_carreta_2', e.target.value)}
-                    />
-                    {formData.crlv_validade_carreta_2 && (
-                      <div style={{ marginTop: 2 }}>
-                        {(() => {
-                          const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta_2, formData.placa_carreta_2, formData.uf_carreta_2);
-                          return (
-                            <span style={{ fontSize: '0.68rem', color: res.cor, fontWeight: 700 }}>
-                              ● {res.label}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                      Data de Vencimento do Laudo de Rocha (Carreta 2)
-                    </label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={formData.validade_laudo_rocha_2}
-                      onChange={(e) => handleChange('validade_laudo_rocha_2', e.target.value)}
-                    />
-                    {formData.validade_laudo_rocha_2 && (
-                      <div style={{ marginTop: 2 }}>
-                        {(() => {
-                          const res = avaliarLaudoRocha(formData.validade_laudo_rocha_2);
-                          return (
-                            <span style={{ fontSize: '0.68rem', color: res.cor, fontWeight: 700 }}>
-                              ● {res.label}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
+
+          {/* SEÇÃO 3: SE FOR BITRUCK, MOSTRA AVISO INFORMATIVO. SE FOR CONJUNTO ARTICULADO, MOSTRA CARRETA 1 & 2 */}
+          {isBitruck ? (
+            <div style={{
+              marginBottom: 20,
+              background: 'rgba(56, 189, 248, 0.06)',
+              border: '1px dashed rgba(56, 189, 248, 0.3)',
+              borderRadius: 12,
+              padding: '14px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}>
+              <Info size={20} color="#38bdf8" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.4 }}>
+                <strong style={{ color: '#38bdf8' }}>Modo Bitruck / Truck (Chassi Rígido) Ativo:</strong>
+                <div>Como este caminhão não utiliza carreta/semirreboque separada, o <strong>Laudo de Inspeção de Rocha / CSV</strong> e o <strong>CRLV</strong> estão vinculados diretamente à placa única do caminhão informada acima.</div>
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              marginBottom: 20,
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: 12,
+              padding: '16px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 14,
+                color: '#a855f7',
+                fontWeight: 700,
+                fontSize: '0.92rem'
+              }}>
+                <FileText size={18} />
+                <span>3. Carreta / Semirreboque 1 & Laudo de Inspeção de Rocha (CSV)</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                {/* PLACA CARRETA & UF */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
+                      Placa da Carreta 1 & Estado (UF)
+                    </label>
+                    {(() => {
+                      const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta, formData.uf_carreta);
+                      if (!info) return null;
+                      return (
+                        <span style={{ fontSize: '0.70rem', color: '#c084fc', fontWeight: 600 }}>
+                          Final {info.finalDigito} ({info.mesNome})
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="ABC-1234 / ABC1D23"
+                      value={formData.placa_carreta}
+                      onChange={(e) => handlePlacaCarretaChange(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                    <select
+                      className="form-select"
+                      value={formData.uf_carreta || 'ES'}
+                      onChange={(e) => handleChange('uf_carreta', e.target.value)}
+                      style={{ width: '80px', fontSize: '0.8rem', padding: '6px 8px' }}
+                      title="Estado (UF) do Detran do semirreboque"
+                    >
+                      {ESTADOS_BRASIL.map(est => (
+                        <option key={est.sigla} value={est.sigla}>{est.sigla}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* DATA DO ÚLTIMO REGISTRO DO CRLV CARRETA 1 */}
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
+                      Data do Último Registro (CRLV Carreta 1) *
+                    </label>
+                    {(() => {
+                      const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta, formData.uf_carreta);
+                      if (!info) return null;
+                      return (
+                        <span 
+                          style={{
+                            background: 'rgba(168, 85, 247, 0.15)',
+                            border: '1px solid rgba(168, 85, 247, 0.3)',
+                            color: '#c084fc',
+                            fontSize: '0.68rem',
+                            borderRadius: 4,
+                            padding: '2px 6px',
+                            fontWeight: 700
+                          }}
+                          title={`Vencimento oficial pelo Detran-${formData.uf_carreta || 'ES'} para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}`}
+                        >
+                          ⚡ Detran-{formData.uf_carreta || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/{String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={formData.crlv_validade_carreta}
+                    onChange={(e) => handleChange('crlv_validade_carreta', e.target.value)}
+                    style={{ width: '100%' }}
+                  />
+                  {formData.crlv_validade_carreta && (
+                    <div style={{ marginTop: 4 }}>
+                      {(() => {
+                        const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta, formData.placa_carreta, formData.uf_carreta);
+                        return (
+                          <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
+                            ● {res.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                {/* DATA DE VENCIMENTO DO LAUDO ROCHA / CSV */}
+                <div>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                    Data de Vencimento do Laudo de Rocha / CSV *
+                  </label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={formData.validade_laudo_rocha}
+                    onChange={(e) => handleChange('validade_laudo_rocha', e.target.value)}
+                    style={{ width: '100%' }}
+                  />
+                  {formData.validade_laudo_rocha && (
+                    <div style={{ marginTop: 4 }}>
+                      {(() => {
+                        const res = avaliarLaudoRocha(formData.validade_laudo_rocha);
+                        return (
+                          <span style={{ fontSize: '0.72rem', color: res.cor, fontWeight: 700 }}>
+                            ● {res.label}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Toggle para Carreta 2 (Bitrem/Rodotrem) */}
+              <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px dashed rgba(255, 255, 255, 0.1)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.82rem', color: '#cbd5e1' }}>
+                  <input
+                    type="checkbox"
+                    checked={temCarreta2}
+                    onChange={(e) => setTemCarreta2(e.target.checked)}
+                  />
+                  <span>Veículo possui <strong>2ª Carreta (Bitrem / Rodotrem)</strong></span>
+                </label>
+
+                {temCarreta2 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Placa Carreta 2 & Estado (UF)</label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="ABC-1234"
+                          value={formData.placa_carreta_2}
+                          onChange={(e) => handlePlacaCarreta2Change(e.target.value)}
+                          style={{ flex: 1 }}
+                        />
+                        <select
+                          className="form-select"
+                          value={formData.uf_carreta_2 || 'ES'}
+                          onChange={(e) => handleChange('uf_carreta_2', e.target.value)}
+                          style={{ width: '80px', fontSize: '0.8rem', padding: '6px 8px' }}
+                          title="Estado (UF) do Detran da 2ª carreta"
+                        >
+                          {ESTADOS_BRASIL.map(est => (
+                            <option key={est.sigla} value={est.sigla}>{est.sigla}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0 }}>
+                          Data do Último Registro (CRLV Carreta 2)
+                        </label>
+                        {(() => {
+                          const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta_2, formData.uf_carreta_2);
+                          if (!info) return null;
+                          return (
+                            <span 
+                              style={{
+                                background: 'rgba(168, 85, 247, 0.15)',
+                                border: '1px solid rgba(168, 85, 247, 0.3)',
+                                color: '#c084fc',
+                                fontSize: '0.65rem',
+                                borderRadius: 4,
+                                padding: '2px 5px',
+                                fontWeight: 700
+                              }}
+                              title={`Vencimento oficial pelo Detran-${formData.uf_carreta_2 || 'ES'} para placa final ${info.labelPar || info.finalDigito}: ${String(info.diaLimite).padStart(2, '0')}/${String(info.mesNumero).padStart(2, '0')}`}
+                            >
+                              ⚡ Detran-{formData.uf_carreta_2 || 'ES'}: {String(info.diaLimite).padStart(2, '0')}/{String(info.mesNumero).padStart(2, '0')} (Final {info.labelPar || info.finalDigito})
+                            </span>
+                          );
+                        })()}
+                      </div>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={formData.crlv_validade_carreta_2}
+                        onChange={(e) => handleChange('crlv_validade_carreta_2', e.target.value)}
+                      />
+                      {formData.crlv_validade_carreta_2 && (
+                        <div style={{ marginTop: 2 }}>
+                          {(() => {
+                            const res = calcularStatusValidadeCRLV(formData.crlv_validade_carreta_2, formData.placa_carreta_2, formData.uf_carreta_2);
+                            return (
+                              <span style={{ fontSize: '0.68rem', color: res.cor, fontWeight: 700 }}>
+                                ● {res.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                        Data de Vencimento do Laudo de Rocha (Carreta 2)
+                      </label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={formData.validade_laudo_rocha_2}
+                        onChange={(e) => handleChange('validade_laudo_rocha_2', e.target.value)}
+                      />
+                      {formData.validade_laudo_rocha_2 && (
+                        <div style={{ marginTop: 2 }}>
+                          {(() => {
+                            const res = avaliarLaudoRocha(formData.validade_laudo_rocha_2);
+                            return (
+                              <span style={{ fontSize: '0.68rem', color: res.cor, fontWeight: 700 }}>
+                                ● {res.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* SEÇÃO 4: TRANSPORTADORA & STATUS GERAL */}
           <div style={{

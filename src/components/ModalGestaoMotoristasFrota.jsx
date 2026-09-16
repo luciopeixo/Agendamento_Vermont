@@ -481,55 +481,99 @@ export function ModalGestaoMotoristasFrota({
                           </div>
                         </td>
 
-                        {/* Cavalo Mecânico */}
+                        {/* Cavalo Mecânico / Veículo */}
                         <td style={{ padding: '10px 14px' }}>
-                          <div style={{ fontWeight: 700, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span>{item.placa_cavalo || '-'}</span>
-                            {item.placa_cavalo && (
-                              <span style={{ fontSize: '0.68rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
-                                {ufCav}
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '0.76rem', color: item.crlv_validade_cavalo ? '#cbd5e1' : '#64748b' }}>
-                            Último Reg: <strong>{formatarDataBR(item.crlv_validade_cavalo)}</strong>
-                          </div>
-                          {detranCavalo?.labelDataVencimento && (
-                            <div style={{ fontSize: '0.70rem', color: detranCavalo.cor, fontWeight: 600 }}>
-                              Detran-{ufCav}: {detranCavalo.labelDataVencimento}
-                            </div>
-                          )}
+                          {(() => {
+                            const ehBitruckItem = Boolean(item.is_bitruck || item.tipo_veiculo?.includes('Truck') || (!item.placa_carreta && item.validade_laudo_rocha));
+                            return (
+                              <>
+                                <div style={{ fontWeight: 700, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span>{item.placa_cavalo || '-'}</span>
+                                  {item.placa_cavalo && (
+                                    <span style={{ fontSize: '0.68rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                                      {ufCav}
+                                    </span>
+                                  )}
+                                  {ehBitruckItem && (
+                                    <span style={{ fontSize: '0.65rem', background: 'rgba(56, 189, 248, 0.25)', color: '#7dd3fc', padding: '1px 5px', borderRadius: 4, fontWeight: 800 }}>
+                                      Bitruck
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.76rem', color: item.crlv_validade_cavalo ? '#cbd5e1' : '#64748b' }}>
+                                  CRLV: <strong>{formatarDataBR(item.crlv_validade_cavalo)}</strong>
+                                </div>
+                                {detranCavalo?.labelDataVencimento && (
+                                  <div style={{ fontSize: '0.70rem', color: detranCavalo.cor, fontWeight: 600 }}>
+                                    Detran-{ufCav}: {detranCavalo.labelDataVencimento}
+                                  </div>
+                                )}
+                                {ehBitruckItem && item.validade_laudo_rocha && (
+                                  <div style={{ marginTop: 3 }}>
+                                    <div style={{ fontSize: '0.74rem', color: '#c084fc', fontWeight: 600 }}>
+                                      Laudo Rocha: <strong>{formatarDataBR(item.validade_laudo_rocha)}</strong>
+                                    </div>
+                                    {laudoEval?.label && (
+                                      <div style={{ fontSize: '0.68rem', color: laudoEval.cor, fontWeight: 600 }}>
+                                        {laudoEval.label}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </td>
 
                         {/* Carreta e Laudo de Rocha */}
                         <td style={{ padding: '10px 14px' }}>
-                          <div style={{ fontWeight: 700, color: '#c084fc', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            <span>{item.placa_carreta || '-'}</span>
-                            {item.placa_carreta && (
-                              <span style={{ fontSize: '0.68rem', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
-                                {ufCarr}
-                              </span>
-                            )}
-                            {item.placa_carreta_2 && (
-                              <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>+ {item.placa_carreta_2}</span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '0.76rem', color: item.crlv_validade_carreta ? '#cbd5e1' : '#64748b' }}>
-                            Último Reg: <strong>{formatarDataBR(item.crlv_validade_carreta)}</strong>
-                          </div>
-                          {detranCarreta?.labelDataVencimento && (
-                            <div style={{ fontSize: '0.70rem', color: detranCarreta.cor, fontWeight: 600 }}>
-                              Detran-{ufCarr}: {detranCarreta.labelDataVencimento}
-                            </div>
-                          )}
-                          <div style={{ fontSize: '0.76rem', color: item.validade_laudo_rocha ? '#cbd5e1' : '#64748b', marginTop: 4 }}>
-                            Venc. Laudo: <strong>{formatarDataBR(item.validade_laudo_rocha)}</strong>
-                          </div>
-                          {laudoEval?.label && item.validade_laudo_rocha && (
-                            <div style={{ fontSize: '0.70rem', color: laudoEval.cor, fontWeight: 600 }}>
-                              {laudoEval.label}
-                            </div>
-                          )}
+                          {(() => {
+                            const ehBitruckItem = Boolean(item.is_bitruck || item.tipo_veiculo?.includes('Truck') || (!item.placa_carreta && item.validade_laudo_rocha));
+                            if (ehBitruckItem) {
+                              return (
+                                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', padding: '3px 8px', borderRadius: 6, fontWeight: 700, fontSize: '0.72rem' }}>
+                                    🚛 Chassi Rígido (Placa Única)
+                                  </span>
+                                  <div style={{ fontSize: '0.70rem', color: '#64748b', marginTop: 3 }}>
+                                    Sem carreta separada
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <>
+                                <div style={{ fontWeight: 700, color: '#c084fc', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                  <span>{item.placa_carreta || '-'}</span>
+                                  {item.placa_carreta && (
+                                    <span style={{ fontSize: '0.68rem', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                                      {ufCarr}
+                                    </span>
+                                  )}
+                                  {item.placa_carreta_2 && (
+                                    <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>+ {item.placa_carreta_2}</span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.76rem', color: item.crlv_validade_carreta ? '#cbd5e1' : '#64748b' }}>
+                                  Último Reg: <strong>{formatarDataBR(item.crlv_validade_carreta)}</strong>
+                                </div>
+                                {detranCarreta?.labelDataVencimento && (
+                                  <div style={{ fontSize: '0.70rem', color: detranCarreta.cor, fontWeight: 600 }}>
+                                    Detran-{ufCarr}: {detranCarreta.labelDataVencimento}
+                                  </div>
+                                )}
+                                <div style={{ fontSize: '0.76rem', color: item.validade_laudo_rocha ? '#cbd5e1' : '#64748b', marginTop: 4 }}>
+                                  Venc. Laudo: <strong>{formatarDataBR(item.validade_laudo_rocha)}</strong>
+                                </div>
+                                {laudoEval?.label && item.validade_laudo_rocha && (
+                                  <div style={{ fontSize: '0.70rem', color: laudoEval.cor, fontWeight: 600 }}>
+                                    {laudoEval.label}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
                         </td>
 
                         {/* Transportadora */}

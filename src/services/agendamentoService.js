@@ -634,6 +634,7 @@ export async function salvarMotoristaNaBase(dadosMotorista = {}) {
       transportadora: transpLimpa,
       transportadora_cnpj: transpCnpj,
       tipo_veiculo: dadosMotorista.tipo_veiculo || existente.tipo_veiculo || 'Carreta / Bitrem',
+      is_bitruck: Boolean(dadosMotorista.is_bitruck || dadosMotorista.tipo_veiculo?.includes('Truck') || existente.is_bitruck),
       placa_cavalo: (dadosMotorista.placa_cavalo || existente.placa_cavalo || '').toUpperCase().trim() || null,
       uf_cavalo: dadosMotorista.uf_cavalo || existente.uf_cavalo || identificarUFPelaPlaca(dadosMotorista.placa_cavalo) || 'ES',
       crlv_validade_cavalo: crlvCav,
@@ -739,6 +740,7 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
       transportadora: (dados.transportadora || existente.transportadora || '').trim().toUpperCase(),
       transportadora_cnpj: dados.transportadora_cnpj || existente.transportadora_cnpj || '',
       tipo_veiculo: dados.tipo_veiculo || existente.tipo_veiculo || 'Carreta / Bitrem',
+      is_bitruck: Boolean(dados.is_bitruck || dados.tipo_veiculo?.includes('Truck') || existente.is_bitruck),
       placa_cavalo: (dados.placa_cavalo || existente.placa_cavalo || '').toUpperCase().trim(),
       uf_cavalo: dados.uf_cavalo || existente.uf_cavalo || identificarUFPelaPlaca(dados.placa_cavalo) || 'ES',
       crlv_validade_cavalo: crlvValidadeCavalo,
@@ -1564,12 +1566,16 @@ export function verificarConformidadeDocumental({
   // Valores obtidos individualmente (permite troca de veículos entre motoristas e preserva documentos salvos no perfil)
   const cnhValidade = motorista?.cnh_validade;
   const cnhCategoria = motorista?.cnh_categoria;
+  const isTruckOuBitruck = String(tipoVeiculo || motorista?.tipo_veiculo || '').toLowerCase().includes('truck') || 
+                           Boolean(motorista?.is_bitruck) ||
+                           Boolean(veiculoCavalo?.is_bitruck);
+
   const crlvCavalo = veiculoCavalo?.crlv_validade_cavalo || motorista?.crlv_validade_cavalo || null;
   const ufCavalo = veiculoCavalo?.uf_cavalo || motorista?.uf_cavalo || identificarUFPelaPlaca(limpaCavalo) || 'ES';
 
   const crlvCarreta = veiculoCarreta?.crlv_validade_carreta || motorista?.crlv_validade_carreta || null;
   const ufCarreta = veiculoCarreta?.uf_carreta || motorista?.uf_carreta || identificarUFPelaPlaca(limpaCarreta) || 'ES';
-  const laudoRocha = veiculoCarreta?.validade_laudo_rocha || motorista?.validade_laudo_rocha || null;
+  const laudoRocha = veiculoCarreta?.validade_laudo_rocha || veiculoCavalo?.validade_laudo_rocha || motorista?.validade_laudo_rocha || null;
 
   const crlvCarreta2 = veiculoCarreta2?.crlv_validade_carreta_2 || veiculoCarreta2?.crlv_validade_carreta || motorista?.crlv_validade_carreta_2 || null;
   const ufCarreta2 = veiculoCarreta2?.uf_carreta_2 || motorista?.uf_carreta_2 || identificarUFPelaPlaca(limpaCarreta2) || 'ES';
@@ -1581,9 +1587,11 @@ export function verificarConformidadeDocumental({
   }
 
   // 2. Categoria CNH (Verifica compatibilidade com carreta/pesados)
-  const isCarretaOuPesado = String(tipoVeiculo || motorista?.tipo_veiculo || '').toLowerCase().includes('carreta') || 
-                            String(tipoVeiculo || motorista?.tipo_veiculo || '').toLowerCase().includes('bitrem') ||
-                            Boolean(limpaCarreta);
+  const isCarretaOuPesado = !isTruckOuBitruck && (
+    String(tipoVeiculo || motorista?.tipo_veiculo || '').toLowerCase().includes('carreta') || 
+    String(tipoVeiculo || motorista?.tipo_veiculo || '').toLowerCase().includes('bitrem') ||
+    Boolean(limpaCarreta)
+  );
   
   if (isCarretaOuPesado && cnhCategoria) {
     const cat = String(cnhCategoria).toUpperCase().trim();
@@ -1592,32 +1600,52 @@ export function verificarConformidadeDocumental({
     }
   }
 
-  // 3. CRLV Cavalo (Último Registro vs Detran-UF)
+  // 3. CRLV Cavalo / Veículo (Último Registro vs Detran-UF)
   if (limpaCavalo || crlvCavalo) {
-    checarCRLVComDetran('crlv_validade_cavalo', `Último Registro CRLV Cavalo${limpaCavalo ? ` (${limpaCavalo} - ${ufCavalo})` : ''}`, crlvCavalo, limpaCavalo || motorista?.placa_cavalo, ufCavalo);
+    checarCRLVComDetran(
+      'crlv_validade_cavalo', 
+      isTruckOuBitruck ? `Último Registro CRLV (${limpaCavalo || 'Veículo'}${limpaCavalo ? ` - ${ufCavalo}` : ''})` : `Último Registro CRLV Cavalo${limpaCavalo ? ` (${limpaCavalo} - ${ufCavalo})` : ''}`, 
+      crlvCavalo, 
+      limpaCavalo || motorista?.placa_cavalo, 
+      ufCavalo
+    );
   }
 
   // 4. CRLV Carreta 1 & Laudo de Rocha
-  if (limpaCarreta || crlvCarreta || laudoRocha) {
-    checarCRLVComDetran('crlv_validade_carreta', `Último Registro CRLV Carreta 1${limpaCarreta ? ` (${limpaCarreta} - ${ufCarreta})` : ''}`, crlvCarreta, limpaCarreta || motorista?.placa_carreta, ufCarreta);
-    checarLaudoRocha('validade_laudo_rocha', `Vencimento do Laudo de Rocha / CSV (Carreta ${limpaCarreta || motorista?.placa_carreta || '1'})`, laudoRocha);
-  }
+  if (isTruckOuBitruck) {
+    // Para Bitruck / Truck de chassi rígido, o Laudo de Rocha é vinculado à placa única
+    if (laudoRocha || limpaCavalo) {
+      checarLaudoRocha('validade_laudo_rocha', `Vencimento do Laudo de Rocha / CSV (${limpaCavalo || motorista?.placa_cavalo || 'Bitruck/Truck'})`, laudoRocha);
+    }
+  } else {
+    // Para conjuntos articulados padrão
+    if (limpaCarreta || crlvCarreta || laudoRocha) {
+      checarCRLVComDetran('crlv_validade_carreta', `Último Registro CRLV Carreta 1${limpaCarreta ? ` (${limpaCarreta} - ${ufCarreta})` : ''}`, crlvCarreta, limpaCarreta || motorista?.placa_carreta, ufCarreta);
+      checarLaudoRocha('validade_laudo_rocha', `Vencimento do Laudo de Rocha / CSV (Carreta ${limpaCarreta || motorista?.placa_carreta || '1'})`, laudoRocha);
+    }
 
-  // 5. Carreta 2 (se houver)
-  if (limpaCarreta2 || crlvCarreta2 || laudoRocha2) {
-    checarCRLVComDetran('crlv_validade_carreta_2', `Último Registro CRLV Carreta 2 (${limpaCarreta2 || motorista?.placa_carreta_2 || '2'} - ${ufCarreta2})`, crlvCarreta2, limpaCarreta2 || motorista?.placa_carreta_2, ufCarreta2);
-    checarLaudoRocha('validade_laudo_rocha_2', `Vencimento do Laudo de Rocha / CSV (Carreta 2 - ${limpaCarreta2 || motorista?.placa_carreta_2 || '2'})`, laudoRocha2);
+    // 5. Carreta 2 (se houver)
+    if (limpaCarreta2 || crlvCarreta2 || laudoRocha2) {
+      checarCRLVComDetran('crlv_validade_carreta_2', `Último Registro CRLV Carreta 2 (${limpaCarreta2 || motorista?.placa_carreta_2 || '2'} - ${ufCarreta2})`, crlvCarreta2, limpaCarreta2 || motorista?.placa_carreta_2, ufCarreta2);
+      checarLaudoRocha('validade_laudo_rocha_2', `Vencimento do Laudo de Rocha / CSV (Carreta 2 - ${limpaCarreta2 || motorista?.placa_carreta_2 || '2'})`, laudoRocha2);
+    }
   }
 
   // Identifica campos essenciais não preenchidos
   const camposFaltando = [];
   if ((motorista || cpfLimpo.length === 11) && !cnhValidade) camposFaltando.push('Validade CNH');
-  if (limpaCavalo && !crlvCavalo) camposFaltando.push(`Último Registro CRLV Cavalo (${limpaCavalo})`);
-  if (limpaCarreta && !crlvCarreta) camposFaltando.push(`Último Registro CRLV Carreta (${limpaCarreta})`);
-  if (limpaCarreta && !laudoRocha) camposFaltando.push(`Vencimento do Laudo de Rocha / CSV (${limpaCarreta})`);
-  if (limpaCarreta2) {
-    if (!crlvCarreta2) camposFaltando.push(`Último Registro CRLV Carreta 2 (${limpaCarreta2})`);
-    if (!laudoRocha2) camposFaltando.push(`Vencimento do Laudo Rocha Carreta 2 (${limpaCarreta2})`);
+  
+  if (isTruckOuBitruck) {
+    if (limpaCavalo && !crlvCavalo) camposFaltando.push(`Último Registro CRLV (${limpaCavalo})`);
+    if (limpaCavalo && !laudoRocha) camposFaltando.push(`Vencimento do Laudo de Rocha / CSV (${limpaCavalo})`);
+  } else {
+    if (limpaCavalo && !crlvCavalo) camposFaltando.push(`Último Registro CRLV Cavalo (${limpaCavalo})`);
+    if (limpaCarreta && !crlvCarreta) camposFaltando.push(`Último Registro CRLV Carreta (${limpaCarreta})`);
+    if (limpaCarreta && !laudoRocha) camposFaltando.push(`Vencimento do Laudo de Rocha / CSV (${limpaCarreta})`);
+    if (limpaCarreta2) {
+      if (!crlvCarreta2) camposFaltando.push(`Último Registro CRLV Carreta 2 (${limpaCarreta2})`);
+      if (!laudoRocha2) camposFaltando.push(`Vencimento do Laudo Rocha Carreta 2 (${limpaCarreta2})`);
+    }
   }
 
   let statusGeral = 'REGULAR';
@@ -1724,7 +1752,7 @@ export function obterStatusConformidadeCNH(cpf = '', dataReferenciaStr = '', nom
 }
 
 /**
- * Retorna o status de conformidade do Cavalo Mecânico pela Placa
+ * Retorna o status de conformidade do Cavalo Mecânico / Veículo pela Placa (com suporte a Bitruck/Truck rígido)
  */
 export function obterStatusConformidadeCavalo(placaCavalo = '', dataReferenciaStr = '', ufInformada = '', cpf = '', nome = '') {
   if (!placaCavalo) return null;
@@ -1754,13 +1782,57 @@ export function obterStatusConformidadeCavalo(placaCavalo = '', dataReferenciaSt
     return {
       cadastrado: false,
       status: 'sem_registro',
-      label: 'Sem CRLV do cavalo registrado na base',
+      label: 'Sem CRLV do veículo registrado na base',
       cor: '#94a3b8'
     };
   }
 
   const uf = ufInformada || veic.uf_cavalo || identificarUFPelaPlaca(limpa) || 'ES';
   const res = avaliarCRLVComDetran(veic.crlv_validade_cavalo, limpa, dataReferenciaStr, uf);
+
+  const isBitruck = Boolean(veic.is_bitruck || veic.tipo_veiculo?.includes('Truck') || (!veic.placa_carreta && veic.validade_laudo_rocha));
+  const laudoData = veic.validade_laudo_rocha;
+  const resLaudo = (isBitruck && laudoData) ? avaliarLaudoRocha(laudoData, dataReferenciaStr) : null;
+
+  if (isBitruck && resLaudo) {
+    const temVencido = res.status === 'vencido' || resLaudo.status === 'vencido';
+    const temAVencer = res.status === 'avencer' || resLaudo.status === 'avencer';
+
+    if (temVencido) {
+      const motivos = [];
+      if (res.status === 'vencido') motivos.push(`CRLV Vencido (${res.labelDataVencimento})`);
+      if (resLaudo.status === 'vencido') motivos.push(`Laudo Rocha Vencido (${resLaudo.labelDataVencimento})`);
+      return {
+        cadastrado: true,
+        status: 'vencido',
+        label: `Doc. Bitruck Vencido: ${motivos.join(' | ')}`,
+        cor: '#ef4444',
+        bg: 'rgba(239, 68, 68, 0.15)',
+        detalhes: res.label
+      };
+    } else if (temAVencer) {
+      const motivos = [];
+      if (res.status === 'avencer') motivos.push(`CRLV em ${res.dias}d (${res.labelDataVencimento})`);
+      if (resLaudo.status === 'avencer') motivos.push(`Laudo em ${resLaudo.dias}d (${resLaudo.labelDataVencimento})`);
+      return {
+        cadastrado: true,
+        status: 'avencer',
+        label: `Doc. Bitruck a Vencer: ${motivos.join(' | ')}`,
+        cor: '#f59e0b',
+        bg: 'rgba(245, 158, 11, 0.15)',
+        detalhes: res.label
+      };
+    } else {
+      return {
+        cadastrado: true,
+        status: 'valido',
+        label: `Bitruck Regular: CRLV até ${res.labelDataVencimento} | Laudo Rocha até ${resLaudo.labelDataVencimento}`,
+        cor: '#22c55e',
+        bg: 'rgba(34, 197, 94, 0.15)',
+        detalhes: res.label
+      };
+    }
+  }
 
   if (res.status === 'vencido') {
     return {
