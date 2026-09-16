@@ -89,13 +89,96 @@ body, body.fundo-negresco {
     url('/assets/vermont_negresco.jpg');
 }
 
-/* Opção 2: Pedreira Taj Mahal - Quartzito Nobre Translúcido Perolado */
+/* Opção 2: Tema Claro Vermont (Quartzito Nobre Taj Mahal / Caixas e Cards Brancos) */
 body.fundo-tajmahal {
-  background-color: #0a0e12;
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --bg-card-solid: #ffffff;
+  --bg-input: #ffffff;
+  background-color: #f1f5f9;
   background-image: 
-    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(0, 118, 44, 0.28) 0%, transparent 70%),
-    linear-gradient(180deg, rgba(11, 16, 20, 0.84) 0%, rgba(14, 20, 26, 0.88) 60%, rgba(9, 13, 16, 0.95) 100%),
-    url('/assets/vermont_tajmahal.jpg');
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(0, 168, 62, 0.09) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.95) 0%, rgba(241, 245, 249, 0.98) 100%);
+  color: #1e293b;
+}
+
+body.fundo-tajmahal h1,
+body.fundo-tajmahal h2,
+body.fundo-tajmahal h3,
+body.fundo-tajmahal h4,
+body.fundo-tajmahal h5,
+body.fundo-tajmahal h6 {
+  color: #0f172a;
+}
+
+body.fundo-tajmahal .glass-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  color: #1e293b;
+}
+
+body.fundo-tajmahal .glass-panel:hover {
+  border-color: rgba(0, 168, 62, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+body.fundo-tajmahal .form-input,
+body.fundo-tajmahal .form-select,
+body.fundo-tajmahal .form-textarea {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+
+body.fundo-tajmahal .form-input:focus,
+body.fundo-tajmahal .form-select:focus,
+body.fundo-tajmahal .form-textarea:focus {
+  background: #ffffff;
+  border-color: var(--vermont-green);
+  box-shadow: 0 0 0 3px rgba(0, 118, 44, 0.15);
+  color: #0f172a;
+}
+
+body.fundo-tajmahal .form-label {
+  color: #475569;
+}
+
+body.fundo-tajmahal .btn-secondary {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+body.fundo-tajmahal .btn-secondary:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+body.fundo-tajmahal .table th {
+  color: #475569 !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+body.fundo-tajmahal .table td {
+  color: #1e293b !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+body.fundo-tajmahal .table tr:hover {
+  background: rgba(0, 168, 62, 0.04) !important;
+}
+
+body.fundo-tajmahal .navbar-container {
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+body.fundo-tajmahal .navbar-brand-title {
+  color: #64748b;
 }
 
 /* Opção 3: Estúdio Minimalista - Grafite Mineral Acetinado sem Textura Fotográfica */
