@@ -1566,7 +1566,7 @@ export function PainelGestao({
             }}
           >
             <FileCheck size={14} />
-            {exibindoApenasSemNF ? 'Voltar para Todos' : `Ver Apenas os ${finalizadosSemNF.length} Sem NF`}
+            {exibindoApenasSemNF ? 'Voltar para Todos' : `Ver Apenas os ${finalizadosSemNF.length} com NF Pendente`}
           </button>
         </div>
       )}
@@ -2715,7 +2715,7 @@ export function PainelGestao({
                                 ) : (
                                   <FileCheck size={14} color="var(--slate-400)" />
                                 )}
-                                <span>{ag.nota_fiscal_emitida ? 'NF OK' : (ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'NF Pendente' : 'NF'}</span>
+                                <span>{ag.nota_fiscal_emitida ? 'NF OK' : 'NF Pendente'}</span>
                               </button>
                             ) : (
                               /* Visualização para Usuários da Pedreira (Somente Leitura) */
@@ -2747,7 +2747,7 @@ export function PainelGestao({
                                 ) : (
                                   <>
                                     <Clock size={13} color="var(--slate-400)" />
-                                    <span>Sem NF</span>
+                                    <span>NF Pendente</span>
                                   </>
                                 )}
                               </div>
