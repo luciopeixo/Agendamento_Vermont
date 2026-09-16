@@ -32,6 +32,7 @@ import {
   listarEnvelopamentos, 
   atualizarStatusEnvelopamento, 
   excluirEnvelopamento, 
+  excluirEnvelopamentosEmLote,
   calcularMetricasEnvelopamento, 
   STATUS_ENVELOPAMENTO,
   inscreverEnvelopamentosRealtime
@@ -235,6 +236,65 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         await carregarDados();
       } catch (err) {
         console.error('Erro ao excluir:', err);
+      }
+    }
+  };
+
+  // Excluir apenas os blocos com status ENVELOPADO de um Romaneio específico
+  const handleExcluirEnvelopadosRomaneio = async (rom) => {
+    const blocosEnvelopados = (rom.blocos || []).filter(b => b.status === 'envelopado');
+    if (blocosEnvelopados.length === 0) {
+      alert('Não há blocos com status "Envelopado" neste romaneio.');
+      return;
+    }
+
+    const nomeRom = rom.numeroRomaneio.startsWith('S/N') ? rom.numeroRomaneio : `Romaneio Nº ${rom.numeroRomaneio}`;
+    const msg = `Tem certeza que deseja EXCLUIR todos os ${blocosEnvelopados.length} bloco(s) ENVELOPADO(S) do ${nomeRom}?`;
+    
+    if (window.confirm(msg)) {
+      try {
+        const ids = blocosEnvelopados.map(b => b.id);
+        await excluirEnvelopamentosEmLote(ids);
+        await carregarDados();
+      } catch (err) {
+        console.error('Erro ao excluir blocos envelopados:', err);
+        alert('Erro ao excluir blocos envelopados.');
+      }
+    }
+  };
+
+  // Excluir todos os blocos de um Romaneio
+  const handleExcluirRomaneioCompleto = async (rom) => {
+    const nomeRom = rom.numeroRomaneio.startsWith('S/N') ? rom.numeroRomaneio : `Romaneio Nº ${rom.numeroRomaneio}`;
+    const msg = `⚠️ ATENÇÃO: Deseja realmente remover TODOS os ${rom.blocos.length} bloco(s) do ${nomeRom}?`;
+    
+    if (window.confirm(msg)) {
+      try {
+        const ids = rom.blocos.map(b => b.id);
+        await excluirEnvelopamentosEmLote(ids);
+        await carregarDados();
+      } catch (err) {
+        console.error('Erro ao excluir romaneio:', err);
+        alert('Erro ao excluir romaneio.');
+      }
+    }
+  };
+
+  // Excluir todos os blocos envelopados de um Cliente
+  const handleExcluirEnvelopadosCliente = async (grupo) => {
+    const blocosEnvelopados = (grupo.blocos || []).filter(b => b.status === 'envelopado');
+    if (blocosEnvelopados.length === 0) return;
+
+    const msg = `Deseja realmente EXCLUIR todos os ${blocosEnvelopados.length} bloco(s) ENVELOPADO(S) do cliente ${grupo.clienteNome}?`;
+    
+    if (window.confirm(msg)) {
+      try {
+        const ids = blocosEnvelopados.map(b => b.id);
+        await excluirEnvelopamentosEmLote(ids);
+        await carregarDados();
+      } catch (err) {
+        console.error('Erro ao excluir envelopados do cliente:', err);
+        alert('Erro ao excluir blocos.');
       }
     }
   };
@@ -911,6 +971,32 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                     }}>
                       📦 {grupo.metricas.total} Bloco{grupo.metricas.total > 1 ? 's' : ''}
                     </span>
+
+                    {/* Botão Excluir Envelopados do Cliente */}
+                    {grupo.metricas.envelopado > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExcluirEnvelopadosCliente(grupo);
+                        }}
+                        className="btn btn-secondary"
+                        style={{
+                          padding: '3px 8px',
+                          fontSize: '0.70rem',
+                          color: '#f87171',
+                          borderColor: 'rgba(239, 68, 68, 0.35)',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                        title={`Excluir todos os ${grupo.metricas.envelopado} blocos envelopados deste cliente`}
+                      >
+                        <Trash2 size={11} /> Limpar Envelopados ({grupo.metricas.envelopado})
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -932,7 +1018,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                             transition: 'all 0.2s ease'
                           }}
                         >
-                          {/* Header do Romaneio com Botão [+] */}
+                          {/* Header do Romaneio com Botão [+] e Ações em Lote */}
                           <div 
                             onClick={() => toggleRomaneio(rom.chaveRomaneio)}
                             style={{
@@ -992,8 +1078,8 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                               </div>
                             </div>
 
-                            {/* Badges de Resumo do Romaneio */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            {/* Badges de Resumo e Botão de Deletar Envelopados */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                               {rom.metricas.envelopado > 0 && (
                                 <span style={{
                                   fontSize: '0.70rem',
@@ -1070,6 +1156,52 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                               }}>
                                 📦 {rom.blocos.length} Bloco{rom.blocos.length > 1 ? 's' : ''}
                               </span>
+
+                              {/* BOTÃO PARA DELETAR BLOCOS ENVELOPADOS DO ROMANEIO */}
+                              {rom.metricas.envelopado > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleExcluirEnvelopadosRomaneio(rom);
+                                  }}
+                                  className="btn btn-secondary"
+                                  style={{
+                                    padding: '3px 8px',
+                                    fontSize: '0.72rem',
+                                    color: '#ef4444',
+                                    borderColor: 'rgba(239, 68, 68, 0.45)',
+                                    background: 'rgba(239, 68, 68, 0.12)',
+                                    fontWeight: 700,
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4
+                                  }}
+                                  title={`Excluir todos os ${rom.metricas.envelopado} blocos envelopados deste romaneio de uma só vez`}
+                                >
+                                  <Trash2 size={12} />
+                                  Deletar Envelopados ({rom.metricas.envelopado})
+                                </button>
+                              )}
+
+                              {/* Botão de Excluir Romaneio Completo */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleExcluirRomaneioCompleto(rom);
+                                }}
+                                className="btn btn-secondary"
+                                style={{
+                                  padding: '3px 6px',
+                                  fontSize: '0.72rem',
+                                  color: 'var(--slate-400)',
+                                  borderColor: 'rgba(255,255,255,0.12)'
+                                }}
+                                title="Excluir todos os blocos deste romaneio"
+                              >
+                                <Trash2 size={12} />
+                              </button>
                             </div>
                           </div>
 

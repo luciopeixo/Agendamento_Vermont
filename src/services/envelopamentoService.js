@@ -394,6 +394,30 @@ export const excluirEnvelopamento = async (id) => {
 };
 
 /**
+ * Exclui múltiplos registros de envelopamento em lote por lista de IDs
+ */
+export const excluirEnvelopamentosEmLote = async (ids = []) => {
+  if (!Array.isArray(ids) || ids.length === 0) return true;
+
+  const setIds = new Set(ids);
+  const locais = carregarEnvelopamentosLocais();
+  const novaLista = locais.filter(item => !setIds.has(item.id));
+  salvarEnvelopamentosLocais(novaLista);
+
+  if (isSupabaseConfigurado()) {
+    try {
+      await supabase.from('envelopamentos').delete().in('id', ids);
+    } catch (err) {
+      console.warn('Erro ao excluir lote no Supabase:', err);
+    }
+    sincronizarEnvelopamentosNuvem(novaLista);
+  }
+
+  notificarAlteracaoEnvelopamento();
+  return true;
+};
+
+/**
  * Importa múltiplos blocos em lote
  */
 export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont') => {
