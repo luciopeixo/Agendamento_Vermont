@@ -614,7 +614,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         pedreira: formData.pedreira,
         material: formData.material,
         numero_bloco: formData.numero_bloco,
-        cliente: formData.cliente
+        cliente: formData.cliente,
+        cliente_cnpj: formData.cliente_cnpj
       });
       if (!cancelado) {
         setAlertaDuplicidade1(resultado.duplicado ? resultado : null);
@@ -625,7 +626,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       cancelado = true;
       clearTimeout(timer);
     };
-  }, [formData.numero_bloco, formData.pedreira, formData.material, formData.cliente]);
+  }, [formData.numero_bloco, formData.pedreira, formData.material, formData.cliente, formData.cliente_cnpj]);
 
   // Verificação em tempo real de duplicidade para Ponto 2 (Carga Combinada)
   useEffect(() => {
@@ -643,7 +644,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         pedreira: ponto2.pedreira,
         material: ponto2.material,
         numero_bloco: ponto2.numero_bloco,
-        cliente: ponto2.cliente || formData.cliente
+        cliente: ponto2.cliente || formData.cliente,
+        cliente_cnpj: ponto2.cliente_cnpj || formData.cliente_cnpj
       });
       if (!cancelado) {
         setAlertaDuplicidade2(resultado.duplicado ? resultado : null);
@@ -654,7 +656,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       cancelado = true;
       clearTimeout(timer);
     };
-  }, [tipoCarregamento, ponto2.numero_bloco, ponto2.pedreira, ponto2.material, ponto2.cliente, formData.cliente]);
+  }, [tipoCarregamento, ponto2.numero_bloco, ponto2.pedreira, ponto2.material, ponto2.cliente, ponto2.cliente_cnpj, formData.cliente, formData.cliente_cnpj]);
 
   // Verificação em tempo real de duplicidade para Ponto 3 (Carga Combinada 3 Blocos)
   useEffect(() => {
@@ -672,7 +674,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         pedreira: ponto3.pedreira,
         material: ponto3.material,
         numero_bloco: ponto3.numero_bloco,
-        cliente: ponto3.cliente || formData.cliente
+        cliente: ponto3.cliente || formData.cliente,
+        cliente_cnpj: ponto3.cliente_cnpj || formData.cliente_cnpj
       });
       if (!cancelado) {
         setAlertaDuplicidade3(resultado.duplicado ? resultado : null);
@@ -683,7 +686,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       cancelado = true;
       clearTimeout(timer);
     };
-  }, [tipoCarregamento, qtdBlocosCombinados, ponto3.numero_bloco, ponto3.pedreira, ponto3.material, ponto3.cliente, formData.cliente]);
+  }, [tipoCarregamento, qtdBlocosCombinados, ponto3.numero_bloco, ponto3.pedreira, ponto3.material, ponto3.cliente, ponto3.cliente_cnpj, formData.cliente, formData.cliente_cnpj]);
 
   const handleChange = (campo, valor) => {
     let valorFinal = valor;
@@ -1070,7 +1073,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         pedreira: formData.pedreira,
         material: formData.material,
         numero_bloco: formData.numero_bloco,
-        cliente: formData.cliente
+        cliente: formData.cliente,
+        cliente_cnpj: formData.cliente_cnpj
       });
       if (checkDuplicado.duplicado) {
         setMensagemErro(checkDuplicado.mensagem);
@@ -1081,7 +1085,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         pedreira: formData.pedreira,
         material: formData.material,
         numero_bloco: formData.numero_bloco,
-        cliente: formData.cliente
+        cliente: formData.cliente,
+        cliente_cnpj: formData.cliente_cnpj
       });
       if (checkDuplicado1.duplicado) {
         setMensagemErro(`[1º Carregamento] ${checkDuplicado1.mensagem}`);
@@ -1092,7 +1097,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         pedreira: ponto2.pedreira,
         material: ponto2.material,
         numero_bloco: ponto2.numero_bloco,
-        cliente: ponto2.cliente || formData.cliente
+        cliente: ponto2.cliente || formData.cliente,
+        cliente_cnpj: ponto2.cliente_cnpj || formData.cliente_cnpj
       });
       if (checkDuplicado2.duplicado) {
         setMensagemErro(`[2º Carregamento] ${checkDuplicado2.mensagem}`);
@@ -1104,7 +1110,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           pedreira: ponto3.pedreira,
           material: ponto3.material,
           numero_bloco: ponto3.numero_bloco,
-          cliente: ponto3.cliente || formData.cliente
+          cliente: ponto3.cliente || formData.cliente,
+          cliente_cnpj: ponto3.cliente_cnpj || formData.cliente_cnpj
         });
         if (checkDuplicado3.duplicado) {
           setMensagemErro(`[3º Carregamento] ${checkDuplicado3.mensagem}`);

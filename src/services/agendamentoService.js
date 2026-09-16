@@ -2601,6 +2601,7 @@ export async function verificarBlocoDuplicado({
   material = '',
   numero_bloco = '',
   cliente = '',
+  cliente_cnpj = '',
   agendamentoIdIgnorar = null
 }) {
   if (!numero_bloco || typeof numero_bloco !== 'string') return { duplicado: false };
@@ -2608,11 +2609,19 @@ export async function verificarBlocoDuplicado({
   const blocosParaVerificar = extrairBlocosDigitados(numero_bloco);
   if (blocosParaVerificar.length === 0) return { duplicado: false };
 
+  const clienteLimpo = limparNomeEmpresa(cliente || '').toUpperCase().trim();
+  const cnpjLimpo = (cliente_cnpj || '').replace(/\D/g, '');
+
+  // A mesma numeração de bloco pode ser utilizada para clientes diferentes.
+  // A trava só atua se o cliente/destinatário já tiver sido informado e coincidir.
+  if (!clienteLimpo && !cnpjLimpo) {
+    return { duplicado: false };
+  }
+
   const idsExcluidos = obterIdsExcluidos();
   const idIgnorarStr = agendamentoIdIgnorar ? String(agendamentoIdIgnorar).trim() : null;
   const pedreiraLimpa = (pedreira || '').trim();
   const materialLimpo = (material || '').trim().toUpperCase();
-  const clienteLimpo = limparNomeEmpresa(cliente || '').toUpperCase();
 
   let listaParaChecar = [];
   if (isSupabaseConfigurado()) {
@@ -2653,7 +2662,8 @@ export async function verificarBlocoDuplicado({
     const agBlocos = extrairBlocosDigitados(ag.numero_bloco);
     const agPedreira = ag.pedreira || '';
     const agMaterial = (ag.material || '').trim().toUpperCase();
-    const agCliente = limparNomeEmpresa(ag.cliente || '').toUpperCase();
+    const agCliente = limparNomeEmpresa(ag.cliente || '').toUpperCase().trim();
+    const agCnpj = (ag.cliente_cnpj || '').replace(/\D/g, '');
 
     // Compara cada bloco digitado com os blocos do agendamento existente
     const blocoCoincidente = blocosParaVerificar.find(bNovo =>
@@ -2662,11 +2672,20 @@ export async function verificarBlocoDuplicado({
 
     if (blocoCoincidente) {
       const mesmaPedreira = !pedreiraLimpa || saoMesmaPedreira(agPedreira, pedreiraLimpa);
-      const mesmoMaterial = !materialLimpo || agMaterial === materialLimpo || agMaterial.includes(materialLimpo) || materialLimpo.includes(agMaterial);
-      const mesmoCliente = !clienteLimpo || agCliente === clienteLimpo || agCliente.includes(clienteLimpo) || clienteLimpo.includes(agCliente);
+      const mesmoMaterial = !materialLimpo || !agMaterial || agMaterial === materialLimpo || agMaterial.includes(materialLimpo) || materialLimpo.includes(agMaterial);
+      
+      const matchCnpj = Boolean(cnpjLimpo && agCnpj && cnpjLimpo === agCnpj);
+      const matchNome = Boolean(
+        clienteLimpo && agCliente && (
+          agCliente === clienteLimpo ||
+          (clienteLimpo.length >= 4 && agCliente.includes(clienteLimpo)) ||
+          (agCliente.length >= 4 && clienteLimpo.includes(agCliente))
+        )
+      );
+      const mesmoCliente = matchCnpj || matchNome;
 
-      // Trava se coincidir pedreira E (material OU cliente)
-      if (mesmaPedreira && (mesmoMaterial || mesmoCliente)) {
+      // Trava OBRIGATORIAMENTE se coincidir o MESMO CLIENTE e a MESMA PEDREIRA
+      if (mesmoCliente && mesmaPedreira && mesmoMaterial) {
         const mensagem = `Já existe um agendamento ativo cadastrado para o Bloco ${blocoCoincidente}`;
 
         return {
@@ -3342,6 +3361,7 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
         material: agendamentoAtualizado.material,
         numero_bloco: agendamentoAtualizado.numero_bloco,
         cliente: agendamentoAtualizado.cliente,
+        cliente_cnpj: agendamentoAtualizado.cliente_cnpj,
         agendamentoIdIgnorar: agendamentoAtualizado.id
       });
       if (checkDuplicado.duplicado) {
@@ -4709,7 +4729,8 @@ export async function salvarAgendamento(dados) {
       pedreira: dados.pedreira,
       material: dados.material,
       numero_bloco: dados.numero_bloco,
-      cliente: dados.cliente
+      cliente: dados.cliente,
+      cliente_cnpj: dados.cliente_cnpj
     });
     if (checkDuplicado.duplicado) {
       throw new Error(checkDuplicado.mensagem);
@@ -4882,11 +4903,13 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
 
       // Verificação de bloco duplicado no banco/local
       const clientePonto = p.cliente || veiculo?.cliente || '';
+      const cnpjPonto = p.cliente_cnpj || veiculo?.cliente_cnpj || '';
       const checkDuplicado = await verificarBlocoDuplicado({
         pedreira: p.pedreira,
         material: p.material,
         numero_bloco: p.numero_bloco,
-        cliente: clientePonto
+        cliente: clientePonto,
+        cliente_cnpj: cnpjPonto
       });
       if (checkDuplicado.duplicado) {
         throw new Error(`[${numPonto}º Carregamento] ${checkDuplicado.mensagem}`);
