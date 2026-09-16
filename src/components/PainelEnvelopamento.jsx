@@ -93,7 +93,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       return;
     }
 
-    const cabecalho = ['Bloco', 'Material', 'Pedreira', 'Cliente', 'CNPJ Cliente', 'Status', 'Comprimento (m)', 'Largura (m)', 'Altura (m)', 'Volume (m3)', 'Peso (Ton)', 'Responsável Envelopamento', 'Data Envelopamento', 'Responsável Liberação', 'Data Liberação', 'Observações'];
+    const cabecalho = ['Bloco', 'Material', 'Pedreira', 'Cliente', 'CNPJ Cliente', 'Status', 'Responsável Envelopamento', 'Data Envelopamento', 'Responsável Liberação', 'Data Liberação', 'Observações'];
     const linhas = envelopamentos.map(b => [
       `"${b.numero_bloco || ''}"`,
       `"${b.material || ''}"`,
@@ -101,11 +101,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       `"${b.cliente_nome || ''}"`,
       `"${b.cliente_cnpj || ''}"`,
       `"${STATUS_ENVELOPAMENTO[b.status?.toUpperCase()]?.label || b.status}"`,
-      b.comprimento || '',
-      b.largura || '',
-      b.altura || '',
-      b.metro_cubico || '',
-      b.peso_ton || '',
       `"${b.responsavel_envelopamento || ''}"`,
       `"${b.data_envelopamento ? formatarDataHoraBR(b.data_envelopamento) : ''}"`,
       `"${b.responsavel_liberacao || ''}"`,
@@ -413,7 +408,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                   <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'left' }}>BLOCO / ROCHA</th>
                   <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'left' }}>PEDREIRA</th>
                   <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'left' }}>CLIENTE COMPRADOR</th>
-                  <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'left' }}>DIMENSÕES / VOLUME</th>
                   <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'center' }}>STATUS ENVELOPAMENTO</th>
                   <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'left' }}>HISTÓRICO & RESPONSÁVEIS</th>
                   <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'center' }}>AÇÕES DE PÁTIO</th>
@@ -471,29 +465,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                           <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>
                             CNPJ: {b.cliente_cnpj}
                           </span>
-                        )}
-                      </td>
-
-                      {/* Medidas / Volume */}
-                      <td style={{ padding: '12px 14px' }}>
-                        {b.metro_cubico ? (
-                          <>
-                            <span style={{ fontSize: '0.82rem', color: '#4ade80', fontWeight: 700 }}>
-                              {b.metro_cubico} m³
-                            </span>
-                            {b.peso_ton && (
-                              <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block' }}>
-                                {b.peso_ton} Ton
-                              </span>
-                            )}
-                            {b.comprimento && b.largura && b.altura && (
-                              <span style={{ fontSize: '0.70rem', color: 'var(--slate-500)', display: 'block' }}>
-                                {b.comprimento} x {b.largura} x {b.altura}m
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <span style={{ fontSize: '0.76rem', color: 'var(--slate-500)' }}>-</span>
                         )}
                       </td>
 

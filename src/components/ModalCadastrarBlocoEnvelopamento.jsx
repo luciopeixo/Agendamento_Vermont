@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Layers, Box, Building2, FileText, CheckCircle2, AlertTriangle, UploadCloud, Plus, Info } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Layers, Box, Building2, Search, CheckCircle2, AlertTriangle, UploadCloud, Plus, Check } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
   obterMateriaisPorPedreira, 
@@ -9,7 +9,12 @@ import {
   validarFormatoBlocoTajMahal,
   isClienteThorOuArgos
 } from '../services/agendamentoService';
-import { STATUS_ENVELOPAMENTO, salvarEnvelopamento, importarBlocosEmLote } from '../services/envelopamentoService';
+import { 
+  STATUS_ENVELOPAMENTO, 
+  salvarEnvelopamento, 
+  importarBlocosEmLote,
+  obterClientesDoBancoDeDados
+} from '../services/envelopamentoService';
 
 export function ModalCadastrarBlocoEnvelopamento({
   blocoEdicao = null,
@@ -28,11 +33,6 @@ export function ModalCadastrarBlocoEnvelopamento({
     numero_bloco: blocoEdicao?.numero_bloco || '',
     cliente_nome: blocoEdicao?.cliente_nome || '',
     cliente_cnpj: blocoEdicao?.cliente_cnpj || '',
-    comprimento: blocoEdicao?.comprimento || '',
-    largura: blocoEdicao?.largura || '',
-    altura: blocoEdicao?.altura || '',
-    metro_cubico: blocoEdicao?.metro_cubico || '',
-    peso_ton: blocoEdicao?.peso_ton || '',
     status: blocoEdicao?.status || 'pendente',
     observacoes: blocoEdicao?.observacoes || ''
   });
@@ -54,6 +54,30 @@ export function ModalCadastrarBlocoEnvelopamento({
   const [erro, setErro] = useState('');
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
 
+  // Lista de clientes do banco de dados para pesquisa/autocomplete
+  const [clientesBase, setClientesBase] = useState([]);
+  const [sugestoesClientes, setSugestoesClientes] = useState([]);
+  const [mostrarDropdownClientes, setMostrarDropdownClientes] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Carregar lista de clientes cadastrados no banco
+  useEffect(() => {
+    obterClientesDoBancoDeDados().then(res => {
+      setClientesBase(res);
+    }).catch(() => {});
+  }, []);
+
+  // Fechar dropdown de sugestões ao clicar fora
+  useEffect(() => {
+    const handleClickFora = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setMostrarDropdownClientes(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickFora);
+    return () => document.removeEventListener('mousedown', handleClickFora);
+  }, []);
+
   // Atualizar lista de materiais conforme a pedreira selecionada
   useEffect(() => {
     const pedId = modoAba === 'individual' ? formData.pedreira_id : loteData.pedreira_id;
@@ -71,16 +95,6 @@ export function ModalCadastrarBlocoEnvelopamento({
     }
   }, [formData.pedreira_id, loteData.pedreira_id, modoAba]);
 
-  // Cálculo automático do metro cúbico ao alterar C x L x A
-  useEffect(() => {
-    const c = parseFloat(formData.comprimento);
-    const l = parseFloat(formData.largura);
-    const a = parseFloat(formData.altura);
-    if (!isNaN(c) && !isNaN(l) && !isNaN(a) && c > 0 && l > 0 && a > 0) {
-      setFormData(prev => ({ ...prev, metro_cubico: (c * l * a).toFixed(3) }));
-    }
-  }, [formData.comprimento, formData.largura, formData.altura]);
-
   const handlePedreiraChange = (pedId) => {
     const pedObj = PEDREIRAS_CEARA.find(p => p.id === pedId);
     const nomePed = pedObj ? pedObj.nome : pedId;
@@ -89,6 +103,45 @@ export function ModalCadastrarBlocoEnvelopamento({
     } else {
       setLoteData(prev => ({ ...prev, pedreira_id: pedId, pedreira_nome: nomePed }));
     }
+  };
+
+  // Filtragem de clientes para a barra de pesquisa
+  const handleFiltrarClientes = (termo) => {
+    if (modoAba === 'individual') {
+      setFormData(prev => ({ ...prev, cliente_nome: termo }));
+    } else {
+      setLoteData(prev => ({ ...prev, cliente_nome: termo }));
+    }
+
+    if (!termo || termo.trim().length < 1) {
+      setSugestoesClientes(clientesBase.slice(0, 10));
+      setMostrarDropdownClientes(true);
+      return;
+    }
+
+    const t = termo.toLowerCase().trim();
+    const filtrados = clientesBase.filter(c => 
+      c.nome.toLowerCase().includes(t) || (c.cnpj && c.cnpj.includes(t))
+    );
+    setSugestoesClientes(filtrados.slice(0, 10));
+    setMostrarDropdownClientes(true);
+  };
+
+  const handleSelecionarCliente = (cliente) => {
+    if (modoAba === 'individual') {
+      setFormData(prev => ({
+        ...prev,
+        cliente_nome: cliente.nome,
+        cliente_cnpj: cliente.cnpj ? formatarCNPJ(cliente.cnpj) : prev.cliente_cnpj
+      }));
+    } else {
+      setLoteData(prev => ({
+        ...prev,
+        cliente_nome: cliente.nome,
+        cliente_cnpj: cliente.cnpj ? formatarCNPJ(cliente.cnpj) : prev.cliente_cnpj
+      }));
+    }
+    setMostrarDropdownClientes(false);
   };
 
   const handleBuscarCNPJ = async (cnpjLimpo, tipo) => {
@@ -119,7 +172,7 @@ export function ModalCadastrarBlocoEnvelopamento({
       return;
     }
     if (!formData.cliente_nome.trim()) {
-      setErro('Informe o nome do cliente / comprador do bloco.');
+      setErro('Informe o cliente / comprador do bloco.');
       return;
     }
 
@@ -156,7 +209,6 @@ export function ModalCadastrarBlocoEnvelopamento({
       return;
     }
 
-    // Extrai números de blocos (linhas, vírgulas ou espaços)
     const linhas = loteData.textoBlocos
       .split(/[\n,;]+/)
       .map(b => sanitizarNumeroBloco(b, isClienteThorOuArgos(loteData.cliente_nome)))
@@ -191,14 +243,16 @@ export function ModalCadastrarBlocoEnvelopamento({
     }
   };
 
+  const clienteAtual = modoAba === 'individual' ? formData.cliente_nome : loteData.cliente_nome;
+
   return (
     <div className="modal-overlay" style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div 
         className="glass-panel" 
         style={{
-          maxWidth: 680,
+          maxWidth: 620,
           width: '100%',
-          maxHeight: '92vh',
+          maxHeight: '90vh',
           overflowY: 'auto',
           padding: 24,
           borderRadius: 14,
@@ -243,7 +297,7 @@ export function ModalCadastrarBlocoEnvelopamento({
 
         {/* Abas: Individual vs Lote (apenas para novos cadastros) */}
         {!blocoEdicao && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20, background: 'rgba(0,0,0,0.3)', padding: 4, borderRadius: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18, background: 'rgba(0,0,0,0.3)', padding: 4, borderRadius: 8 }}>
             <button
               type="button"
               onClick={() => setModoAba('individual')}
@@ -324,7 +378,7 @@ export function ModalCadastrarBlocoEnvelopamento({
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Ex: 1256926 ou 11/26 (Thor/Argos)"
+                  placeholder="Ex: 0326 ou 11/26 (Thor/Argos)"
                   value={formData.numero_bloco}
                   onChange={(e) => {
                     const sanitizado = sanitizarNumeroBloco(e.target.value, isClienteThorOuArgos(formData.cliente_nome));
@@ -347,110 +401,105 @@ export function ModalCadastrarBlocoEnvelopamento({
                   ))}
                 </select>
               </div>
+            </div>
 
-              {/* CNPJ do Cliente */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontSize: '0.82rem' }}>CNPJ do Cliente (Opcional):</label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="00.000.000/0000-00"
-                    value={formData.cliente_cnpj}
-                    onChange={(e) => {
-                      const fmt = formatarCNPJ(e.target.value);
-                      setFormData(prev => ({ ...prev, cliente_cnpj: fmt }));
-                      const limpo = fmt.replace(/\D/g, '');
-                      if (limpo.length === 14) {
-                        handleBuscarCNPJ(limpo, 'individual');
-                      }
-                    }}
-                  />
-                  {buscandoCNPJ && (
-                    <span className="spinner" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14 }} />
-                  )}
-                </div>
-              </div>
-
-              {/* Nome do Cliente */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontSize: '0.82rem' }}>Cliente / Comprador:</label>
+            {/* BARRA DE PESQUISA DE CLIENTES NO BANCO DE DADOS */}
+            <div className="form-group" style={{ marginTop: 14, position: 'relative' }} ref={dropdownRef}>
+              <label className="form-label" style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Cliente / Comprador:</span>
+                <span style={{ fontSize: '0.72rem', color: '#4ade80' }}>🔍 Pesquisa rápida no banco de dados</span>
+              </label>
+              
+              <div style={{ position: 'relative' }}>
+                <Search size={16} color="var(--slate-400)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Nome do Cliente / Destinatário"
+                  placeholder="Digite para pesquisar o cliente ou insira um novo..."
                   value={formData.cliente_nome}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cliente_nome: e.target.value }))}
+                  onChange={(e) => handleFiltrarClientes(e.target.value)}
+                  onFocus={() => {
+                    handleFiltrarClientes(formData.cliente_nome);
+                  }}
+                  style={{ paddingLeft: 36 }}
                   required
                 />
               </div>
+
+              {/* Dropdown de Clientes Encontrados */}
+              {mostrarDropdownClientes && sugestoesClientes.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: 'var(--slate-800)',
+                  border: '1px solid rgba(0, 168, 62, 0.4)',
+                  borderRadius: 8,
+                  marginTop: 4,
+                  maxHeight: 180,
+                  overflowY: 'auto',
+                  zIndex: 100,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
+                }}>
+                  {sugestoesClientes.map((cli, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handleSelecionarCliente(cli)}
+                      style={{
+                        padding: '9px 14px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.84rem',
+                        color: '#fff',
+                        transition: 'background 0.15s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0, 168, 62, 0.2)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Building2 size={14} color="#4ade80" />
+                        <strong>{cli.nome}</strong>
+                      </div>
+                      {cli.cnpj && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>
+                          CNPJ: {cli.cnpj}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Medidas Físicas (Opcionais) */}
-            <div style={{ marginTop: 14, padding: 12, background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--slate-300)', display: 'block', marginBottom: 10 }}>
-                📏 Dimensões e Cubagem (Opcional):
-              </span>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Comp. (m):</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-input"
-                    placeholder="Ex: 3.20"
-                    value={formData.comprimento}
-                    onChange={(e) => setFormData(prev => ({ ...prev, comprimento: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Largura (m):</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-input"
-                    placeholder="Ex: 1.85"
-                    value={formData.largura}
-                    onChange={(e) => setFormData(prev => ({ ...prev, largura: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Altura (m):</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-input"
-                    placeholder="Ex: 1.90"
-                    value={formData.altura}
-                    onChange={(e) => setFormData(prev => ({ ...prev, altura: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Volume (m³):</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    readOnly
-                    placeholder="0.000"
-                    value={formData.metro_cubico}
-                    style={{ background: 'rgba(0,0,0,0.2)', color: '#4ade80' }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>Peso (Ton):</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-input"
-                    placeholder="Ex: 28.5"
-                    value={formData.peso_ton}
-                    onChange={(e) => setFormData(prev => ({ ...prev, peso_ton: e.target.value }))}
-                  />
-                </div>
+            {/* CNPJ do Cliente (Opcional) */}
+            <div className="form-group" style={{ marginTop: 14 }}>
+              <label className="form-label" style={{ fontSize: '0.82rem' }}>CNPJ do Cliente (Opcional):</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="00.000.000/0000-00"
+                  value={formData.cliente_cnpj}
+                  onChange={(e) => {
+                    const fmt = formatarCNPJ(e.target.value);
+                    setFormData(prev => ({ ...prev, cliente_cnpj: fmt }));
+                    const limpo = fmt.replace(/\D/g, '');
+                    if (limpo.length === 14) {
+                      handleBuscarCNPJ(limpo, 'individual');
+                    }
+                  }}
+                />
+                {buscandoCNPJ && (
+                  <span className="spinner" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14 }} />
+                )}
               </div>
             </div>
 
-            {/* Observações */}
+            {/* Observações / Detalhes de Pátio */}
             <div className="form-group" style={{ marginTop: 14 }}>
               <label className="form-label" style={{ fontSize: '0.82rem' }}>Observações / Detalhes de Pátio:</label>
               <textarea
@@ -504,38 +553,85 @@ export function ModalCadastrarBlocoEnvelopamento({
                   ))}
                 </select>
               </div>
+            </div>
 
-              <div className="form-group">
-                <label className="form-label" style={{ fontSize: '0.82rem' }}>CNPJ do Cliente (Opcional):</label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="00.000.000/0000-00"
-                    value={loteData.cliente_cnpj}
-                    onChange={(e) => {
-                      const fmt = formatarCNPJ(e.target.value);
-                      setLoteData(prev => ({ ...prev, cliente_cnpj: fmt }));
-                      const limpo = fmt.replace(/\D/g, '');
-                      if (limpo.length === 14) {
-                        handleBuscarCNPJ(limpo, 'lote');
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" style={{ fontSize: '0.82rem' }}>Cliente / Destinatário Comum:</label>
+            {/* Barra de Pesquisa de Cliente no Lote */}
+            <div className="form-group" style={{ marginTop: 14, position: 'relative' }} ref={dropdownRef}>
+              <label className="form-label" style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Cliente / Destinatário Comum:</span>
+                <span style={{ fontSize: '0.72rem', color: '#4ade80' }}>🔍 Pesquisa no banco</span>
+              </label>
+              
+              <div style={{ position: 'relative' }}>
+                <Search size={16} color="var(--slate-400)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Nome do Cliente"
+                  placeholder="Pesquisar cliente ou digitar..."
                   value={loteData.cliente_nome}
-                  onChange={(e) => setLoteData(prev => ({ ...prev, cliente_nome: e.target.value }))}
+                  onChange={(e) => handleFiltrarClientes(e.target.value)}
+                  onFocus={() => handleFiltrarClientes(loteData.cliente_nome)}
+                  style={{ paddingLeft: 36 }}
                   required
                 />
               </div>
+
+              {mostrarDropdownClientes && sugestoesClientes.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: 'var(--slate-800)',
+                  border: '1px solid rgba(0, 168, 62, 0.4)',
+                  borderRadius: 8,
+                  marginTop: 4,
+                  maxHeight: 180,
+                  overflowY: 'auto',
+                  zIndex: 100,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
+                }}>
+                  {sugestoesClientes.map((cli, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handleSelecionarCliente(cli)}
+                      style={{
+                        padding: '9px 14px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.84rem',
+                        color: '#fff'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0, 168, 62, 0.2)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Building2 size={14} color="#4ade80" />
+                        <strong>{cli.nome}</strong>
+                      </div>
+                      {cli.cnpj && (
+                        <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>
+                          CNPJ: {cli.cnpj}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="form-group" style={{ marginTop: 14 }}>
+              <label className="form-label" style={{ fontSize: '0.82rem' }}>CNPJ do Cliente (Opcional):</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="00.000.000/0000-00"
+                value={loteData.cliente_cnpj}
+                onChange={(e) => setLoteData(prev => ({ ...prev, cliente_cnpj: formatarCNPJ(e.target.value) }))}
+              />
             </div>
 
             <div className="form-group" style={{ marginTop: 14 }}>
@@ -544,16 +640,13 @@ export function ModalCadastrarBlocoEnvelopamento({
               </label>
               <textarea
                 className="form-input"
-                rows={5}
+                rows={4}
                 placeholder="Exemplo:&#10;1256926&#10;1256927&#10;1256928"
                 value={loteData.textoBlocos}
                 onChange={(e) => setLoteData(prev => ({ ...prev, textoBlocos: e.target.value }))}
                 required
                 style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}
               />
-              <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', marginTop: 4, display: 'block' }}>
-                💡 Cada linha será cadastrada como um bloco independente vinculado ao cliente e pedreira informados.
-              </span>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>

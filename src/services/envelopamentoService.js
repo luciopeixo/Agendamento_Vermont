@@ -298,3 +298,82 @@ export const calcularMetricasEnvelopamento = (lista = []) => {
     agendados: lista.filter(i => i.status === 'agendado' || i.status === 'carregado').length,
   };
 };
+
+/**
+ * Obtém todos os clientes únicos existentes no banco de dados / agendamentos / envelopamentos
+ */
+export const obterClientesDoBancoDeDados = async () => {
+  const mapaClientes = new Map();
+
+  const adicionarCliente = (nome, cnpj) => {
+    if (!nome) return;
+    const nomeLimpo = String(nome).trim().toUpperCase();
+    if (!nomeLimpo || nomeLimpo.length < 2) return;
+
+    const cnpjLimpo = cnpj ? String(cnpj).trim() : '';
+    const chave = nomeLimpo;
+
+    if (!mapaClientes.has(chave)) {
+      mapaClientes.set(chave, {
+        nome: nomeLimpo,
+        cnpj: cnpjLimpo
+      });
+    } else if (cnpjLimpo && !mapaClientes.get(chave).cnpj) {
+      mapaClientes.get(chave).cnpj = cnpjLimpo;
+    }
+  };
+
+  // Clientes comuns da Vermont
+  const clientesPadrao = [
+    { nome: 'THOR GRANITOS LTDA', cnpj: '08.234.567/0001-89' },
+    { nome: 'ARGOS GRANITOS E ROCHAS LTDA', cnpj: '10.987.654/0001-32' },
+    { nome: 'GRANITOS DO BRASIL S/A', cnpj: '' },
+    { nome: 'MINERAÇÃO SANTA LUZIA', cnpj: '' }
+  ];
+  clientesPadrao.forEach(c => adicionarCliente(c.nome, c.cnpj));
+
+  // Ler dos Envelopamentos locais
+  const envLocais = carregarEnvelopamentosLocais();
+  envLocais.forEach(e => adicionarCliente(e.cliente_nome, e.cliente_cnpj));
+
+  // Ler dos Agendamentos locais
+  try {
+    const rawAg = localStorage.getItem('vermont_agendamentos_locais');
+    if (rawAg) {
+      const ags = JSON.parse(rawAg);
+      if (Array.isArray(ags)) {
+        ags.forEach(a => adicionarCliente(a.cliente, a.cliente_cnpj));
+      }
+    }
+  } catch (err) {}
+
+  // Consultar no Supabase se conectado
+  if (isSupabaseConfigurado()) {
+    try {
+      const { data: agsSupabase } = await supabase
+        .from('agendamentos')
+        .select('cliente, cliente_cnpj')
+        .limit(2000);
+
+      if (Array.isArray(agsSupabase)) {
+        agsSupabase.forEach(a => adicionarCliente(a.cliente, a.cliente_cnpj));
+      }
+    } catch (err) {}
+
+    try {
+      const { data: envSupabase } = await supabase
+        .from('envelopamentos')
+        .select('cliente_nome, cliente_cnpj')
+        .limit(2000);
+
+      if (Array.isArray(envSupabase)) {
+        envSupabase.forEach(e => adicionarCliente(e.cliente_nome, e.cliente_cnpj));
+      }
+    } catch (err) {}
+  }
+
+  const resultado = Array.from(mapaClientes.values());
+  resultado.sort((a, b) => a.nome.localeCompare(b.nome));
+  return resultado;
+};
+
