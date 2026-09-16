@@ -23,6 +23,10 @@ import {
   consultarCNPJReceita,
   obterAgendamentosLocais
 } from '../services/agendamentoService';
+import { 
+  verificarStatusEnvelopamentoAgendamento, 
+  listarEnvelopamentos 
+} from '../services/envelopamentoService';
 
 export function ModalEditarAgendamento({ 
   agendamento, 
@@ -109,6 +113,24 @@ export function ModalEditarAgendamento({
       numero_bloco: formData.numero_bloco
     });
   }, [formData.material, formData.cliente, formData.numero_bloco]);
+
+  // Sincronização em tempo real do status de envelopamento do bloco
+  const [infoEnvelopamento, setInfoEnvelopamento] = useState(null);
+
+  useEffect(() => {
+    let ativo = true;
+    if (formData.numero_bloco && formData.numero_bloco.length >= 2) {
+      listarEnvelopamentos().then(envs => {
+        if (ativo) {
+          const res = verificarStatusEnvelopamentoAgendamento(formData, envs);
+          setInfoEnvelopamento(res);
+        }
+      }).catch(() => {});
+    } else {
+      setInfoEnvelopamento(null);
+    }
+    return () => { ativo = false; };
+  }, [formData.numero_bloco, formData.cliente, formData.material, formData.pedreira]);
 
   const handleChange = (campo, valor) => {
     setFormData(prev => {
@@ -454,7 +476,38 @@ export function ModalEditarAgendamento({
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <div className="form-group">
-                <label className="form-label form-label-required">Número do Bloco</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 4 }}>
+                  <label className="form-label form-label-required" style={{ margin: 0 }}>Número do Bloco</label>
+                  {infoEnvelopamento && (
+                    <span
+                      title={`Status Envelopamento: ${infoEnvelopamento.label} (${infoEnvelopamento.descricao})`}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        background: infoEnvelopamento.bg,
+                        border: `1px solid ${infoEnvelopamento.border}`,
+                        color: infoEnvelopamento.cor,
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: 4
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          backgroundColor: infoEnvelopamento.cor,
+                          boxShadow: infoEnvelopamento.isEnvelopadoOuLiberado ? '0 0 5px rgba(34, 197, 94, 0.8)' : '0 0 5px rgba(239, 68, 68, 0.8)',
+                          display: 'inline-block'
+                        }}
+                      />
+                      {infoEnvelopamento.label}
+                    </span>
+                  )}
+                </div>
                 <input
                   type="text"
                   className="form-input"

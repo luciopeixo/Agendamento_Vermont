@@ -23,7 +23,8 @@ import {
   atualizarStatusEnvelopamento, 
   excluirEnvelopamento, 
   calcularMetricasEnvelopamento, 
-  STATUS_ENVELOPAMENTO 
+  STATUS_ENVELOPAMENTO,
+  inscreverEnvelopamentosRealtime
 } from '../services/envelopamentoService';
 import { PEDREIRAS_CEARA, formatarDataHoraBR } from '../services/agendamentoService';
 import { ModalCadastrarBlocoEnvelopamento } from './ModalCadastrarBlocoEnvelopamento';
@@ -42,8 +43,8 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
   const usuarioNome = usuario?.user_metadata?.nome || usuario?.email?.split('@')[0] || 'Equipe Vermont';
 
-  const carregarDados = async () => {
-    setCarregando(true);
+  const carregarDados = async (silencioso = false) => {
+    if (!silencioso) setCarregando(true);
     try {
       const dados = await listarEnvelopamentos({
         pedreira: filtroPedreira,
@@ -54,12 +55,22 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
     } catch (err) {
       console.error('Erro ao carregar envelopamentos:', err);
     } finally {
-      setCarregando(false);
+      if (!silencioso) setCarregando(false);
     }
   };
 
   useEffect(() => {
     carregarDados();
+  }, [filtroPedreira, filtroStatus, buscaTexto]);
+
+  // Sincronização em tempo real (Supabase Realtime + eventos locais e entre abas)
+  useEffect(() => {
+    const unsub = inscreverEnvelopamentosRealtime(() => {
+      carregarDados(true);
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
   }, [filtroPedreira, filtroStatus, buscaTexto]);
 
   const metricas = calcularMetricasEnvelopamento(envelopamentos);

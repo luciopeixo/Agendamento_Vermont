@@ -140,6 +140,70 @@ export const listarEnvelopamentos = async (filtros = {}) => {
   });
 };
 
+// Dispara evento local para sincronização reativa instantânea entre componentes e abas
+export const notificarAlteracaoEnvelopamento = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vermont_envelopamento_changed'));
+  }
+};
+
+/**
+ * Inscreve um callback para ser notificado sempre que houver alterações nos envelopamentos
+ * (via Supabase Realtime, eventos da janela local e Storage entre abas).
+ */
+export const inscreverEnvelopamentosRealtime = (callback) => {
+  let supabaseChannel = null;
+
+  // 1. Supabase Realtime
+  if (isSupabaseConfigurado()) {
+    try {
+      supabaseChannel = supabase
+        .channel(`realtime_envelopamentos_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'envelopamentos' },
+          (payload) => {
+            if (typeof callback === 'function') callback(payload);
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('[Envelopamento Realtime] Falha ao criar canal Supabase:', err);
+    }
+  }
+
+  // 2. Evento na janela atual
+  const handleLocalEvent = () => {
+    if (typeof callback === 'function') callback({ event: 'LOCAL_CHANGE' });
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('vermont_envelopamento_changed', handleLocalEvent);
+  }
+
+  // 3. Evento entre abas (Storage)
+  const handleStorageEvent = (e) => {
+    if (e.key === LOCAL_STORAGE_KEY && typeof callback === 'function') {
+      callback({ event: 'STORAGE_CHANGE' });
+    }
+  };
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', handleStorageEvent);
+  }
+
+  // Retorna função de limpeza (unsubscribe)
+  return () => {
+    if (supabaseChannel && isSupabaseConfigurado()) {
+      try {
+        supabase.removeChannel(supabaseChannel);
+      } catch (e) {}
+    }
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('vermont_envelopamento_changed', handleLocalEvent);
+      window.removeEventListener('storage', handleStorageEvent);
+    }
+  };
+};
+
 /**
  * Salva ou atualiza um registro de envelopamento
  */
@@ -181,6 +245,9 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
     locais.unshift(registroCompleto);
   }
   salvarEnvelopamentosLocais(locais);
+
+  // Notificar ouvintes locais imediatamente
+  notificarAlteracaoEnvelopamento();
 
   // Também registra automaticamente o cliente na base de clientes se informado
   if (registroCompleto.cliente_nome) {
@@ -240,6 +307,8 @@ export const excluirEnvelopamento = async (id) => {
   const novaLista = locais.filter(item => item.id !== id);
   salvarEnvelopamentosLocais(novaLista);
 
+  notificarAlteracaoEnvelopamento();
+
   if (isSupabaseConfigurado()) {
     try {
       await supabase.from('envelopamentos').delete().eq('id', id);
@@ -286,6 +355,110 @@ export const buscarStatusEnvelopamentoPorBloco = async (numeroBloco, clienteNome
   });
 
   return encontrado || null;
+};
+
+/**
+ * Verifica e sincroniza o status de envelopamento de um bloco de agendamento.
+ * Realiza a correspondência por:
+ * 1. numero_bloco (chave primária)
+ * 2. cliente (opcional / reforço de correspondência)
+ * 3. material (opcional)
+ * 4. pedreira (opcional)
+ * 
+ * Regra visual Vermont:
+ * - 🟢 Verde: Envelopado OU Sem envelopamento (liberado)
+ * - 🔴 Vermelho: Pendente de Envelopamento, Em andamento, Aguardando corte e reparo, ou Não Envelopado/Não Cadastrado
+ */
+export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelopamentos = []) => {
+  if (!agendamento || !agendamento.numero_bloco) {
+    return {
+      encontrado: false,
+      isEnvelopadoOuLiberado: false,
+      status: 'pendente_envelopamento',
+      label: 'Não Envelopado',
+      cor: '#ef4444',
+      bg: 'rgba(239, 68, 68, 0.15)',
+      border: '#dc2626',
+      descricao: 'Bloco sem registro de envelopamento'
+    };
+  }
+
+  const numBlocoAg = String(agendamento.numero_bloco).trim().toUpperCase();
+  const clienteAg = String(agendamento.cliente || '').trim().toLowerCase();
+  const materialAg = String(agendamento.material || '').trim().toLowerCase();
+  const pedreiraAg = String(agendamento.pedreira || '').trim().toLowerCase();
+
+  // Filtrar todos os que batem com o número do bloco
+  const candidatos = (Array.isArray(listaEnvelopamentos) ? listaEnvelopamentos : []).filter(env => {
+    const numEnv = String(env.numero_bloco || '').trim().toUpperCase();
+    return numEnv === numBlocoAg;
+  });
+
+  let correspondente = null;
+
+  if (candidatos.length === 1) {
+    correspondente = candidatos[0];
+  } else if (candidatos.length > 1) {
+    // Tenta encontrar o melhor match com cliente, material ou pedreira
+    correspondente = candidatos.find(env => {
+      const cliEnv = String(env.cliente_nome || '').trim().toLowerCase();
+      const matEnv = String(env.material || '').trim().toLowerCase();
+      const pedEnv = String(env.pedreira_nome || '').trim().toLowerCase();
+
+      const bateCliente = clienteAg && cliEnv && (cliEnv.includes(clienteAg) || clienteAg.includes(cliEnv));
+      const bateMaterial = materialAg && matEnv && (matEnv.includes(materialAg) || materialAg.includes(matEnv));
+      const batePedreira = pedreiraAg && pedEnv && (pedEnv.includes(pedreiraAg) || pedreiraAg.includes(pedEnv));
+
+      return (bateCliente && bateMaterial) || (bateCliente && batePedreira) || bateCliente;
+    }) || candidatos[0];
+  }
+
+  if (!correspondente) {
+    return {
+      encontrado: false,
+      isEnvelopadoOuLiberado: false,
+      status: 'pendente_envelopamento',
+      label: 'Não Envelopado',
+      cor: '#ef4444',
+      bg: 'rgba(239, 68, 68, 0.15)',
+      border: '#dc2626',
+      descricao: 'Bloco não cadastrado no módulo de envelopamento'
+    };
+  }
+
+  const st = correspondente.status;
+  const isLiberado = st === 'envelopado' || st === 'sem_envelopamento';
+
+  if (isLiberado) {
+    return {
+      encontrado: true,
+      isEnvelopadoOuLiberado: true,
+      status: st,
+      label: st === 'sem_envelopamento' ? 'Sem envelopamento' : 'Envelopado',
+      cor: '#22c55e',
+      bg: 'rgba(34, 197, 94, 0.15)',
+      border: '#16a34a',
+      descricao: st === 'sem_envelopamento' ? 'Bloco liberado sem necessidade de envelopamento' : 'Bloco envelopado e liberado',
+      registro: correspondente
+    };
+  } else {
+    let label = 'Não Envelopado';
+    if (st === 'em_andamento') label = 'Em andamento';
+    else if (st === 'aguardando_corte_reparo') label = 'Aguardando corte/reparo';
+    else if (st === 'pendente_envelopamento' || st === 'pendente') label = 'Pendente';
+
+    return {
+      encontrado: true,
+      isEnvelopadoOuLiberado: false,
+      status: st,
+      label,
+      cor: '#ef4444',
+      bg: 'rgba(239, 68, 68, 0.15)',
+      border: '#dc2626',
+      descricao: STATUS_ENVELOPAMENTO[st?.toUpperCase()]?.descricao || 'Bloco não liberado para carregamento',
+      registro: correspondente
+    };
+  }
 };
 
 /**

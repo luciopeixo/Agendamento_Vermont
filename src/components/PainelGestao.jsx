@@ -34,6 +34,11 @@ import {
   carregarBaseMotoristasUnificada,
   isSupabaseConfigurado
 } from '../services/agendamentoService';
+import { 
+  listarEnvelopamentos, 
+  verificarStatusEnvelopamentoAgendamento, 
+  inscreverEnvelopamentosRealtime 
+} from '../services/envelopamentoService';
 import { supabase } from '../lib/supabase';
 import { ModalEditarAgendamento } from './ModalEditarAgendamento';
 import { ModalHistoricoStatus } from './ModalHistoricoStatus';
@@ -287,6 +292,9 @@ export function PainelGestao({
   // Filtro exclusivo para visualizar apenas agendamentos finalizados sem NF
   const [exibindoApenasSemNF, setExibindoApenasSemNF] = useState(false);
 
+  // Base de envelopamentos sincronizada em tempo real para status visual dos blocos
+  const [envelopamentos, setEnvelopamentos] = useState([]);
+
   // Agendamentos Finalizados sem confirmação de emissão de Nota Fiscal (para alerta ao Admin)
   const finalizadosSemNF = useMemo(() => {
     const base = todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos;
@@ -313,7 +321,7 @@ export function PainelGestao({
   const carregarDados = async (isManual = true) => {
     if (isManual) setCarregando(true);
     try {
-      const [lista, pendentes, listaCompletaGeral] = await Promise.all([
+      const [lista, pendentes, listaCompletaGeral, envsData] = await Promise.all([
         listarAgendamentos({
           pedreira: filtroPedreira,
           status: filtroStatus,
@@ -324,11 +332,16 @@ export function PainelGestao({
           dataReferencia: hojeStr
         }),
         // Busca base histórica completa sem restrição de data para alimentar a aba analítica / gráficos do Admin
-        listarAgendamentos({})
+        listarAgendamentos({}),
+        // Busca dados sincronizados de envelopamento de blocos
+        listarEnvelopamentos()
       ]);
 
       setPendenciasAnteriores(pendentes);
       setTodosAgendamentos(listaCompletaGeral);
+      if (Array.isArray(envsData)) {
+        setEnvelopamentos(envsData);
+      }
 
       // Sincroniza a base de motoristas em segundo plano com o Supabase e histórico de agendamentos
       try {
@@ -402,10 +415,11 @@ export function PainelGestao({
     carregarDados(true);
   }, [filtroPedreira, filtroStatus, filtroData]);
 
-  // Sincronização em tempo real via Supabase Realtime para agendamentos e base de motoristas
+  // Sincronização em tempo real via Supabase Realtime para agendamentos, base de motoristas e envelopamentos
   useEffect(() => {
+    let channel = null;
     if (isSupabaseConfigurado()) {
-      const channel = supabase
+      channel = supabase
         .channel('realtime_painel_gestao_sync')
         .on(
           'postgres_changes',
@@ -423,12 +437,31 @@ export function PainelGestao({
             carregarDados(false);
           }
         )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'envelopamentos' },
+          () => {
+            listarEnvelopamentos().then(envs => setEnvelopamentos(envs)).catch(() => {});
+          }
+        )
         .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     }
+
+    // Ouvinte em tempo real para atualizações locais/janelas de envelopamentos
+    const unsubEnvelopamento = inscreverEnvelopamentosRealtime(() => {
+      listarEnvelopamentos().then(envs => setEnvelopamentos(envs)).catch(() => {});
+    });
+
+    return () => {
+      if (channel && isSupabaseConfigurado()) {
+        try {
+          supabase.removeChannel(channel);
+        } catch (e) {}
+      }
+      if (typeof unsubEnvelopamento === 'function') {
+        unsubEnvelopamento();
+      }
+    };
   }, []);
 
   // Intervalo de Auto-Atualização a cada 1 minuto (60 segundos) com contador em tempo real
@@ -2316,12 +2349,50 @@ export function PainelGestao({
                         </div>
                       </td>
 
-                      {/* Bloco / Cliente */}
+                      {/* Bloco / Cliente com Sincronização Visual de Envelopamento */}
                       <td style={{ padding: '12px 14px' }}>
-                        <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.94rem' }}>
-                          Bloco: {ag.numero_bloco}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.94rem' }}>
+                            Bloco: {ag.numero_bloco}
+                          </span>
+                          {(() => {
+                            const infoEnv = verificarStatusEnvelopamentoAgendamento(ag, envelopamentos);
+                            return (
+                              <span 
+                                title={`Status do Bloco: ${infoEnv.label} (${infoEnv.descricao})`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  background: infoEnv.bg,
+                                  border: `1px solid ${infoEnv.border}`,
+                                  color: infoEnv.cor,
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  padding: '1px 6px',
+                                  borderRadius: 4,
+                                  whiteSpace: 'nowrap',
+                                  cursor: 'help'
+                                }}
+                              >
+                                <span 
+                                  style={{
+                                    width: 7,
+                                    height: 7,
+                                    borderRadius: '50%',
+                                    backgroundColor: infoEnv.cor,
+                                    boxShadow: infoEnv.isEnvelopadoOuLiberado 
+                                      ? '0 0 6px rgba(34, 197, 94, 0.9)' 
+                                      : '0 0 6px rgba(239, 68, 68, 0.9)',
+                                    display: 'inline-block'
+                                  }}
+                                />
+                                {infoEnv.label}
+                              </span>
+                            );
+                          })()}
                         </div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)', marginTop: '2px' }}>
                           Cliente: <strong style={{ color: 'var(--slate-200)' }}>{limparNomeEmpresa(ag.cliente)}</strong>
                         </div>
                         <div style={{ fontSize: '0.74rem', color: 'var(--slate-400)', marginTop: '2px' }}>
