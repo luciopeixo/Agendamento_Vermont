@@ -569,6 +569,8 @@ export const processarRomaneioPdfTexto = async (textoCompleto) => {
         material: materialNormalizado,
         material_original: materialBruto,
         peso_kg: pesoKgExtraido,
+        numero_romaneio: numeroRomaneio || '',
+        data_romaneio: dataEmissao || '',
         pedreira_id: pedreiraDetectada.id,
         pedreira_nome: pedreiraDetectada.nome,
         cliente_nome: clienteNome,

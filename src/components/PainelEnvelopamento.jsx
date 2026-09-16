@@ -53,9 +53,10 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [buscaTexto, setBuscaTexto] = useState('');
   const [executandoAcaoId, setExecutandoAcaoId] = useState(null);
 
-  // Modo de visualização: 'matriz' (agrupado por cliente) ou 'tabela' (lista plana)
+  // Modo de visualização: 'matriz' (agrupado por cliente -> romaneio -> blocos) ou 'tabela' (lista plana)
   const [modoVisualizacao, setModoVisualizacao] = useState('matriz');
   const [clientesExpandidos, setClientesExpandidos] = useState(new Set());
+  const [romaneiosExpandidos, setRomaneiosExpandidos] = useState(new Set());
 
   const usuarioNome = usuario?.user_metadata?.nome || usuario?.email?.split('@')[0] || 'Equipe Vermont';
 
@@ -77,29 +78,72 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
   useEffect(() => {
     carregarDados();
-  }, [filtroPedreira, filtroStatus, buscaTexto]);
 
-  // Sincronização em tempo real (Supabase Realtime + eventos locais e entre abas)
-  useEffect(() => {
-    const unsub = inscreverEnvelopamentosRealtime(() => {
+    const unsubscribe = inscreverEnvelopamentosRealtime(() => {
       carregarDados(true);
     });
+
     return () => {
-      if (typeof unsub === 'function') unsub();
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, [filtroPedreira, filtroStatus, buscaTexto]);
 
   const metricas = calcularMetricasEnvelopamento(envelopamentos);
 
-  // Agrupamento em Matriz por Cliente Comprador
+  // Agrupamento Hierárquico em Matriz: Cliente -> Romaneios -> Blocos
   const gruposPorCliente = useMemo(() => {
-    const mapa = new Map();
+    const mapaClientes = new Map();
+
     envelopamentos.forEach(item => {
       const cliNome = String(item.cliente_nome || 'CLIENTE NÃO INFORMADO').trim().toUpperCase();
-      if (!mapa.has(cliNome)) {
-        mapa.set(cliNome, {
+      
+      // Identificar Romaneio do Bloco (seja pelo campo gravado ou por observações)
+      let numRom = String(item.numero_romaneio || '').trim().toUpperCase();
+      if (!numRom && item.observacoes) {
+        const matchRom = item.observacoes.match(/Romaneio\s+N[º°o]?\s*([0-9A-Za-z/]+)/i);
+        if (matchRom) numRom = matchRom[1].trim().toUpperCase();
+      }
+      if (!numRom) numRom = 'S/N (CADASTRO DIRETO)';
+
+      const dataRom = item.data_romaneio || '';
+
+      if (!mapaClientes.has(cliNome)) {
+        mapaClientes.set(cliNome, {
           clienteNome: cliNome,
           clienteCnpj: item.cliente_cnpj || '',
+          pedreiras: new Set(),
+          blocos: [],
+          romaneiosMap: new Map(),
+          metricas: {
+            total: 0,
+            envelopado: 0,
+            sem_envelopamento: 0,
+            pendente_envelopamento: 0,
+            em_andamento: 0,
+            aguardando_corte_reparo: 0
+          }
+        });
+      }
+
+      const grupoCliente = mapaClientes.get(cliNome);
+      if (!grupoCliente.clienteCnpj && item.cliente_cnpj) grupoCliente.clienteCnpj = item.cliente_cnpj;
+      if (item.pedreira_nome) grupoCliente.pedreiras.add(item.pedreira_nome);
+      grupoCliente.blocos.push(item);
+      grupoCliente.metricas.total++;
+
+      if (item.status === 'envelopado') grupoCliente.metricas.envelopado++;
+      else if (item.status === 'sem_envelopamento') grupoCliente.metricas.sem_envelopamento++;
+      else if (item.status === 'pendente_envelopamento' || item.status === 'pendente') grupoCliente.metricas.pendente_envelopamento++;
+      else if (item.status === 'em_andamento') grupoCliente.metricas.em_andamento++;
+      else if (item.status === 'aguardando_corte_reparo') grupoCliente.metricas.aguardando_corte_reparo++;
+
+      // Agrupamento por Romaneio
+      const chaveRom = `${cliNome}___${numRom}`;
+      if (!grupoCliente.romaneiosMap.has(chaveRom)) {
+        grupoCliente.romaneiosMap.set(chaveRom, {
+          chaveRomaneio: chaveRom,
+          numeroRomaneio: numRom,
+          dataRomaneio: dataRom,
           pedreiras: new Set(),
           blocos: [],
           metricas: {
@@ -112,19 +156,26 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           }
         });
       }
-      const grupo = mapa.get(cliNome);
-      if (!grupo.clienteCnpj && item.cliente_cnpj) grupo.clienteCnpj = item.cliente_cnpj;
-      if (item.pedreira_nome) grupo.pedreiras.add(item.pedreira_nome);
-      grupo.blocos.push(item);
-      grupo.metricas.total++;
-      if (item.status === 'envelopado') grupo.metricas.envelopado++;
-      else if (item.status === 'sem_envelopamento') grupo.metricas.sem_envelopamento++;
-      else if (item.status === 'pendente_envelopamento' || item.status === 'pendente') grupo.metricas.pendente_envelopamento++;
-      else if (item.status === 'em_andamento') grupo.metricas.em_andamento++;
-      else if (item.status === 'aguardando_corte_reparo') grupo.metricas.aguardando_corte_reparo++;
+
+      const grupoRom = grupoCliente.romaneiosMap.get(chaveRom);
+      if (item.pedreira_nome) grupoRom.pedreiras.add(item.pedreira_nome);
+      if (!grupoRom.dataRomaneio && dataRom) grupoRom.dataRomaneio = dataRom;
+      grupoRom.blocos.push(item);
+      grupoRom.metricas.total++;
+
+      if (item.status === 'envelopado') grupoRom.metricas.envelopado++;
+      else if (item.status === 'sem_envelopamento') grupoRom.metricas.sem_envelopamento++;
+      else if (item.status === 'pendente_envelopamento' || item.status === 'pendente') grupoRom.metricas.pendente_envelopamento++;
+      else if (item.status === 'em_andamento') grupoRom.metricas.em_andamento++;
+      else if (item.status === 'aguardando_corte_reparo') grupoRom.metricas.aguardando_corte_reparo++;
     });
 
-    return Array.from(mapa.values()).sort((a, b) => b.metricas.total - a.metricas.total);
+    const lista = Array.from(mapaClientes.values()).map(cli => ({
+      ...cli,
+      romaneios: Array.from(cli.romaneiosMap.values()).sort((a, b) => b.blocos.length - a.blocos.length)
+    }));
+
+    return lista.sort((a, b) => b.metricas.total - a.metricas.total);
   }, [envelopamentos]);
 
   const toggleCliente = (cliNome) => {
@@ -139,12 +190,30 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
     });
   };
 
+  const toggleRomaneio = (chaveRomaneio) => {
+    setRomaneiosExpandidos(prev => {
+      const novo = new Set(prev);
+      if (novo.has(chaveRomaneio)) {
+        novo.delete(chaveRomaneio);
+      } else {
+        novo.add(chaveRomaneio);
+      }
+      return novo;
+    });
+  };
+
   const expandirTodos = () => {
     setClientesExpandidos(new Set(gruposPorCliente.map(g => g.clienteNome)));
+    const todosRom = [];
+    gruposPorCliente.forEach(g => {
+      g.romaneios.forEach(r => todosRom.push(r.chaveRomaneio));
+    });
+    setRomaneiosExpandidos(new Set(todosRom));
   };
 
   const recolherTodos = () => {
     setClientesExpandidos(new Set());
+    setRomaneiosExpandidos(new Set());
   };
 
   const handleAvancarStatus = async (item, proximoStatus) => {
@@ -817,6 +886,21 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                     )}
 
                     <span style={{
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      background: 'rgba(56, 189, 248, 0.12)',
+                      padding: '4px 9px',
+                      borderRadius: 8,
+                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      color: '#0284c7',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}>
+                      <FileText size={13} /> {grupo.romaneios.length} Romaneio{grupo.romaneios.length > 1 ? 's' : ''}
+                    </span>
+
+                    <span style={{
                       fontSize: '0.80rem',
                       fontWeight: 800,
                       background: 'rgba(0,0,0,0.2)',
@@ -830,243 +914,407 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                   </div>
                 </div>
 
-                {/* Tabela de Blocos do Cliente (Expandida com o [+]) */}
+                {/* NÍVEL 2: LISTA DE ROMANEIOS DO CLIENTE (Expandido com o [+] do Cliente) */}
                 {isExpandido && (
-                  <div style={{ overflowX: 'auto', background: 'rgba(0,0,0,0.03)' }}>
-                    <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ background: 'rgba(0,0,0,0.25)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: 'var(--slate-400)', textAlign: 'left', width: '15%' }}>BLOCO / ROCHA</th>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: 'var(--slate-400)', textAlign: 'left', width: '18%' }}>PEDREIRA</th>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: 'var(--slate-400)', textAlign: 'center', width: '22%' }}>STATUS ENVELOPAMENTO</th>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: 'var(--slate-400)', textAlign: 'left', width: '25%' }}>HISTÓRICO & RESPONSÁVEIS</th>
-                          <th style={{ padding: '10px 14px', fontSize: '0.74rem', color: 'var(--slate-400)', textAlign: 'center', width: '20%' }}>AÇÕES DE PÁTIO</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {grupo.blocos.map((b) => {
-                          const statusInfo = STATUS_ENVELOPAMENTO[b.status?.toUpperCase()] || STATUS_ENVELOPAMENTO.PENDENTE_ENVELOPAMENTO;
-                          const executando = executandoAcaoId === b.id;
+                  <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(0,0,0,0.06)' }}>
+                    {grupo.romaneios.map((rom) => {
+                      const isRomExpandido = romaneiosExpandidos.has(rom.chaveRomaneio);
+                      const pedreirasRomStr = Array.from(rom.pedreiras).join(', ') || 'Polo Vermont';
 
-                          return (
-                            <tr 
-                              key={b.id}
-                              style={{ 
-                                borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                background: b.status === 'envelopado' ? 'rgba(34, 197, 94, 0.03)' : undefined
-                              }}
-                            >
-                              {/* Bloco */}
-                              <td style={{ padding: '10px 14px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                  <span style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    color: 'inherit',
-                                    fontWeight: 800,
-                                    padding: '4px 8px',
-                                    borderRadius: 6,
-                                    fontSize: '0.86rem',
-                                    fontFamily: 'monospace',
-                                    letterSpacing: '0.05em',
-                                    border: '1px solid rgba(255,255,255,0.15)',
-                                    display: 'inline-block'
-                                  }}>
-                                    {b.numero_bloco}
-                                  </span>
-                                  {b.peso_kg && (
-                                    <span style={{
-                                      fontSize: '0.72rem',
-                                      color: '#0284c7',
-                                      background: 'rgba(56, 189, 248, 0.12)',
-                                      padding: '2px 6px',
-                                      borderRadius: 4,
-                                      border: '1px solid rgba(56, 189, 248, 0.25)',
-                                      fontFamily: 'monospace',
-                                      fontWeight: 700
-                                    }}>
-                                      ⚖️ {b.peso_kg} kg
-                                    </span>
-                                  )}
-                                </div>
-                                <span style={{ fontSize: '0.76rem', color: 'var(--slate-400)', display: 'block', marginTop: 4, fontWeight: 600 }}>
-                                  {b.material}
-                                </span>
-                              </td>
-
-                              {/* Pedreira */}
-                              <td style={{ padding: '10px 14px' }}>
-                                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'inherit' }}>
-                                  {b.pedreira_nome || '-'}
-                                </span>
-                              </td>
-
-                              {/* Status */}
-                              <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                                <div style={{
-                                  display: 'inline-flex',
+                      return (
+                        <div 
+                          key={rom.chaveRomaneio} 
+                          style={{ 
+                            borderRadius: 10, 
+                            border: isRomExpandido ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid rgba(255, 255, 255, 0.10)',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            overflow: 'hidden',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          {/* Header do Romaneio com Botão [+] */}
+                          <div 
+                            onClick={() => toggleRomaneio(rom.chaveRomaneio)}
+                            style={{
+                              padding: '10px 14px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              cursor: 'pointer',
+                              background: isRomExpandido ? 'rgba(56, 189, 248, 0.08)' : 'rgba(0,0,0,0.18)',
+                              borderBottom: isRomExpandido ? '1px solid rgba(255, 255, 255, 0.08)' : 'none',
+                              flexWrap: 'wrap',
+                              gap: 10
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              {/* Botão [+] / [-] do Romaneio */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleRomaneio(rom.chaveRomaneio);
+                                }}
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: 6,
+                                  border: isRomExpandido ? '1px solid #0284c7' : '1px solid rgba(255, 255, 255, 0.2)',
+                                  background: isRomExpandido ? '#0284c7' : 'rgba(255, 255, 255, 0.06)',
+                                  color: '#fff',
+                                  display: 'flex',
                                   alignItems: 'center',
-                                  gap: 6,
-                                  padding: '5px 12px',
-                                  borderRadius: 20,
-                                  fontSize: '0.76rem',
-                                  fontWeight: 700,
-                                  background: statusInfo.bg,
-                                  color: statusInfo.cor,
-                                  border: `1px solid ${statusInfo.border}`
-                                }}>
-                                  {b.status === 'envelopado' && <CheckCircle2 size={13} />}
-                                  {b.status === 'em_andamento' && <Layers size={13} />}
-                                  {b.status === 'aguardando_corte_reparo' && <Scissors size={13} />}
-                                  {b.status === 'pendente_envelopamento' && <Clock size={13} />}
-                                  {b.status === 'sem_envelopamento' && <Ban size={13} />}
-                                  <span>{statusInfo.label}</span>
-                                </div>
-                              </td>
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  fontSize: '0.85rem',
+                                  fontWeight: 800,
+                                  transition: 'all 0.2s',
+                                  boxShadow: isRomExpandido ? '0 2px 6px rgba(2, 132, 199, 0.35)' : 'none'
+                                }}
+                                title={isRomExpandido ? 'Recolher blocos deste romaneio' : 'Expandir blocos deste romaneio'}
+                              >
+                                {isRomExpandido ? <ChevronDown size={15} /> : <Plus size={15} />}
+                              </button>
 
-                              {/* Histórico & Observações */}
-                              <td style={{ padding: '10px 14px' }}>
-                                {b.status === 'envelopado' && b.responsavel_liberacao ? (
-                                  <div style={{ fontSize: '0.74rem', color: '#16a34a' }}>
-                                    <span>Liberado por: <strong>{b.responsavel_liberacao}</strong></span>
-                                    {b.data_liberacao && (
-                                      <span style={{ display: 'block', color: 'var(--slate-400)', fontSize: '0.70rem' }}>
-                                        {formatarDataHoraBR(b.data_liberacao)}
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : b.status === 'sem_envelopamento' && b.responsavel_liberacao ? (
-                                  <div style={{ fontSize: '0.74rem', color: '#0284c7' }}>
-                                    <span>Liberado direto por: <strong>{b.responsavel_liberacao}</strong></span>
-                                  </div>
-                                ) : b.status === 'em_andamento' && b.responsavel_envelopamento ? (
-                                  <div style={{ fontSize: '0.74rem', color: '#d97706' }}>
-                                    <span>Envelopando: <strong>{b.responsavel_envelopamento}</strong></span>
-                                    {b.data_envelopamento && (
-                                      <span style={{ display: 'block', color: 'var(--slate-400)', fontSize: '0.70rem' }}>
-                                        Início: {formatarDataHoraBR(b.data_envelopamento)}
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>
-                                    Cadastrado em {formatarDataHoraBR(b.data_cadastro)}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <FileText size={16} color="#38bdf8" />
+                                <strong style={{ fontSize: '0.94rem', color: '#0284c7', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
+                                  {rom.numeroRomaneio.startsWith('S/N') ? rom.numeroRomaneio : `ROMANEIO Nº ${rom.numeroRomaneio}`}
+                                </strong>
+                                {rom.dataRomaneio && (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)', background: 'rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: 4 }}>
+                                    Emissão: {rom.dataRomaneio}
                                   </span>
                                 )}
-                                {b.observacoes && (
-                                  <div style={{ fontSize: '0.70rem', color: 'var(--slate-500)', marginTop: 2, fontStyle: 'italic', maxWidth: 260 }}>
-                                    "{b.observacoes}"
-                                  </div>
-                                )}
-                              </td>
+                                <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>
+                                  • {pedreirasRomStr}
+                                </span>
+                              </div>
+                            </div>
 
-                              {/* Ações de Pátio */}
-                              <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                  {b.status === 'pendente_envelopamento' && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        disabled={executando}
-                                        onClick={() => handleAvancarStatus(b, 'em_andamento')}
-                                        className="btn btn-secondary"
-                                        style={{ padding: '4px 8px', fontSize: '0.72rem', gap: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', borderColor: '#f59e0b' }}
-                                        title="Iniciar Envelopamento no pátio"
+                            {/* Badges de Resumo do Romaneio */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              {rom.metricas.envelopado > 0 && (
+                                <span style={{
+                                  fontSize: '0.70rem',
+                                  padding: '2px 7px',
+                                  borderRadius: 12,
+                                  background: 'rgba(34, 197, 94, 0.15)',
+                                  color: '#16a34a',
+                                  border: '1px solid #16a34a',
+                                  fontWeight: 700
+                                }}>
+                                  {rom.metricas.envelopado} Envelopado{rom.metricas.envelopado > 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {rom.metricas.sem_envelopamento > 0 && (
+                                <span style={{
+                                  fontSize: '0.70rem',
+                                  padding: '2px 7px',
+                                  borderRadius: 12,
+                                  background: 'rgba(56, 189, 248, 0.15)',
+                                  color: '#0284c7',
+                                  border: '1px solid #0284c7',
+                                  fontWeight: 700
+                                }}>
+                                  {rom.metricas.sem_envelopamento} Sem Env.
+                                </span>
+                              )}
+                              {rom.metricas.pendente_envelopamento > 0 && (
+                                <span style={{
+                                  fontSize: '0.70rem',
+                                  padding: '2px 7px',
+                                  borderRadius: 12,
+                                  background: 'rgba(148, 163, 184, 0.15)',
+                                  color: '#64748b',
+                                  border: '1px solid #64748b',
+                                  fontWeight: 700
+                                }}>
+                                  {rom.metricas.pendente_envelopamento} Pendente{rom.metricas.pendente_envelopamento > 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {rom.metricas.em_andamento > 0 && (
+                                <span style={{
+                                  fontSize: '0.70rem',
+                                  padding: '2px 7px',
+                                  borderRadius: 12,
+                                  background: 'rgba(245, 158, 11, 0.15)',
+                                  color: '#d97706',
+                                  border: '1px solid #d97706',
+                                  fontWeight: 700
+                                }}>
+                                  {rom.metricas.em_andamento} Em andamento
+                                </span>
+                              )}
+                              {rom.metricas.aguardando_corte_reparo > 0 && (
+                                <span style={{
+                                  fontSize: '0.70rem',
+                                  padding: '2px 7px',
+                                  borderRadius: 12,
+                                  background: 'rgba(239, 68, 68, 0.15)',
+                                  color: '#dc2626',
+                                  border: '1px solid #dc2626',
+                                  fontWeight: 700
+                                }}>
+                                  {rom.metricas.aguardando_corte_reparo} Reparo
+                                </span>
+                              )}
+
+                              <span style={{
+                                fontSize: '0.74rem',
+                                fontWeight: 800,
+                                background: 'rgba(255,255,255,0.08)',
+                                padding: '2px 8px',
+                                borderRadius: 6,
+                                color: 'inherit'
+                              }}>
+                                📦 {rom.blocos.length} Bloco{rom.blocos.length > 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* NÍVEL 3: TABELA DE BLOCOS DESTE ROMANEIO (Expandido com o [+] do Romaneio) */}
+                          {isRomExpandido && (
+                            <div style={{ overflowX: 'auto', background: 'rgba(0,0,0,0.03)' }}>
+                              <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr style={{ background: 'rgba(0,0,0,0.25)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'left', width: '16%' }}>BLOCO / ROCHA</th>
+                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'left', width: '18%' }}>PEDREIRA</th>
+                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'center', width: '22%' }}>STATUS ENVELOPAMENTO</th>
+                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'left', width: '24%' }}>HISTÓRICO & RESPONSÁVEIS</th>
+                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'center', width: '20%' }}>AÇÕES DE PÁTIO</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {rom.blocos.map((b) => {
+                                    const statusInfo = STATUS_ENVELOPAMENTO[b.status?.toUpperCase()] || STATUS_ENVELOPAMENTO.PENDENTE_ENVELOPAMENTO;
+                                    const executando = executandoAcaoId === b.id;
+
+                                    return (
+                                      <tr 
+                                        key={b.id}
+                                        style={{ 
+                                          borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                          background: b.status === 'envelopado' ? 'rgba(34, 197, 94, 0.03)' : undefined
+                                        }}
                                       >
-                                        <Play size={11} /> Iniciar
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={executando}
-                                        onClick={() => handleAvancarStatus(b, 'sem_envelopamento')}
-                                        className="btn btn-secondary"
-                                        style={{ padding: '4px 7px', fontSize: '0.72rem', color: '#0284c7' }}
-                                        title="Marcar como sem necessidade de envelopamento"
-                                      >
-                                        Sem Env.
-                                      </button>
-                                    </>
-                                  )}
+                                        {/* Bloco */}
+                                        <td style={{ padding: '8px 12px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                            <span style={{
+                                              background: 'rgba(255, 255, 255, 0.08)',
+                                              color: 'inherit',
+                                              fontWeight: 800,
+                                              padding: '3px 7px',
+                                              borderRadius: 6,
+                                              fontSize: '0.84rem',
+                                              fontFamily: 'monospace',
+                                              letterSpacing: '0.05em',
+                                              border: '1px solid rgba(255,255,255,0.15)',
+                                              display: 'inline-block'
+                                            }}>
+                                              {b.numero_bloco}
+                                            </span>
+                                            {b.peso_kg && (
+                                              <span style={{
+                                                fontSize: '0.72rem',
+                                                color: '#0284c7',
+                                                background: 'rgba(56, 189, 248, 0.12)',
+                                                padding: '2px 6px',
+                                                borderRadius: 4,
+                                                border: '1px solid rgba(56, 189, 248, 0.25)',
+                                                fontFamily: 'monospace',
+                                                fontWeight: 700
+                                              }}>
+                                                ⚖️ {b.peso_kg} kg
+                                              </span>
+                                            )}
+                                          </div>
+                                          <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block', marginTop: 3, fontWeight: 600 }}>
+                                            {b.material}
+                                          </span>
+                                        </td>
 
-                                  {b.status === 'em_andamento' && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        disabled={executando}
-                                        onClick={() => handleAvancarStatus(b, 'envelopado')}
-                                        className="btn btn-vermont"
-                                        style={{ padding: '4px 8px', fontSize: '0.72rem', gap: 4 }}
-                                        title="Finalizar e marcar como Envelopado"
-                                      >
-                                        <CheckCircle2 size={12} /> Envelopado
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={executando}
-                                        onClick={() => handleAvancarStatus(b, 'aguardando_corte_reparo')}
-                                        className="btn btn-secondary"
-                                        style={{ padding: '4px 7px', fontSize: '0.70rem', color: '#dc2626' }}
-                                        title="Necessita de corte ou reparo"
-                                      >
-                                        Corte
-                                      </button>
-                                    </>
-                                  )}
+                                        {/* Pedreira */}
+                                        <td style={{ padding: '8px 12px' }}>
+                                          <span style={{ fontSize: '0.80rem', fontWeight: 600, color: 'inherit' }}>
+                                            {b.pedreira_nome || '-'}
+                                          </span>
+                                        </td>
 
-                                  {b.status === 'aguardando_corte_reparo' && (
-                                    <button
-                                      type="button"
-                                      disabled={executando}
-                                      onClick={() => handleAvancarStatus(b, 'em_andamento')}
-                                      className="btn btn-secondary"
-                                      style={{ padding: '4px 8px', fontSize: '0.72rem', gap: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', borderColor: '#f59e0b' }}
-                                      title="Retomar para processo de envelopamento"
-                                    >
-                                      <Play size={11} /> Retomar
-                                    </button>
-                                  )}
+                                        {/* Status */}
+                                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                          <div style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            padding: '4px 10px',
+                                            borderRadius: 20,
+                                            fontSize: '0.74rem',
+                                            fontWeight: 700,
+                                            background: statusInfo.bg,
+                                            color: statusInfo.cor,
+                                            border: `1px solid ${statusInfo.border}`
+                                          }}>
+                                            {b.status === 'envelopado' && <CheckCircle2 size={12} />}
+                                            {b.status === 'em_andamento' && <Layers size={12} />}
+                                            {b.status === 'aguardando_corte_reparo' && <Scissors size={12} />}
+                                            {b.status === 'pendente_envelopamento' && <Clock size={12} />}
+                                            {b.status === 'sem_envelopamento' && <Ban size={12} />}
+                                            <span>{statusInfo.label}</span>
+                                          </div>
+                                        </td>
 
-                                  {(b.status === 'envelopado' || b.status === 'sem_envelopamento') && (
-                                    <button
-                                      type="button"
-                                      disabled={executando}
-                                      onClick={() => handleAvancarStatus(b, 'em_andamento')}
-                                      className="btn btn-secondary"
-                                      style={{ padding: '4px 6px', fontSize: '0.70rem', color: 'var(--slate-400)' }}
-                                      title="Reverter para Em Andamento"
-                                    >
-                                      Reverter
-                                    </button>
-                                  )}
+                                        {/* Histórico & Observações */}
+                                        <td style={{ padding: '8px 12px' }}>
+                                          {b.status === 'envelopado' && b.responsavel_liberacao ? (
+                                            <div style={{ fontSize: '0.74rem', color: '#16a34a' }}>
+                                              <span>Liberado por: <strong>{b.responsavel_liberacao}</strong></span>
+                                              {b.data_liberacao && (
+                                                <span style={{ display: 'block', color: 'var(--slate-400)', fontSize: '0.70rem' }}>
+                                                  {formatarDataHoraBR(b.data_liberacao)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          ) : b.status === 'sem_envelopamento' && b.responsavel_liberacao ? (
+                                            <div style={{ fontSize: '0.74rem', color: '#0284c7' }}>
+                                              <span>Liberado direto por: <strong>{b.responsavel_liberacao}</strong></span>
+                                            </div>
+                                          ) : b.status === 'em_andamento' && b.responsavel_envelopamento ? (
+                                            <div style={{ fontSize: '0.74rem', color: '#d97706' }}>
+                                              <span>Envelopando: <strong>{b.responsavel_envelopamento}</strong></span>
+                                              {b.data_envelopamento && (
+                                                <span style={{ display: 'block', color: 'var(--slate-400)', fontSize: '0.70rem' }}>
+                                                  Início: {formatarDataHoraBR(b.data_envelopamento)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>
+                                              Cadastrado em {formatarDataHoraBR(b.data_cadastro)}
+                                            </span>
+                                          )}
+                                          {b.observacoes && (
+                                            <div style={{ fontSize: '0.70rem', color: 'var(--slate-500)', marginTop: 2, fontStyle: 'italic', maxWidth: 260 }}>
+                                              "{b.observacoes}"
+                                            </div>
+                                          )}
+                                        </td>
 
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setBlocoEmEdicao(b);
-                                      setModalCadastroAberto(true);
-                                    }}
-                                    className="btn btn-secondary"
-                                    style={{ padding: '4px 6px' }}
-                                    title="Editar dados do bloco"
-                                  >
-                                    <Edit3 size={12} />
-                                  </button>
+                                        {/* Ações de Pátio */}
+                                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                            {b.status === 'pendente_envelopamento' && (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  disabled={executando}
+                                                  onClick={() => handleAvancarStatus(b, 'em_andamento')}
+                                                  className="btn btn-secondary"
+                                                  style={{ padding: '4px 8px', fontSize: '0.72rem', gap: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', borderColor: '#f59e0b' }}
+                                                  title="Iniciar Envelopamento no pátio"
+                                                >
+                                                  <Play size={11} /> Iniciar
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  disabled={executando}
+                                                  onClick={() => handleAvancarStatus(b, 'sem_envelopamento')}
+                                                  className="btn btn-secondary"
+                                                  style={{ padding: '4px 7px', fontSize: '0.72rem', color: '#0284c7' }}
+                                                  title="Marcar como sem necessidade de envelopamento"
+                                                >
+                                                  Sem Env.
+                                                </button>
+                                              </>
+                                            )}
 
-                                  <button
-                                    type="button"
-                                    onClick={() => handleExcluir(b.id, b.numero_bloco)}
-                                    className="btn btn-danger"
-                                    style={{ padding: '4px 6px' }}
-                                    title="Remover do controle"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                                            {b.status === 'em_andamento' && (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  disabled={executando}
+                                                  onClick={() => handleAvancarStatus(b, 'envelopado')}
+                                                  className="btn btn-vermont"
+                                                  style={{ padding: '4px 8px', fontSize: '0.72rem', gap: 4 }}
+                                                  title="Finalizar e marcar como Envelopado"
+                                                >
+                                                  <CheckCircle2 size={12} /> Envelopado
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  disabled={executando}
+                                                  onClick={() => handleAvancarStatus(b, 'aguardando_corte_reparo')}
+                                                  className="btn btn-secondary"
+                                                  style={{ padding: '4px 7px', fontSize: '0.70rem', color: '#dc2626' }}
+                                                  title="Necessita de corte ou reparo"
+                                                >
+                                                  Corte
+                                                </button>
+                                              </>
+                                            )}
+
+                                            {b.status === 'aguardando_corte_reparo' && (
+                                              <button
+                                                type="button"
+                                                disabled={executando}
+                                                onClick={() => handleAvancarStatus(b, 'em_andamento')}
+                                                className="btn btn-secondary"
+                                                style={{ padding: '4px 8px', fontSize: '0.72rem', gap: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', borderColor: '#f59e0b' }}
+                                                title="Retomar para processo de envelopamento"
+                                              >
+                                                <Play size={11} /> Retomar
+                                              </button>
+                                            )}
+
+                                            {(b.status === 'envelopado' || b.status === 'sem_envelopamento') && (
+                                              <button
+                                                type="button"
+                                                disabled={executando}
+                                                onClick={() => handleAvancarStatus(b, 'em_andamento')}
+                                                className="btn btn-secondary"
+                                                style={{ padding: '4px 6px', fontSize: '0.70rem', color: 'var(--slate-400)' }}
+                                                title="Reverter para Em Andamento"
+                                              >
+                                                Reverter
+                                              </button>
+                                            )}
+
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setBlocoEmEdicao(b);
+                                                setModalCadastroAberto(true);
+                                              }}
+                                              className="btn btn-secondary"
+                                              style={{ padding: '4px 6px' }}
+                                              title="Editar dados do bloco"
+                                            >
+                                              <Edit3 size={12} />
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              onClick={() => handleExcluir(b.id, b.numero_bloco)}
+                                              className="btn btn-danger"
+                                              style={{ padding: '4px 6px' }}
+                                              title="Remover do controle"
+                                            >
+                                              <Trash2 size={12} />
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1147,11 +1395,27 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                         <strong style={{ fontSize: '0.84rem', color: 'inherit', display: 'block' }}>
                           {b.cliente_nome}
                         </strong>
-                        {b.cliente_cnpj && (
-                          <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>
-                            CNPJ: {b.cliente_cnpj}
-                          </span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                          {b.cliente_cnpj && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>
+                              CNPJ: {b.cliente_cnpj}
+                            </span>
+                          )}
+                          {b.numero_romaneio && (
+                            <span style={{
+                              fontSize: '0.70rem',
+                              color: '#0284c7',
+                              background: 'rgba(56, 189, 248, 0.12)',
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              border: '1px solid rgba(56, 189, 248, 0.25)',
+                              fontFamily: 'monospace',
+                              fontWeight: 700
+                            }}>
+                              Romaneio Nº {b.numero_romaneio}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td style={{ padding: '12px 14px', textAlign: 'center' }}>

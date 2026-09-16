@@ -36,6 +36,7 @@ export function ModalCadastrarBlocoEnvelopamento({
     material: blocoEdicao?.material || 'Taj Mahal',
     numero_bloco: blocoEdicao?.numero_bloco || '',
     peso_kg: blocoEdicao?.peso_kg || '',
+    numero_romaneio: blocoEdicao?.numero_romaneio || '',
     cliente_nome: blocoEdicao?.cliente_nome || '',
     cliente_cnpj: blocoEdicao?.cliente_cnpj || '',
     status: blocoEdicao?.status || 'pendente_envelopamento',
@@ -47,6 +48,7 @@ export function ModalCadastrarBlocoEnvelopamento({
     pedreira_id: 'uruoca',
     pedreira_nome: 'Uruoca - CE (Taj Mahal)',
     material: 'Taj Mahal',
+    numero_romaneio: '',
     cliente_nome: '',
     cliente_cnpj: '',
     status: 'pendente_envelopamento',
@@ -482,6 +484,18 @@ export function ModalCadastrarBlocoEnvelopamento({
                   placeholder="Ex: 34.849,11"
                   value={formData.peso_kg}
                   onChange={(e) => setFormData(prev => ({ ...prev, peso_kg: e.target.value }))}
+                />
+              </div>
+
+              {/* Romaneio Nº */}
+              <div className="form-group">
+                <label className="form-label" style={{ fontSize: '0.82rem' }}>Romaneio Nº (Opcional):</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Ex: 839/26 ou S/N"
+                  value={formData.numero_romaneio}
+                  onChange={(e) => setFormData(prev => ({ ...prev, numero_romaneio: e.target.value }))}
                 />
               </div>
 

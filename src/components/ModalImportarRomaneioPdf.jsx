@@ -255,6 +255,8 @@ export function ModalImportarRomaneioPdf({
         pedreira_nome: dadosProcessados.pedreira.nome,
         material: b.material,
         peso_kg: b.peso_kg || '',
+        numero_romaneio: dadosProcessados.numeroRomaneio || b.numero_romaneio || '',
+        data_romaneio: dadosProcessados.dataEmissao || b.data_romaneio || '',
         cliente_nome: dadosProcessados.cliente.nome,
         cliente_cnpj: dadosProcessados.cliente.cnpj,
         status: b.status,

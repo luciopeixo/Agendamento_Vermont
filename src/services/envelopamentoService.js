@@ -295,6 +295,8 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
     cliente_cnpj: String(dados.cliente_cnpj || '').trim(),
     material: String(dados.material || '').trim(),
     peso_kg: String(dados.peso_kg || '').trim(),
+    numero_romaneio: String(dados.numero_romaneio || dados.romaneio_numero || '').trim().toUpperCase(),
+    data_romaneio: String(dados.data_romaneio || dados.data_emissao || '').trim(),
     pedreira_id: dados.pedreira_id || '',
     pedreira_nome: dados.pedreira_nome || '',
     status: statusNormalizado,
