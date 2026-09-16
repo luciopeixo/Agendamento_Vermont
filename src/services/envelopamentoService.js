@@ -1,58 +1,51 @@
 import { supabase, isSupabaseConfigurado } from '../lib/supabase.js';
 
 const LOCAL_STORAGE_KEY = 'vermont_envelopamentos_locais';
+const CLIENTES_STORAGE_KEY = 'vermont_clientes_cadastrados';
 
 /**
- * Definição dos Status possíveis do Envelopamento de Bloco
+ * Definição oficial dos Status de Envelopamento de Bloco da Vermont Mineração
  */
 export const STATUS_ENVELOPAMENTO = {
-  PENDENTE: {
-    id: 'pendente',
-    label: 'Pendente',
+  PENDENTE_ENVELOPAMENTO: {
+    id: 'pendente_envelopamento',
+    label: 'Pendente de Envelopamento',
     cor: '#94a3b8',
     bg: 'rgba(148, 163, 184, 0.15)',
     border: '#64748b',
-    descricao: 'Aguardando início do envelopamento'
+    descricao: 'Aguardando início do envelopamento no pátio'
   },
-  EM_ENVELOPAMENTO: {
-    id: 'em_envelopamento',
-    label: 'Em Envelopamento',
+  EM_ANDAMENTO: {
+    id: 'em_andamento',
+    label: 'Em andamento',
     cor: '#f59e0b',
     bg: 'rgba(245, 158, 11, 0.15)',
     border: '#d97706',
     descricao: 'Bloco passando pelo processo físico de envelopamento'
   },
-  CONFERIDO: {
-    id: 'conferido',
-    label: 'Conferido',
-    cor: '#38bdf8',
-    bg: 'rgba(56, 189, 248, 0.15)',
-    border: '#0284c7',
-    descricao: 'Qualidade e medidas conferidas pela equipe Vermont'
+  AGUARDANDO_CORTE_REPARO: {
+    id: 'aguardando_corte_reparo',
+    label: 'Aguardando corte e reparo',
+    cor: '#f87171',
+    bg: 'rgba(239, 68, 68, 0.15)',
+    border: '#dc2626',
+    descricao: 'Bloco necessita de corte ou reparo antes de ser liberado'
   },
-  LIBERADO: {
-    id: 'liberado',
-    label: 'Liberado p/ Agendamento',
+  ENVELOPADO: {
+    id: 'envelopado',
+    label: 'Envelopado',
     cor: '#4ade80',
     bg: 'rgba(34, 197, 94, 0.15)',
     border: '#22c55e',
-    descricao: 'Bloco pronto e disponível para agendamento de carregamento'
+    descricao: 'Bloco devidamente envelopado e liberado'
   },
-  AGENDADO: {
-    id: 'agendado',
-    label: 'Agendado',
-    cor: '#c084fc',
-    bg: 'rgba(192, 132, 252, 0.15)',
-    border: '#a855f7',
-    descricao: 'Bloco vinculado a um agendamento de transporte'
-  },
-  CARREGADO: {
-    id: 'carregado',
-    label: 'Carregado',
-    cor: '#a3e635',
-    bg: 'rgba(163, 230, 53, 0.15)',
-    border: '#84cc16',
-    descricao: 'Carregamento finalizado e caminhão liberado'
+  SEM_ENVELOPAMENTO: {
+    id: 'sem_envelopamento',
+    label: 'Sem envelopamento',
+    cor: '#38bdf8',
+    bg: 'rgba(56, 189, 248, 0.15)',
+    border: '#0284c7',
+    descricao: 'Bloco liberado sem necessidade de envelopamento'
   }
 };
 
@@ -119,6 +112,15 @@ export const listarEnvelopamentos = async (filtros = {}) => {
     dados = carregarEnvelopamentosLocais();
   }
 
+  // Normalizar status legados caso existam
+  dados = dados.map(item => {
+    let st = item.status;
+    if (st === 'pendente') st = 'pendente_envelopamento';
+    if (st === 'em_envelopamento') st = 'em_andamento';
+    if (st === 'conferido' || st === 'liberado') st = 'envelopado';
+    return { ...item, status: st };
+  });
+
   // Aplicar filtros em memória
   return dados.filter(item => {
     if (filtros.pedreira && item.pedreira_nome !== filtros.pedreira) return false;
@@ -145,30 +147,25 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
   const agora = new Date().toISOString();
   const id = dados.id || `env_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
+  let statusNormalizado = dados.status || 'pendente_envelopamento';
+  if (statusNormalizado === 'pendente') statusNormalizado = 'pendente_envelopamento';
+  if (statusNormalizado === 'em_envelopamento') statusNormalizado = 'em_andamento';
+  if (statusNormalizado === 'liberado' || statusNormalizado === 'conferido') statusNormalizado = 'envelopado';
+
   const registroCompleto = {
     id,
     numero_bloco: String(dados.numero_bloco || '').trim().toUpperCase(),
-    cliente_nome: String(dados.cliente_nome || '').trim(),
+    cliente_nome: String(dados.cliente_nome || '').trim().toUpperCase(),
     cliente_cnpj: String(dados.cliente_cnpj || '').trim(),
     material: String(dados.material || '').trim(),
     pedreira_id: dados.pedreira_id || '',
     pedreira_nome: dados.pedreira_nome || '',
-    comprimento: dados.comprimento ? Number(dados.comprimento) : null,
-    largura: dados.largura ? Number(dados.largura) : null,
-    altura: dados.altura ? Number(dados.altura) : null,
-    metro_cubico: dados.metro_cubico ? Number(dados.metro_cubico) : (
-      dados.comprimento && dados.largura && dados.altura
-        ? Number((Number(dados.comprimento) * Number(dados.largura) * Number(dados.altura)).toFixed(3))
-        : null
-    ),
-    peso_ton: dados.peso_ton ? Number(dados.peso_ton) : null,
-    status: dados.status || 'pendente',
-    responsavel_envelopamento: dados.responsavel_envelopamento || (dados.status === 'em_envelopamento' ? usuarioNome : null),
-    responsavel_conferencia: dados.responsavel_conferencia || (dados.status === 'conferido' ? usuarioNome : null),
-    responsavel_liberacao: dados.responsavel_liberacao || (dados.status === 'liberado' ? usuarioNome : null),
+    status: statusNormalizado,
+    responsavel_envelopamento: dados.responsavel_envelopamento || (statusNormalizado === 'em_andamento' ? usuarioNome : null),
+    responsavel_liberacao: dados.responsavel_liberacao || (statusNormalizado === 'envelopado' || statusNormalizado === 'sem_envelopamento' ? usuarioNome : null),
     data_cadastro: dados.data_cadastro || agora,
-    data_envelopamento: dados.data_envelopamento || (dados.status === 'em_envelopamento' ? agora : null),
-    data_liberacao: dados.data_liberacao || (dados.status === 'liberado' ? agora : null),
+    data_envelopamento: dados.data_envelopamento || (statusNormalizado === 'em_andamento' ? agora : null),
+    data_liberacao: dados.data_liberacao || (statusNormalizado === 'envelopado' || statusNormalizado === 'sem_envelopamento' ? agora : null),
     observacoes: dados.observacoes || '',
     agendamento_id: dados.agendamento_id || null,
     created_at: dados.created_at || agora,
@@ -184,6 +181,14 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
     locais.unshift(registroCompleto);
   }
   salvarEnvelopamentosLocais(locais);
+
+  // Também registra automaticamente o cliente na base de clientes se informado
+  if (registroCompleto.cliente_nome) {
+    salvarClienteCadastrado({
+      nome: registroCompleto.cliente_nome,
+      cnpj: registroCompleto.cliente_cnpj
+    }).catch(() => {});
+  }
 
   // 2. Tentar persistir no Supabase se disponível
   if (isSupabaseConfigurado()) {
@@ -216,12 +221,10 @@ export const atualizarStatusEnvelopamento = async (id, novoStatus, usuarioNome =
     updated_at: agora
   };
 
-  if (novoStatus === 'em_envelopamento') {
+  if (novoStatus === 'em_andamento') {
     atualizacoes.responsavel_envelopamento = usuarioNome;
     atualizacoes.data_envelopamento = agora;
-  } else if (novoStatus === 'conferido') {
-    atualizacoes.responsavel_conferencia = usuarioNome;
-  } else if (novoStatus === 'liberado') {
+  } else if (novoStatus === 'envelopado' || novoStatus === 'sem_envelopamento') {
     atualizacoes.responsavel_liberacao = usuarioNome;
     atualizacoes.data_liberacao = agora;
   }
@@ -249,7 +252,7 @@ export const excluirEnvelopamento = async (id) => {
 };
 
 /**
- * Importa múltiplos blocos em lote (ex: colando lista de números de blocos)
+ * Importa múltiplos blocos em lote
  */
 export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont') => {
   const resultados = [];
@@ -286,26 +289,114 @@ export const buscarStatusEnvelopamentoPorBloco = async (numeroBloco, clienteNome
 };
 
 /**
- * Calcula os totais e métricas para os cards de resumo
+ * Calcula os totais e métricas para os cards de resumo com os status oficiais
  */
 export const calcularMetricasEnvelopamento = (lista = []) => {
   return {
     total: lista.length,
-    pendentes: lista.filter(i => i.status === 'pendente').length,
-    em_envelopamento: lista.filter(i => i.status === 'em_envelopamento').length,
-    conferidos: lista.filter(i => i.status === 'conferido').length,
-    liberados: lista.filter(i => i.status === 'liberado').length,
-    agendados: lista.filter(i => i.status === 'agendado' || i.status === 'carregado').length,
+    pendente_envelopamento: lista.filter(i => i.status === 'pendente_envelopamento' || i.status === 'pendente').length,
+    em_andamento: lista.filter(i => i.status === 'em_andamento' || i.status === 'em_envelopamento').length,
+    aguardando_corte_reparo: lista.filter(i => i.status === 'aguardando_corte_reparo').length,
+    envelopado: lista.filter(i => i.status === 'envelopado' || i.status === 'liberado' || i.status === 'conferido').length,
+    sem_envelopamento: lista.filter(i => i.status === 'sem_envelopamento').length
   };
 };
 
+// ==========================================
+// CADASTRO E GESTÃO DE CLIENTES
+// ==========================================
+
 /**
- * Obtém todos os clientes únicos existentes no banco de dados / agendamentos / envelopamentos
+ * Lê os clientes cadastrados localmente
+ */
+export const carregarClientesLocais = () => {
+  try {
+    const raw = localStorage.getItem(CLIENTES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+};
+
+/**
+ * Salva a lista de clientes no LocalStorage
+ */
+export const salvarClientesLocais = (lista) => {
+  try {
+    localStorage.setItem(CLIENTES_STORAGE_KEY, JSON.stringify(lista));
+  } catch (err) {}
+};
+
+/**
+ * Cadastra ou atualiza um cliente
+ */
+export const salvarClienteCadastrado = async (dadosCliente) => {
+  if (!dadosCliente || !dadosCliente.nome) return null;
+
+  const nomeLimpo = String(dadosCliente.nome).trim().toUpperCase();
+  const cnpjLimpo = String(dadosCliente.cnpj || '').trim();
+  const id = dadosCliente.id || `cli_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  const agora = new Date().toISOString();
+
+  const clienteObj = {
+    id,
+    nome: nomeLimpo,
+    cnpj: cnpjLimpo,
+    telefone: dadosCliente.telefone || '',
+    email: dadosCliente.email || '',
+    cidade: dadosCliente.cidade || '',
+    uf: dadosCliente.uf || '',
+    observacoes: dadosCliente.observacoes || '',
+    created_at: dadosCliente.created_at || agora,
+    updated_at: agora
+  };
+
+  // Salvar no LocalStorage
+  const locais = carregarClientesLocais();
+  const index = locais.findIndex(c => c.nome === nomeLimpo || (c.id && c.id === id));
+  if (index >= 0) {
+    locais[index] = { ...locais[index], ...clienteObj };
+  } else {
+    locais.unshift(clienteObj);
+  }
+  salvarClientesLocais(locais);
+
+  // Tentar salvar no Supabase
+  if (isSupabaseConfigurado()) {
+    try {
+      await supabase.from('clientes').upsert(clienteObj);
+    } catch (err) {}
+  }
+
+  return clienteObj;
+};
+
+/**
+ * Exclui um cliente da base cadastrada
+ */
+export const excluirClienteCadastrado = async (idOuNome) => {
+  const locais = carregarClientesLocais();
+  const filtrados = locais.filter(c => c.id !== idOuNome && c.nome !== idOuNome);
+  salvarClientesLocais(filtrados);
+
+  if (isSupabaseConfigurado()) {
+    try {
+      await supabase.from('clientes').delete().or(`id.eq.${idOuNome},nome.eq.${idOuNome}`);
+    } catch (err) {}
+  }
+
+  return true;
+};
+
+/**
+ * Obtém todos os clientes únicos existentes no banco de dados / cadastro / agendamentos / envelopamentos
  */
 export const obterClientesDoBancoDeDados = async () => {
   const mapaClientes = new Map();
 
-  const adicionarCliente = (nome, cnpj) => {
+  const adicionarCliente = (nome, cnpj, extra = {}) => {
     if (!nome) return;
     const nomeLimpo = String(nome).trim().toUpperCase();
     if (!nomeLimpo || nomeLimpo.length < 2) return;
@@ -315,15 +406,26 @@ export const obterClientesDoBancoDeDados = async () => {
 
     if (!mapaClientes.has(chave)) {
       mapaClientes.set(chave, {
+        id: extra.id || `cli_${Math.random().toString(36).substr(2, 6)}`,
         nome: nomeLimpo,
-        cnpj: cnpjLimpo
+        cnpj: cnpjLimpo,
+        telefone: extra.telefone || '',
+        email: extra.email || '',
+        observacoes: extra.observacoes || ''
       });
-    } else if (cnpjLimpo && !mapaClientes.get(chave).cnpj) {
-      mapaClientes.get(chave).cnpj = cnpjLimpo;
+    } else {
+      const existente = mapaClientes.get(chave);
+      if (cnpjLimpo && !existente.cnpj) existente.cnpj = cnpjLimpo;
+      if (extra.telefone && !existente.telefone) existente.telefone = extra.telefone;
+      if (extra.email && !existente.email) existente.email = extra.email;
     }
   };
 
-  // Clientes comuns da Vermont
+  // 1. Clientes cadastrados explicitamente
+  const clientesCadastrados = carregarClientesLocais();
+  clientesCadastrados.forEach(c => adicionarCliente(c.nome, c.cnpj, c));
+
+  // 2. Clientes padrão conhecidos da Vermont
   const clientesPadrao = [
     { nome: 'THOR GRANITOS LTDA', cnpj: '08.234.567/0001-89' },
     { nome: 'ARGOS GRANITOS E ROCHAS LTDA', cnpj: '10.987.654/0001-32' },
@@ -332,11 +434,11 @@ export const obterClientesDoBancoDeDados = async () => {
   ];
   clientesPadrao.forEach(c => adicionarCliente(c.nome, c.cnpj));
 
-  // Ler dos Envelopamentos locais
+  // 3. Ler dos Envelopamentos locais
   const envLocais = carregarEnvelopamentosLocais();
   envLocais.forEach(e => adicionarCliente(e.cliente_nome, e.cliente_cnpj));
 
-  // Ler dos Agendamentos locais
+  // 4. Ler dos Agendamentos locais
   try {
     const rawAg = localStorage.getItem('vermont_agendamentos_locais');
     if (rawAg) {
@@ -347,25 +449,24 @@ export const obterClientesDoBancoDeDados = async () => {
     }
   } catch (err) {}
 
-  // Consultar no Supabase se conectado
+  // 5. Consultar no Supabase se conectado
   if (isSupabaseConfigurado()) {
     try {
-      const { data: agsSupabase } = await supabase
-        .from('agendamentos')
-        .select('cliente, cliente_cnpj')
-        .limit(2000);
+      const { data: cliSupabase } = await supabase.from('clientes').select('*').limit(1000);
+      if (Array.isArray(cliSupabase)) {
+        cliSupabase.forEach(c => adicionarCliente(c.nome, c.cnpj, c));
+      }
+    } catch (err) {}
 
+    try {
+      const { data: agsSupabase } = await supabase.from('agendamentos').select('cliente, cliente_cnpj').limit(2000);
       if (Array.isArray(agsSupabase)) {
         agsSupabase.forEach(a => adicionarCliente(a.cliente, a.cliente_cnpj));
       }
     } catch (err) {}
 
     try {
-      const { data: envSupabase } = await supabase
-        .from('envelopamentos')
-        .select('cliente_nome, cliente_cnpj')
-        .limit(2000);
-
+      const { data: envSupabase } = await supabase.from('envelopamentos').select('cliente_nome, cliente_cnpj').limit(2000);
       if (Array.isArray(envSupabase)) {
         envSupabase.forEach(e => adicionarCliente(e.cliente_nome, e.cliente_cnpj));
       }
@@ -376,4 +477,3 @@ export const obterClientesDoBancoDeDados = async () => {
   resultado.sort((a, b) => a.nome.localeCompare(b.nome));
   return resultado;
 };
-

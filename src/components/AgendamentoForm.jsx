@@ -1633,15 +1633,39 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
-                      background: statusEnvelopamento1.status === 'liberado' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(56, 189, 248, 0.12)',
-                      border: `1px solid ${statusEnvelopamento1.status === 'liberado' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(56, 189, 248, 0.4)'}`,
-                      color: statusEnvelopamento1.status === 'liberado' ? '#4ade80' : '#38bdf8'
+                      background: (statusEnvelopamento1.status === 'envelopado' || statusEnvelopamento1.status === 'sem_envelopamento')
+                        ? 'rgba(34, 197, 94, 0.12)' 
+                        : statusEnvelopamento1.status === 'aguardando_corte_reparo'
+                          ? 'rgba(239, 68, 68, 0.12)'
+                          : 'rgba(245, 158, 11, 0.12)',
+                      border: `1px solid ${(statusEnvelopamento1.status === 'envelopado' || statusEnvelopamento1.status === 'sem_envelopamento')
+                        ? 'rgba(34, 197, 94, 0.4)' 
+                        : statusEnvelopamento1.status === 'aguardando_corte_reparo'
+                          ? 'rgba(239, 68, 68, 0.4)'
+                          : 'rgba(245, 158, 11, 0.4)'}`,
+                      color: (statusEnvelopamento1.status === 'envelopado' || statusEnvelopamento1.status === 'sem_envelopamento')
+                        ? '#4ade80' 
+                        : statusEnvelopamento1.status === 'aguardando_corte_reparo'
+                          ? '#f87171'
+                          : '#fbbf24'
                     }}>
-                      {statusEnvelopamento1.status === 'liberado' ? <CheckCircle size={15} /> : <Layers size={15} />}
+                      {statusEnvelopamento1.status === 'envelopado' ? (
+                        <CheckCircle size={15} />
+                      ) : statusEnvelopamento1.status === 'aguardando_corte_reparo' ? (
+                        <AlertTriangle size={15} />
+                      ) : (
+                        <Layers size={15} />
+                      )}
                       <span>
-                        {statusEnvelopamento1.status === 'liberado' 
-                          ? `✅ Bloco ${statusEnvelopamento1.numero_bloco} conferido e liberado pela Vermont para agendamento.` 
-                          : `ℹ️ Bloco ${statusEnvelopamento1.numero_bloco} registrado no pátio (Status: ${statusEnvelopamento1.status}).`}
+                        {statusEnvelopamento1.status === 'envelopado' 
+                          ? `✅ Bloco ${statusEnvelopamento1.numero_bloco} envelopado e liberado para carregamento.`
+                          : statusEnvelopamento1.status === 'sem_envelopamento'
+                            ? `✅ Bloco ${statusEnvelopamento1.numero_bloco} liberado (sem necessidade de envelopamento).`
+                            : statusEnvelopamento1.status === 'em_andamento'
+                              ? `⏳ Bloco ${statusEnvelopamento1.numero_bloco} em processo de envelopamento no pátio.`
+                              : statusEnvelopamento1.status === 'aguardando_corte_reparo'
+                                ? `⚠️ Bloco ${statusEnvelopamento1.numero_bloco} aguardando corte e reparo no pátio.`
+                                : `ℹ️ Bloco ${statusEnvelopamento1.numero_bloco} cadastrado no pátio (pendente de envelopamento).`}
                       </span>
                     </div>
                   )}

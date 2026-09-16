@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Layers, Box, Building2, Search, CheckCircle2, AlertTriangle, UploadCloud, Plus, Check } from 'lucide-react';
+import { X, Layers, Box, Building2, Search, CheckCircle2, AlertTriangle, UploadCloud, Plus, UserPlus } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
   obterMateriaisPorPedreira, 
@@ -15,6 +15,7 @@ import {
   importarBlocosEmLote,
   obterClientesDoBancoDeDados
 } from '../services/envelopamentoService';
+import { ModalGestaoClientes } from './ModalGestaoClientes';
 
 export function ModalCadastrarBlocoEnvelopamento({
   blocoEdicao = null,
@@ -23,6 +24,7 @@ export function ModalCadastrarBlocoEnvelopamento({
   usuarioNome = 'Equipe Vermont'
 }) {
   const [modoAba, setModoAba] = useState('individual'); // 'individual' ou 'lote'
+  const [modalGestaoClientesAberto, setModalGestaoClientesAberto] = useState(false);
   
   // Estado Individual
   const [formData, setFormData] = useState({
@@ -33,7 +35,7 @@ export function ModalCadastrarBlocoEnvelopamento({
     numero_bloco: blocoEdicao?.numero_bloco || '',
     cliente_nome: blocoEdicao?.cliente_nome || '',
     cliente_cnpj: blocoEdicao?.cliente_cnpj || '',
-    status: blocoEdicao?.status || 'pendente',
+    status: blocoEdicao?.status || 'pendente_envelopamento',
     observacoes: blocoEdicao?.observacoes || ''
   });
 
@@ -44,7 +46,7 @@ export function ModalCadastrarBlocoEnvelopamento({
     material: 'Taj Mahal',
     cliente_nome: '',
     cliente_cnpj: '',
-    status: 'pendente',
+    status: 'pendente_envelopamento',
     textoBlocos: '',
     observacoes: ''
   });
@@ -60,11 +62,15 @@ export function ModalCadastrarBlocoEnvelopamento({
   const [mostrarDropdownClientes, setMostrarDropdownClientes] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Carregar lista de clientes cadastrados no banco
-  useEffect(() => {
-    obterClientesDoBancoDeDados().then(res => {
+  const carregarClientes = async () => {
+    try {
+      const res = await obterClientesDoBancoDeDados();
       setClientesBase(res);
-    }).catch(() => {});
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    carregarClientes();
   }, []);
 
   // Fechar dropdown de sugestões ao clicar fora
@@ -105,7 +111,6 @@ export function ModalCadastrarBlocoEnvelopamento({
     }
   };
 
-  // Filtragem de clientes para a barra de pesquisa
   const handleFiltrarClientes = (termo) => {
     if (modoAba === 'individual') {
       setFormData(prev => ({ ...prev, cliente_nome: termo }));
@@ -243,8 +248,6 @@ export function ModalCadastrarBlocoEnvelopamento({
     }
   };
 
-  const clienteAtual = modoAba === 'individual' ? formData.cliente_nome : loteData.cliente_nome;
-
   return (
     <div className="modal-overlay" style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div 
@@ -281,7 +284,7 @@ export function ModalCadastrarBlocoEnvelopamento({
                 {blocoEdicao ? 'Editar Bloco no Envelopamento' : 'Cadastrar Bloco para Envelopamento'}
               </h3>
               <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--slate-400)' }}>
-                Controle de pátio, conferência física e liberação para agendamento
+                Controle de pátio e liberação de blocos Vermont
               </p>
             </div>
           </div>
@@ -403,24 +406,41 @@ export function ModalCadastrarBlocoEnvelopamento({
               </div>
             </div>
 
-            {/* BARRA DE PESQUISA DE CLIENTES NO BANCO DE DADOS */}
+            {/* BARRA DE PESQUISA DE CLIENTES NO BANCO DE DADOS + BOTÃO CADASTRAR CLIENTE */}
             <div className="form-group" style={{ marginTop: 14, position: 'relative' }} ref={dropdownRef}>
-              <label className="form-label" style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Cliente / Comprador:</span>
-                <span style={{ fontSize: '0.72rem', color: '#4ade80' }}>🔍 Pesquisa rápida no banco de dados</span>
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <label className="form-label" style={{ fontSize: '0.82rem', margin: 0 }}>
+                  Cliente / Comprador:
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setModalGestaoClientesAberto(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#4ade80',
+                    fontSize: '0.74rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontWeight: 600,
+                    textDecoration: 'underline'
+                  }}
+                >
+                  <UserPlus size={13} /> + Cadastrar / Gerenciar Clientes
+                </button>
+              </div>
               
               <div style={{ position: 'relative' }}>
                 <Search size={16} color="var(--slate-400)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Digite para pesquisar o cliente ou insira um novo..."
+                  placeholder="Pesquisar cliente ou digitar..."
                   value={formData.cliente_nome}
                   onChange={(e) => handleFiltrarClientes(e.target.value)}
-                  onFocus={() => {
-                    handleFiltrarClientes(formData.cliente_nome);
-                  }}
+                  onFocus={() => handleFiltrarClientes(formData.cliente_nome)}
                   style={{ paddingLeft: 36 }}
                   required
                 />
@@ -505,7 +525,7 @@ export function ModalCadastrarBlocoEnvelopamento({
               <textarea
                 className="form-input"
                 rows={2}
-                placeholder="Ex: Bloco no pátio 2, envelopamento com manta reforçada..."
+                placeholder="Ex: Bloco no pátio 2..."
                 value={formData.observacoes}
                 onChange={(e) => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
               />
@@ -553,13 +573,25 @@ export function ModalCadastrarBlocoEnvelopamento({
                   ))}
                 </select>
               </div>
+
+              <div className="form-group">
+                <label className="form-label" style={{ fontSize: '0.82rem' }}>Status dos Blocos:</label>
+                <select
+                  className="form-select"
+                  value={loteData.status}
+                  onChange={(e) => setLoteData(prev => ({ ...prev, status: e.target.value }))}
+                >
+                  {Object.values(STATUS_ENVELOPAMENTO).map(st => (
+                    <option key={st.id} value={st.id}>{st.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Barra de Pesquisa de Cliente no Lote */}
             <div className="form-group" style={{ marginTop: 14, position: 'relative' }} ref={dropdownRef}>
-              <label className="form-label" style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Cliente / Destinatário Comum:</span>
-                <span style={{ fontSize: '0.72rem', color: '#4ade80' }}>🔍 Pesquisa no banco</span>
+              <label className="form-label" style={{ fontSize: '0.82rem' }}>
+                Cliente / Destinatário Comum:
               </label>
               
               <div style={{ position: 'relative' }}>
@@ -659,6 +691,21 @@ export function ModalCadastrarBlocoEnvelopamento({
               </button>
             </div>
           </form>
+        )}
+
+        {/* Modal de Gestão de Clientes */}
+        {modalGestaoClientesAberto && (
+          <ModalGestaoClientes
+            onFechar={() => {
+              setModalGestaoClientesAberto(false);
+              carregarClientes();
+            }}
+            onClienteSelecionado={(cli) => {
+              handleSelecionarCliente(cli);
+              carregarClientes();
+              setModalGestaoClientesAberto(false);
+            }}
+          />
         )}
       </div>
     </div>

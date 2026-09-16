@@ -8,17 +8,15 @@ import {
   CheckCircle2, 
   Clock, 
   AlertTriangle, 
-  ArrowRight, 
   Edit3, 
   Trash2, 
-  Filter, 
   Box, 
   Building2, 
-  UserCheck, 
-  Calendar, 
-  ShieldCheck,
-  PackageCheck,
-  CheckCheck
+  Users, 
+  Scissors, 
+  CheckCheck, 
+  Ban, 
+  Play
 } from 'lucide-react';
 import { 
   listarEnvelopamentos, 
@@ -29,11 +27,13 @@ import {
 } from '../services/envelopamentoService';
 import { PEDREIRAS_CEARA, formatarDataHoraBR } from '../services/agendamentoService';
 import { ModalCadastrarBlocoEnvelopamento } from './ModalCadastrarBlocoEnvelopamento';
+import { ModalGestaoClientes } from './ModalGestaoClientes';
 
 export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [envelopamentos, setEnvelopamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
+  const [modalClientesAberto, setModalClientesAberto] = useState(false);
   const [blocoEmEdicao, setBlocoEmEdicao] = useState(null);
   const [filtroPedreira, setFiltroPedreira] = useState(pedreiraOperador || '');
   const [filtroStatus, setFiltroStatus] = useState('');
@@ -140,11 +140,11 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             <h2 style={{ margin: 0, fontSize: '1.4rem', color: '#fff', display: 'flex', alignItems: 'center', gap: 10 }}>
               Controle de Envelopamento de Blocos
               <span style={{ fontSize: '0.70rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(56, 189, 248, 0.3)' }}>
-                Módulo Local Ativo
+                Exclusivo Admin & Pedreiras
               </span>
             </h2>
             <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--slate-400)' }}>
-              Gestão de pátio, preparação física, conferência de qualidade e liberação para agendamento
+              Acompanhamento de pátio, preparação física e liberação de blocos Vermont
             </p>
           </div>
         </div>
@@ -158,6 +158,17 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             style={{ padding: '8px 12px' }}
           >
             <RefreshCw size={16} className={carregando ? 'spinner' : ''} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setModalClientesAberto(true)}
+            className="btn btn-secondary"
+            title="Gerenciar base de clientes compradores"
+            style={{ padding: '8px 14px', gap: 6, fontSize: '0.82rem' }}
+          >
+            <Users size={15} color="#4ade80" />
+            Clientes
           </button>
           
           <button
@@ -181,12 +192,12 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             style={{ padding: '8px 16px', gap: 6, fontSize: '0.86rem' }}
           >
             <Plus size={18} />
-            Novo Bloco p/ Envelopar
+            Novo Bloco
           </button>
         </div>
       </div>
 
-      {/* Cards de Métricas / Status */}
+      {/* Cards de Métricas / 5 Status Oficiais */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 20 }}>
         
         {/* Total */}
@@ -195,14 +206,14 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             <Box size={20} color="#94a3b8" />
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)', display: 'block' }}>Total de Blocos</span>
-            <strong style={{ fontSize: '1.4rem', color: '#fff' }}>{metricas.total}</strong>
+            <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block' }}>Total de Blocos</span>
+            <strong style={{ fontSize: '1.35rem', color: '#fff' }}>{metricas.total}</strong>
           </div>
         </div>
 
-        {/* Pendentes */}
+        {/* Pendente de Envelopamento */}
         <div 
-          onClick={() => setFiltroStatus(filtroStatus === 'pendente' ? '' : 'pendente')}
+          onClick={() => setFiltroStatus(filtroStatus === 'pendente_envelopamento' ? '' : 'pendente_envelopamento')}
           className="glass-panel" 
           style={{ 
             padding: '14px 18px', 
@@ -211,21 +222,21 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             gap: 12, 
             borderLeft: '4px solid #94a3b8',
             cursor: 'pointer',
-            background: filtroStatus === 'pendente' ? 'rgba(148, 163, 184, 0.1)' : undefined
+            background: filtroStatus === 'pendente_envelopamento' ? 'rgba(148, 163, 184, 0.1)' : undefined
           }}
         >
           <div style={{ background: 'rgba(148, 163, 184, 0.15)', padding: 10, borderRadius: 10 }}>
             <Clock size={20} color="#94a3b8" />
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)', display: 'block' }}>Pendentes</span>
-            <strong style={{ fontSize: '1.4rem', color: '#94a3b8' }}>{metricas.pendentes}</strong>
+            <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block' }}>Pendente Envelop.</span>
+            <strong style={{ fontSize: '1.35rem', color: '#94a3b8' }}>{metricas.pendente_envelopamento}</strong>
           </div>
         </div>
 
-        {/* Em Envelopamento */}
+        {/* Em andamento */}
         <div 
-          onClick={() => setFiltroStatus(filtroStatus === 'em_envelopamento' ? '' : 'em_envelopamento')}
+          onClick={() => setFiltroStatus(filtroStatus === 'em_andamento' ? '' : 'em_andamento')}
           className="glass-panel" 
           style={{ 
             padding: '14px 18px', 
@@ -234,44 +245,44 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             gap: 12, 
             borderLeft: '4px solid #f59e0b',
             cursor: 'pointer',
-            background: filtroStatus === 'em_envelopamento' ? 'rgba(245, 158, 11, 0.1)' : undefined
+            background: filtroStatus === 'em_andamento' ? 'rgba(245, 158, 11, 0.1)' : undefined
           }}
         >
           <div style={{ background: 'rgba(245, 158, 11, 0.15)', padding: 10, borderRadius: 10 }}>
             <Layers size={20} color="#f59e0b" />
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)', display: 'block' }}>Em Envelopamento</span>
-            <strong style={{ fontSize: '1.4rem', color: '#fbbf24' }}>{metricas.em_envelopamento}</strong>
+            <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block' }}>Em andamento</span>
+            <strong style={{ fontSize: '1.35rem', color: '#fbbf24' }}>{metricas.em_andamento}</strong>
           </div>
         </div>
 
-        {/* Conferidos */}
+        {/* Aguardando corte e reparo */}
         <div 
-          onClick={() => setFiltroStatus(filtroStatus === 'conferido' ? '' : 'conferido')}
+          onClick={() => setFiltroStatus(filtroStatus === 'aguardando_corte_reparo' ? '' : 'aguardando_corte_reparo')}
           className="glass-panel" 
           style={{ 
             padding: '14px 18px', 
             display: 'flex', 
             alignItems: 'center', 
             gap: 12, 
-            borderLeft: '4px solid #0284c7',
+            borderLeft: '4px solid #ef4444',
             cursor: 'pointer',
-            background: filtroStatus === 'conferido' ? 'rgba(56, 189, 248, 0.1)' : undefined
+            background: filtroStatus === 'aguardando_corte_reparo' ? 'rgba(239, 68, 68, 0.1)' : undefined
           }}
         >
-          <div style={{ background: 'rgba(56, 189, 248, 0.15)', padding: 10, borderRadius: 10 }}>
-            <UserCheck size={20} color="#38bdf8" />
+          <div style={{ background: 'rgba(239, 68, 68, 0.15)', padding: 10, borderRadius: 10 }}>
+            <Scissors size={20} color="#f87171" />
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)', display: 'block' }}>Conferidos</span>
-            <strong style={{ fontSize: '1.4rem', color: '#38bdf8' }}>{metricas.conferidos}</strong>
+            <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block' }}>Aguard. Corte/Reparo</span>
+            <strong style={{ fontSize: '1.35rem', color: '#f87171' }}>{metricas.aguardando_corte_reparo}</strong>
           </div>
         </div>
 
-        {/* Liberados */}
+        {/* Envelopado */}
         <div 
-          onClick={() => setFiltroStatus(filtroStatus === 'liberado' ? '' : 'liberado')}
+          onClick={() => setFiltroStatus(filtroStatus === 'envelopado' ? '' : 'envelopado')}
           className="glass-panel" 
           style={{ 
             padding: '14px 18px', 
@@ -280,38 +291,38 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             gap: 12, 
             borderLeft: '4px solid #22c55e',
             cursor: 'pointer',
-            background: filtroStatus === 'liberado' ? 'rgba(34, 197, 94, 0.1)' : undefined
+            background: filtroStatus === 'envelopado' ? 'rgba(34, 197, 94, 0.1)' : undefined
           }}
         >
           <div style={{ background: 'rgba(34, 197, 94, 0.15)', padding: 10, borderRadius: 10 }}>
             <CheckCircle2 size={20} color="#4ade80" />
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)', display: 'block' }}>Liberados p/ Cliente</span>
-            <strong style={{ fontSize: '1.4rem', color: '#4ade80' }}>{metricas.liberados}</strong>
+            <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block' }}>Envelopado</span>
+            <strong style={{ fontSize: '1.35rem', color: '#4ade80' }}>{metricas.envelopado}</strong>
           </div>
         </div>
 
-        {/* Agendados */}
+        {/* Sem envelopamento */}
         <div 
-          onClick={() => setFiltroStatus(filtroStatus === 'agendado' ? '' : 'agendado')}
+          onClick={() => setFiltroStatus(filtroStatus === 'sem_envelopamento' ? '' : 'sem_envelopamento')}
           className="glass-panel" 
           style={{ 
             padding: '14px 18px', 
             display: 'flex', 
             alignItems: 'center', 
             gap: 12, 
-            borderLeft: '4px solid #a855f7',
+            borderLeft: '4px solid #38bdf8',
             cursor: 'pointer',
-            background: filtroStatus === 'agendado' ? 'rgba(192, 132, 252, 0.1)' : undefined
+            background: filtroStatus === 'sem_envelopamento' ? 'rgba(56, 189, 248, 0.1)' : undefined
           }}
         >
-          <div style={{ background: 'rgba(192, 132, 252, 0.15)', padding: 10, borderRadius: 10 }}>
-            <PackageCheck size={20} color="#c084fc" />
+          <div style={{ background: 'rgba(56, 189, 248, 0.15)', padding: 10, borderRadius: 10 }}>
+            <Ban size={20} color="#38bdf8" />
           </div>
           <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)', display: 'block' }}>Já Agendados</span>
-            <strong style={{ fontSize: '1.4rem', color: '#c084fc' }}>{metricas.agendados}</strong>
+            <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block' }}>Sem Envelopamento</span>
+            <strong style={{ fontSize: '1.35rem', color: '#38bdf8' }}>{metricas.sem_envelopamento}</strong>
           </div>
         </div>
       </div>
@@ -344,7 +355,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           </select>
         </div>
 
-        <div style={{ flex: '0 1 180px' }}>
+        <div style={{ flex: '0 1 220px' }}>
           <select
             className="form-select"
             value={filtroStatus}
@@ -415,7 +426,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
               </thead>
               <tbody>
                 {envelopamentos.map((b) => {
-                  const statusInfo = STATUS_ENVELOPAMENTO[b.status?.toUpperCase()] || STATUS_ENVELOPAMENTO.PENDENTE;
+                  const statusInfo = STATUS_ENVELOPAMENTO[b.status?.toUpperCase()] || STATUS_ENVELOPAMENTO.PENDENTE_ENVELOPAMENTO;
                   const executando = executandoAcaoId === b.id;
 
                   return (
@@ -424,7 +435,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                       style={{ 
                         borderBottom: '1px solid rgba(255,255,255,0.04)',
                         transition: 'background 0.2s',
-                        background: b.status === 'liberado' ? 'rgba(34, 197, 94, 0.03)' : undefined
+                        background: b.status === 'envelopado' ? 'rgba(34, 197, 94, 0.03)' : undefined
                       }}
                     >
                       {/* Bloco & Rocha */}
@@ -482,18 +493,18 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                           color: statusInfo.cor,
                           border: `1px solid ${statusInfo.border}`
                         }}>
-                          {b.status === 'liberado' && <CheckCircle2 size={13} />}
-                          {b.status === 'em_envelopamento' && <Layers size={13} />}
-                          {b.status === 'conferido' && <UserCheck size={13} />}
-                          {b.status === 'pendente' && <Clock size={13} />}
-                          {b.status === 'agendado' && <PackageCheck size={13} />}
+                          {b.status === 'envelopado' && <CheckCircle2 size={13} />}
+                          {b.status === 'em_andamento' && <Layers size={13} />}
+                          {b.status === 'aguardando_corte_reparo' && <Scissors size={13} />}
+                          {b.status === 'pendente_envelopamento' && <Clock size={13} />}
+                          {b.status === 'sem_envelopamento' && <Ban size={13} />}
                           <span>{statusInfo.label}</span>
                         </div>
                       </td>
 
                       {/* Responsáveis e Datas */}
                       <td style={{ padding: '12px 14px' }}>
-                        {b.status === 'liberado' && b.responsavel_liberacao ? (
+                        {b.status === 'envelopado' && b.responsavel_liberacao ? (
                           <div style={{ fontSize: '0.74rem', color: '#4ade80' }}>
                             <span>Liberado por: <strong>{b.responsavel_liberacao}</strong></span>
                             {b.data_liberacao && (
@@ -502,11 +513,15 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                               </span>
                             )}
                           </div>
-                        ) : b.status === 'conferido' && b.responsavel_conferencia ? (
+                        ) : b.status === 'sem_envelopamento' && b.responsavel_liberacao ? (
                           <div style={{ fontSize: '0.74rem', color: '#38bdf8' }}>
-                            <span>Conferido por: <strong>{b.responsavel_conferencia}</strong></span>
+                            <span>Liberado direto por: <strong>{b.responsavel_liberacao}</strong></span>
                           </div>
-                        ) : b.status === 'em_envelopamento' && b.responsavel_envelopamento ? (
+                        ) : b.status === 'aguardando_corte_reparo' ? (
+                          <div style={{ fontSize: '0.74rem', color: '#f87171' }}>
+                            <span>Aguardando corte / reparo</span>
+                          </div>
+                        ) : b.status === 'em_andamento' && b.responsavel_envelopamento ? (
                           <div style={{ fontSize: '0.74rem', color: '#fbbf24' }}>
                             <span>Envelopando: <strong>{b.responsavel_envelopamento}</strong></span>
                             {b.data_envelopamento && (
@@ -531,54 +546,78 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                       <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           
-                          {/* Botão de Avanço Rápido de Status */}
-                          {b.status === 'pendente' && (
+                          {/* Botões de Avanço Rápido de Status */}
+                          {b.status === 'pendente_envelopamento' && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={executando}
+                                onClick={() => handleAvancarStatus(b, 'em_andamento')}
+                                className="btn btn-secondary"
+                                style={{ padding: '5px 8px', fontSize: '0.74rem', gap: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', borderColor: '#f59e0b' }}
+                                title="Iniciar Envelopamento no pátio"
+                              >
+                                <Play size={12} /> Iniciar
+                              </button>
+                              <button
+                                type="button"
+                                disabled={executando}
+                                onClick={() => handleAvancarStatus(b, 'sem_envelopamento')}
+                                className="btn btn-secondary"
+                                style={{ padding: '5px 7px', fontSize: '0.72rem', color: '#38bdf8' }}
+                                title="Marcar como sem necessidade de envelopamento"
+                              >
+                                Sem Envelop.
+                              </button>
+                            </>
+                          )}
+
+                          {b.status === 'em_andamento' && (
+                            <>
+                              <button
+                                type="button"
+                                disabled={executando}
+                                onClick={() => handleAvancarStatus(b, 'envelopado')}
+                                className="btn btn-vermont"
+                                style={{ padding: '5px 8px', fontSize: '0.74rem', gap: 4 }}
+                                title="Finalizar e marcar como Envelopado"
+                              >
+                                <CheckCircle2 size={13} /> Envelopado
+                              </button>
+                              <button
+                                type="button"
+                                disabled={executando}
+                                onClick={() => handleAvancarStatus(b, 'aguardando_corte_reparo')}
+                                className="btn btn-secondary"
+                                style={{ padding: '5px 7px', fontSize: '0.72rem', color: '#f87171' }}
+                                title="Necessita de corte ou reparo"
+                              >
+                                Corte/Reparo
+                              </button>
+                            </>
+                          )}
+
+                          {b.status === 'aguardando_corte_reparo' && (
                             <button
                               type="button"
                               disabled={executando}
-                              onClick={() => handleAvancarStatus(b, 'em_envelopamento')}
+                              onClick={() => handleAvancarStatus(b, 'em_andamento')}
                               className="btn btn-secondary"
                               style={{ padding: '5px 8px', fontSize: '0.74rem', gap: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', borderColor: '#f59e0b' }}
-                              title="Iniciar Envelopamento no pátio"
+                              title="Retomar para processo de envelopamento"
                             >
-                              <Layers size={13} /> Iniciar
+                              <Play size={12} /> Retomar
                             </button>
                           )}
 
-                          {b.status === 'em_envelopamento' && (
+                          {(b.status === 'envelopado' || b.status === 'sem_envelopamento') && (
                             <button
                               type="button"
                               disabled={executando}
-                              onClick={() => handleAvancarStatus(b, 'conferido')}
-                              className="btn btn-secondary"
-                              style={{ padding: '5px 8px', fontSize: '0.74rem', gap: 4, background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', borderColor: '#0284c7' }}
-                              title="Concluir conferência física"
-                            >
-                              <UserCheck size={13} /> Conferir
-                            </button>
-                          )}
-
-                          {b.status === 'conferido' && (
-                            <button
-                              type="button"
-                              disabled={executando}
-                              onClick={() => handleAvancarStatus(b, 'liberado')}
-                              className="btn btn-vermont"
-                              style={{ padding: '5px 8px', fontSize: '0.74rem', gap: 4 }}
-                              title="Liberar bloco para o cliente agendar"
-                            >
-                              <CheckCircle2 size={13} /> Liberar
-                            </button>
-                          )}
-
-                          {b.status === 'liberado' && (
-                            <button
-                              type="button"
-                              disabled={executando}
-                              onClick={() => handleAvancarStatus(b, 'conferido')}
+                              onClick={() => handleAvancarStatus(b, 'em_andamento')}
                               className="btn btn-secondary"
                               style={{ padding: '5px 6px', fontSize: '0.70rem', color: 'var(--slate-400)' }}
-                              title="Reverter para status Conferido"
+                              title="Reverter para Em Andamento"
                             >
                               Reverter
                             </button>
@@ -619,7 +658,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         )}
       </div>
 
-      {/* Modal de Cadastro / Edição */}
+      {/* Modal de Cadastro / Edição de Bloco */}
       {modalCadastroAberto && (
         <ModalCadastrarBlocoEnvelopamento
           blocoEdicao={blocoEmEdicao}
@@ -633,6 +672,15 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             if (qtdLote) {
               alert(`${qtdLote} blocos importados com sucesso para envelopamento!`);
             }
+          }}
+        />
+      )}
+
+      {/* Modal de Gestão de Clientes */}
+      {modalClientesAberto && (
+        <ModalGestaoClientes
+          onFechar={() => {
+            setModalClientesAberto(false);
           }}
         />
       )}
