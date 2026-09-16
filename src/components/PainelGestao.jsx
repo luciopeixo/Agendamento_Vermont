@@ -283,6 +283,16 @@ export function PainelGestao({
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(20);
 
+  // Agendamentos Finalizados sem confirmação de emissão de Nota Fiscal (para alerta ao Admin)
+  const finalizadosSemNF = useMemo(() => {
+    const base = todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos;
+    return base.filter(a => {
+      const st = (a.status || '').trim();
+      const isFinalizado = st === 'Finalizado' || st === 'Carregado';
+      return isFinalizado && !a.nota_fiscal_emitida;
+    });
+  }, [todosAgendamentos, agendamentos]);
+
   // Solicita permissão para notificações na área de trabalho do navegador
   const solicitarPermissaoDesktop = async () => {
     if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
@@ -1482,6 +1492,75 @@ export function PainelGestao({
         </div>
       </div>
 
+      {/* Alerta de Nota Fiscal Pendente para o Administrador Geral */}
+      {isAdmin && finalizadosSemNF.length > 0 && (
+        <div className="animate-fade no-print" style={{
+          marginBottom: 20,
+          padding: '14px 18px',
+          background: 'rgba(245, 158, 11, 0.12)',
+          border: '1px solid rgba(245, 158, 11, 0.45)',
+          borderRadius: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              background: '#f59e0b',
+              color: '#000',
+              borderRadius: '50%',
+              width: 32,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: '1rem',
+              flexShrink: 0
+            }}>
+              <AlertTriangle size={18} color="#000" />
+            </div>
+            <div>
+              <strong style={{ color: '#fbbf24', fontSize: '0.95rem', display: 'block' }}>
+                Atenção Admin: {finalizadosSemNF.length} agendamento{finalizadosSemNF.length > 1 ? 's' : ''} com status "Finalizado" sem confirmação de Nota Fiscal (NF)
+              </strong>
+              <span style={{ color: '#fef3c7', fontSize: '0.82rem' }}>
+                Existem blocos carregados e finalizados que ainda estão sem o check de NF emitida. Fique atento e faça a conferência para manter o controle fiscal em dia.
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroStatus(['Finalizado', 'Carregado']);
+              setFiltroData('');
+              setExibindoPendenciasAnteriores(false);
+            }}
+            className="btn"
+            style={{
+              background: '#f59e0b',
+              color: '#000',
+              fontWeight: 700,
+              fontSize: '0.80rem',
+              padding: '7px 14px',
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
+            }}
+          >
+            <FileCheck size={14} />
+            Filtrar Finalizados ({finalizadosSemNF.length} sem NF)
+          </button>
+        </div>
+      )}
+
       {/* Barra de Filtros (Oculto na impressão) */}
       <div className="glass-panel no-print" style={{ padding: 18, marginBottom: 20 }}>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -2516,73 +2595,94 @@ export function PainelGestao({
                             Editar
                           </button>
 
-                          {/* BOTÃO DE CONTROLE DE EMISSÃO DE NOTA FISCAL (Apenas Admin edita, todos visualizam) */}
-                          {isAcessoAdminGeral ? (
-                            <button
-                              type="button"
-                              onClick={() => handleAlternarNotaFiscal(ag)}
-                              className="btn"
-                              disabled={salvandoNFId === String(ag.id).trim()}
-                              style={{
-                                padding: '6px 10px',
-                                fontSize: '0.78rem',
-                                gap: 5,
-                                transition: 'all 0.2s',
-                                background: ag.nota_fiscal_emitida ? 'rgba(34, 197, 94, 0.18)' : 'rgba(255, 255, 255, 0.05)',
-                                borderColor: ag.nota_fiscal_emitida ? '#22c55e' : 'rgba(255, 255, 255, 0.2)',
-                                color: ag.nota_fiscal_emitida ? '#4ade80' : 'var(--slate-300)',
-                                fontWeight: ag.nota_fiscal_emitida ? 700 : 500,
-                                cursor: 'pointer'
-                              }}
-                              title={
-                                ag.nota_fiscal_emitida
-                                  ? `Nota Fiscal Emitida${ag.nota_fiscal_data ? ' em ' + formatarDataHoraBR(ag.nota_fiscal_data) : ''}${ag.nota_fiscal_usuario ? ' por ' + ag.nota_fiscal_usuario : ''}. Clique para desmarcar.`
-                                  : 'Clique para marcar que a Nota Fiscal deste bloco foi emitida (Exclusivo Admin)'
-                              }
-                            >
-                              {salvandoNFId === String(ag.id).trim() ? (
-                                <span className="spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} />
-                              ) : ag.nota_fiscal_emitida ? (
-                                <CheckCircle2 size={14} color="#4ade80" />
-                              ) : (
-                                <FileCheck size={14} color="var(--slate-400)" />
-                              )}
-                              <span>{ag.nota_fiscal_emitida ? 'NF OK' : 'NF'}</span>
-                            </button>
-                          ) : (
-                            /* Visualização para Usuários da Pedreira (Somente Leitura) */
-                            <div
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                padding: '5px 8px',
-                                borderRadius: 6,
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                background: ag.nota_fiscal_emitida ? 'rgba(34, 197, 94, 0.15)' : 'rgba(148, 163, 184, 0.08)',
-                                border: `1px solid ${ag.nota_fiscal_emitida ? 'rgba(34, 197, 94, 0.35)' : 'rgba(148, 163, 184, 0.2)'}`,
-                                color: ag.nota_fiscal_emitida ? '#4ade80' : 'var(--slate-400)',
-                                cursor: 'default'
-                              }}
-                              title={
-                                ag.nota_fiscal_emitida
-                                  ? `Nota Fiscal deste bloco já emitida${ag.nota_fiscal_data ? ' em ' + formatarDataHoraBR(ag.nota_fiscal_data) : ''}`
-                                  : 'Aguardando emissão da Nota Fiscal'
-                              }
-                            >
-                              {ag.nota_fiscal_emitida ? (
-                                <>
-                                  <CheckCircle2 size={13} color="#4ade80" />
-                                  <span>NF OK</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Clock size={13} color="var(--slate-400)" />
-                                  <span>Sem NF</span>
-                                </>
-                              )}
-                            </div>
+                          {/* BOTÃO DE CONTROLE DE EMISSÃO DE NOTA FISCAL (Oculto se Cancelado; Admin edita, Pedreira visualiza) */}
+                          {ag.status !== 'Cancelado' && (
+                            isAcessoAdminGeral ? (
+                              <button
+                                type="button"
+                                onClick={() => handleAlternarNotaFiscal(ag)}
+                                className="btn"
+                                disabled={salvandoNFId === String(ag.id).trim()}
+                                style={{
+                                  padding: '6px 10px',
+                                  fontSize: '0.78rem',
+                                  gap: 5,
+                                  transition: 'all 0.2s',
+                                  background: ag.nota_fiscal_emitida 
+                                    ? 'rgba(34, 197, 94, 0.18)' 
+                                    : (ag.status === 'Finalizado' || ag.status === 'Carregado')
+                                      ? 'rgba(245, 158, 11, 0.15)'
+                                      : 'rgba(255, 255, 255, 0.05)',
+                                  borderColor: ag.nota_fiscal_emitida 
+                                    ? '#22c55e' 
+                                    : (ag.status === 'Finalizado' || ag.status === 'Carregado')
+                                      ? '#f59e0b'
+                                      : 'rgba(255, 255, 255, 0.2)',
+                                  color: ag.nota_fiscal_emitida 
+                                    ? '#4ade80' 
+                                    : (ag.status === 'Finalizado' || ag.status === 'Carregado')
+                                      ? '#fbbf24'
+                                      : 'var(--slate-300)',
+                                  fontWeight: ag.nota_fiscal_emitida || ag.status === 'Finalizado' || ag.status === 'Carregado' ? 700 : 500,
+                                  cursor: 'pointer',
+                                  boxShadow: (!ag.nota_fiscal_emitida && (ag.status === 'Finalizado' || ag.status === 'Carregado')) 
+                                    ? '0 0 8px rgba(245, 158, 11, 0.25)' 
+                                    : 'none'
+                                }}
+                                title={
+                                  ag.nota_fiscal_emitida
+                                    ? `Nota Fiscal Emitida${ag.nota_fiscal_data ? ' em ' + formatarDataHoraBR(ag.nota_fiscal_data) : ''}${ag.nota_fiscal_usuario ? ' por ' + ag.nota_fiscal_usuario : ''}. Clique para desmarcar.`
+                                    : (ag.status === 'Finalizado' || ag.status === 'Carregado')
+                                      ? '⚠️ Bloco Finalizado sem Nota Fiscal! Clique para confirmar que a NF foi emitida (Exclusivo Admin)'
+                                      : 'Clique para marcar que a Nota Fiscal deste bloco foi emitida (Exclusivo Admin)'
+                                }
+                              >
+                                {salvandoNFId === String(ag.id).trim() ? (
+                                  <span className="spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} />
+                                ) : ag.nota_fiscal_emitida ? (
+                                  <CheckCircle2 size={14} color="#4ade80" />
+                                ) : (ag.status === 'Finalizado' || ag.status === 'Carregado') ? (
+                                  <AlertTriangle size={14} color="#fbbf24" />
+                                ) : (
+                                  <FileCheck size={14} color="var(--slate-400)" />
+                                )}
+                                <span>{ag.nota_fiscal_emitida ? 'NF OK' : (ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'NF Pendente' : 'NF'}</span>
+                              </button>
+                            ) : (
+                              /* Visualização para Usuários da Pedreira (Somente Leitura) */
+                              <div
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  padding: '5px 8px',
+                                  borderRadius: 6,
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  background: ag.nota_fiscal_emitida ? 'rgba(34, 197, 94, 0.15)' : 'rgba(148, 163, 184, 0.08)',
+                                  border: `1px solid ${ag.nota_fiscal_emitida ? 'rgba(34, 197, 94, 0.35)' : 'rgba(148, 163, 184, 0.2)'}`,
+                                  color: ag.nota_fiscal_emitida ? '#4ade80' : 'var(--slate-400)',
+                                  cursor: 'default'
+                                }}
+                                title={
+                                  ag.nota_fiscal_emitida
+                                    ? `Nota Fiscal deste bloco já emitida${ag.nota_fiscal_data ? ' em ' + formatarDataHoraBR(ag.nota_fiscal_data) : ''}`
+                                    : 'Aguardando emissão da Nota Fiscal'
+                                }
+                              >
+                                {ag.nota_fiscal_emitida ? (
+                                  <>
+                                    <CheckCircle2 size={13} color="#4ade80" />
+                                    <span>NF OK</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock size={13} color="var(--slate-400)" />
+                                    <span>Sem NF</span>
+                                  </>
+                                )}
+                              </div>
+                            )
                           )}
 
                           {/* BOTÃO VER COMPROVANTE (Exclusivo Administrador Geral) */}

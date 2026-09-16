@@ -2602,46 +2602,60 @@ export function isClienteThorOuArgos(cliente = '') {
 }
 
 /**
- * Valida a regra de formatação de bloco para Taj Mahal:
- * - Se Material for Taj Mahal e Cliente for THOR ou ARGOS: o número do bloco DEVE conter '/' (ex: 11/26)
- * - Se Material for Taj Mahal e Cliente for outro: o número do bloco NÃO PODE conter '/'
+ * Valida a regra de formatação de bloco:
+ * 1. Proibição universal de '-' (hífen) ou '.' (ponto).
+ * 2. Se Material for Taj Mahal e Cliente for THOR ou ARGOS: o número do bloco DEVE conter '/' (ex: 11/26)
+ * 3. Em todos os outros casos (outros materiais ou outros clientes): o número do bloco NÃO PODE conter a barra '/'
  * Retorna { valido: boolean, mensagem: string | null }
  */
 export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numero_bloco = '' }) {
-  if (!material || !numero_bloco) return { valido: true };
+  if (!numero_bloco) return { valido: true };
 
-  const matUpper = material.toUpperCase().trim();
-  if (!matUpper.includes('TAJ MAHAL') && matUpper !== 'TAJ MAHAL') {
-    return { valido: true };
+  const blocoTrim = String(numero_bloco).trim();
+  if (!blocoTrim) return { valido: true };
+
+  // 1. Proibição universal de '-' (hífen) ou '.' (ponto)
+  if (blocoTrim.includes('-') || blocoTrim.includes('.')) {
+    return {
+      valido: false,
+      mensagem: 'Número do bloco não pode conter "-" ou ".".'
+    };
   }
 
-  const blocoTrim = numero_bloco.trim();
   const contemBarra = blocoTrim.includes('/');
+  const matUpper = (material || '').toUpperCase().trim();
+  const isTajMahal = matUpper.includes('TAJ MAHAL') || matUpper === 'TAJ MAHAL';
   const isThorArgos = isClienteThorOuArgos(cliente);
 
-  // Se o cliente ainda não foi informado, não valida restrição ainda
-  if (!cliente || !cliente.trim()) {
+  // Se o material for Taj Mahal e o cliente for THOR ou ARGOS: a barra '/' é OBRIGATÓRIA
+  if (isTajMahal && isThorArgos) {
+    if (!contemBarra) {
+      const nomeCli = cliente ? cliente.toUpperCase().trim() : 'THOR / ARGOS';
+      return {
+        valido: false,
+        mensagem: `Para o material Taj Mahal com o cliente ${nomeCli}, o número do bloco deve conter a barra com o ano (ex: 11/26 ou 123/26).`
+      };
+    }
     return { valido: true };
   }
 
-  if (isThorArgos) {
-    if (!contemBarra) {
-      return {
-        valido: false,
-        mensagem: `Para o material Taj Mahal com o cliente ${cliente.toUpperCase().trim()}, o número do bloco deve conter a barra com o ano (ex: 11/26 ou 123/26).`
-      };
-    }
-  } else {
-    if (contemBarra) {
-      return {
-        valido: false,
-        mensagem: 'Para o material Taj Mahal deste cliente, o número do bloco não pode conter a barra "/" (informe apenas a numeração do bloco, ex: 1256926).'
-      };
-    }
+  // Se for Taj Mahal e o cliente ainda não foi informado, aguarda o cliente ser informado antes de bloquear barra
+  if (isTajMahal && (!cliente || !cliente.trim())) {
+    return { valido: true };
+  }
+
+  // Em todos os outros casos: a barra '/' é PROIBIDA
+  if (contemBarra) {
+    return {
+      valido: false,
+      mensagem: 'Número do bloco não pode conter a barra "/".'
+    };
   }
 
   return { valido: true };
 }
+
+export const validarFormatoNumeroBloco = validarFormatoBlocoTajMahal;
 
 /**
  * Verifica se já existe um agendamento ativo cadastrado para o mesmo cliente, número de bloco, pedreira e material
