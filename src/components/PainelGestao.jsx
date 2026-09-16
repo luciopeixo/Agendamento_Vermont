@@ -2361,8 +2361,8 @@ export function PainelGestao({
 
                             return (
                               <>
-                                {/* Indicador discreto de Peso para Admin (?) com Tooltip e Hover */}
-                                {isAcessoAdminGeral && Boolean(pesoBloco) && (
+                                {/* Indicador discreto de Peso (?) com Tooltip ao passar o mouse */}
+                                {Boolean(pesoBloco) && (
                                   <span 
                                     title={`⚖️ Peso Cadastrado: ${pesoBloco} kg`}
                                     style={{
