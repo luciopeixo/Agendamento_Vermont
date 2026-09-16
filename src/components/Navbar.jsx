@@ -118,16 +118,6 @@ export function Navbar({
             <span>Painel de Carregamento</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setAbaAtiva('envelopamento')}
-            className={`btn navbar-btn ${abaAtiva === 'envelopamento' ? 'btn-vermont' : 'btn-secondary'}`}
-            title="Acessar o Controle de Envelopamento de Blocos"
-          >
-            {isAdmin ? <Layers size={17} /> : <Lock size={15} color="#4ade80" />}
-            <span>Envelopamento</span>
-          </button>
-
           {isAdmin && (
             <button
               type="button"
