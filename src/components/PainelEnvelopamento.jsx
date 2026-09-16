@@ -176,10 +176,11 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       return;
     }
 
-    const cabecalho = ['Bloco', 'Material', 'Pedreira', 'Cliente', 'CNPJ Cliente', 'Status', 'Responsável Envelopamento', 'Data Envelopamento', 'Responsável Liberação', 'Data Liberação', 'Observações'];
+    const cabecalho = ['Bloco', 'Material', 'Peso (Kg)', 'Pedreira', 'Cliente', 'CNPJ Cliente', 'Status', 'Responsável Envelopamento', 'Data Envelopamento', 'Responsável Liberação', 'Data Liberação', 'Observações'];
     const linhas = envelopamentos.map(b => [
       `"${b.numero_bloco || ''}"`,
       `"${b.material || ''}"`,
+      `"${b.peso_kg || ''}"`,
       `"${b.pedreira_nome || ''}"`,
       `"${b.cliente_nome || ''}"`,
       `"${b.cliente_cnpj || ''}"`,
@@ -857,20 +858,36 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                             >
                               {/* Bloco */}
                               <td style={{ padding: '10px 14px' }}>
-                                <span style={{
-                                  background: 'rgba(255, 255, 255, 0.08)',
-                                  color: 'inherit',
-                                  fontWeight: 800,
-                                  padding: '4px 8px',
-                                  borderRadius: 6,
-                                  fontSize: '0.86rem',
-                                  fontFamily: 'monospace',
-                                  letterSpacing: '0.05em',
-                                  border: '1px solid rgba(255,255,255,0.15)',
-                                  display: 'inline-block'
-                                }}>
-                                  {b.numero_bloco}
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                  <span style={{
+                                    background: 'rgba(255, 255, 255, 0.08)',
+                                    color: 'inherit',
+                                    fontWeight: 800,
+                                    padding: '4px 8px',
+                                    borderRadius: 6,
+                                    fontSize: '0.86rem',
+                                    fontFamily: 'monospace',
+                                    letterSpacing: '0.05em',
+                                    border: '1px solid rgba(255,255,255,0.15)',
+                                    display: 'inline-block'
+                                  }}>
+                                    {b.numero_bloco}
+                                  </span>
+                                  {b.peso_kg && (
+                                    <span style={{
+                                      fontSize: '0.72rem',
+                                      color: '#0284c7',
+                                      background: 'rgba(56, 189, 248, 0.12)',
+                                      padding: '2px 6px',
+                                      borderRadius: 4,
+                                      border: '1px solid rgba(56, 189, 248, 0.25)',
+                                      fontFamily: 'monospace',
+                                      fontWeight: 700
+                                    }}>
+                                      ⚖️ {b.peso_kg} kg
+                                    </span>
+                                  )}
+                                </div>
                                 <span style={{ fontSize: '0.76rem', color: 'var(--slate-400)', display: 'block', marginTop: 4, fontWeight: 600 }}>
                                   {b.material}
                                 </span>
@@ -1087,18 +1104,34 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                       }}
                     >
                       <td style={{ padding: '12px 14px' }}>
-                        <span style={{
-                          background: 'rgba(255, 255, 255, 0.08)',
-                          color: 'inherit',
-                          fontWeight: 800,
-                          padding: '4px 8px',
-                          borderRadius: 6,
-                          fontSize: '0.86rem',
-                          fontFamily: 'monospace',
-                          border: '1px solid rgba(255,255,255,0.15)'
-                        }}>
-                          {b.numero_bloco}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            color: 'inherit',
+                            fontWeight: 800,
+                            padding: '4px 8px',
+                            borderRadius: 6,
+                            fontSize: '0.86rem',
+                            fontFamily: 'monospace',
+                            border: '1px solid rgba(255,255,255,0.15)'
+                          }}>
+                            {b.numero_bloco}
+                          </span>
+                          {b.peso_kg && (
+                            <span style={{
+                              fontSize: '0.72rem',
+                              color: '#0284c7',
+                              background: 'rgba(56, 189, 248, 0.12)',
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              border: '1px solid rgba(56, 189, 248, 0.25)',
+                              fontFamily: 'monospace',
+                              fontWeight: 700
+                            }}>
+                              ⚖️ {b.peso_kg} kg
+                            </span>
+                          )}
+                        </div>
                         <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)', display: 'block', marginTop: 4, fontWeight: 600 }}>
                           {b.material}
                         </span>

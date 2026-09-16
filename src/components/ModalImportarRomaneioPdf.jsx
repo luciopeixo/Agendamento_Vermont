@@ -29,7 +29,8 @@ import {
 import { 
   PEDREIRAS_CEARA, 
   obterMateriaisPorPedreira, 
-  formatarCNPJ 
+  formatarCNPJ,
+  consultarCNPJReceita
 } from '../services/agendamentoService';
 
 export function ModalImportarRomaneioPdf({
@@ -43,6 +44,7 @@ export function ModalImportarRomaneioPdf({
   const [nomeArquivo, setNomeArquivo] = useState('');
   const [dadosProcessados, setDadosProcessados] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [buscandoCnpj, setBuscandoCnpj] = useState(false);
 
   // Clientes do banco para autocomplete
   const [clientesBase, setClientesBase] = useState([]);
@@ -50,6 +52,35 @@ export function ModalImportarRomaneioPdf({
   const [mostrarDropdownClientes, setMostrarDropdownClientes] = useState(false);
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const handleConsultarCnpjReceita = async (cnpjParaBuscar) => {
+    const limpo = (cnpjParaBuscar || dadosProcessados?.cliente?.cnpj || '').replace(/\D/g, '');
+    if (limpo.length !== 14) return;
+    
+    setBuscandoCnpj(true);
+    try {
+      const res = await consultarCNPJReceita(limpo);
+      if (res?.valido && res?.empresa?.razao_social) {
+        const razao = res.empresa.razao_social.toUpperCase().trim();
+        setDadosProcessados(prev => ({
+          ...prev,
+          cliente: {
+            ...prev.cliente,
+            nome: razao,
+            fonte: res.fonte || 'Receita Federal (Oficial)'
+          },
+          blocos: prev.blocos.map(b => ({
+            ...b,
+            cliente_nome: razao
+          }))
+        }));
+      }
+    } catch (e) {
+      console.warn('Erro ao consultar CNPJ:', e);
+    } finally {
+      setBuscandoCnpj(false);
+    }
+  };
 
   useEffect(() => {
     obterClientesDoBancoDeDados().then(res => setClientesBase(res || [])).catch(() => {});
@@ -223,6 +254,7 @@ export function ModalImportarRomaneioPdf({
         pedreira_id: dadosProcessados.pedreira.id,
         pedreira_nome: dadosProcessados.pedreira.nome,
         material: b.material,
+        peso_kg: b.peso_kg || '',
         cliente_nome: dadosProcessados.cliente.nome,
         cliente_cnpj: dadosProcessados.cliente.cnpj,
         status: b.status,
@@ -471,7 +503,22 @@ export function ModalImportarRomaneioPdf({
 
               {/* Cliente */}
               <div style={{ position: 'relative' }} ref={dropdownRef}>
-                <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)', display: 'block' }}>Cliente Comprador</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Cliente Comprador</span>
+                  {dadosProcessados.cliente?.fonte && (
+                    <span style={{
+                      fontSize: '0.68rem',
+                      background: dadosProcessados.cliente.fonte.includes('Receita') ? 'rgba(34, 197, 94, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+                      color: dadosProcessados.cliente.fonte.includes('Receita') ? '#4ade80' : '#38bdf8',
+                      padding: '1px 6px',
+                      borderRadius: 4,
+                      border: `1px solid ${dadosProcessados.cliente.fonte.includes('Receita') ? 'rgba(34, 197, 94, 0.3)' : 'rgba(56, 189, 248, 0.3)'}`,
+                      fontWeight: 700
+                    }}>
+                      {dadosProcessados.cliente.fonte}
+                    </span>
+                  )}
+                </div>
                 <input
                   type="text"
                   className="form-input"
@@ -520,22 +567,45 @@ export function ModalImportarRomaneioPdf({
 
               {/* CNPJ */}
               <div>
-                <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)', display: 'block' }}>CNPJ do Cliente</span>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={dadosProcessados.cliente.cnpj}
-                  onChange={(e) => {
-                    const fmt = formatarCNPJ(e.target.value);
-                    setDadosProcessados(prev => ({
-                      ...prev,
-                      cliente: { ...prev.cliente, cnpj: fmt },
-                      blocos: prev.blocos.map(b => ({ ...b, cliente_cnpj: fmt }))
-                    }));
-                  }}
-                  style={{ height: 34, fontSize: '0.82rem', padding: '4px 10px', marginTop: 2 }}
-                  placeholder="00.000.000/0000-00"
-                />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>CNPJ do Cliente</span>
+                  {buscandoCnpj && (
+                    <span style={{ fontSize: '0.68rem', color: '#38bdf8' }}>Consultando Receita...</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={dadosProcessados.cliente.cnpj}
+                    onChange={(e) => {
+                      const fmt = formatarCNPJ(e.target.value);
+                      const limpo = fmt.replace(/\D/g, '');
+                      setDadosProcessados(prev => ({
+                        ...prev,
+                        cliente: { ...prev.cliente, cnpj: fmt },
+                        blocos: prev.blocos.map(b => ({ ...b, cliente_cnpj: fmt }))
+                      }));
+                      if (limpo.length === 14) {
+                        handleConsultarCnpjReceita(limpo);
+                      }
+                    }}
+                    style={{ height: 34, fontSize: '0.82rem', padding: '4px 10px', marginTop: 2, flex: 1 }}
+                    placeholder="00.000.000/0000-00"
+                  />
+                  {dadosProcessados.cliente.cnpj && (
+                    <button
+                      type="button"
+                      onClick={() => handleConsultarCnpjReceita(dadosProcessados.cliente.cnpj)}
+                      disabled={buscandoCnpj}
+                      className="btn btn-secondary"
+                      style={{ height: 34, padding: '0 8px', fontSize: '0.74rem', marginTop: 2, gap: 4 }}
+                      title="Consultar Razão Social oficial na Receita Federal via BrasilAPI"
+                    >
+                      <RefreshCw size={13} className={buscandoCnpj ? 'spinner' : ''} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -596,6 +666,7 @@ export function ModalImportarRomaneioPdf({
                     </th>
                     <th style={{ padding: '10px 12px', fontSize: '0.75rem', color: 'var(--slate-400)', textAlign: 'left' }}>BLOCO</th>
                     <th style={{ padding: '10px 12px', fontSize: '0.75rem', color: 'var(--slate-400)', textAlign: 'left' }}>MATERIAL</th>
+                    <th style={{ padding: '10px 12px', fontSize: '0.75rem', color: 'var(--slate-400)', textAlign: 'center' }}>PESO (KG)</th>
                     <th style={{ padding: '10px 12px', fontSize: '0.75rem', color: 'var(--slate-400)', textAlign: 'left' }}>STATUS SUGERIDO & REGRA</th>
                     <th style={{ padding: '10px 12px', fontSize: '0.75rem', color: 'var(--slate-400)', textAlign: 'center', width: 50 }}>AÇÃO</th>
                   </tr>
@@ -640,6 +711,27 @@ export function ModalImportarRomaneioPdf({
                           <span style={{ fontSize: '0.80rem', color: '#fff', fontWeight: 600 }}>
                             {b.material}
                           </span>
+                        </td>
+
+                        {/* Peso (Kg) */}
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          {b.peso_kg ? (
+                            <span style={{
+                              fontSize: '0.78rem',
+                              color: '#38bdf8',
+                              fontWeight: 700,
+                              fontFamily: 'monospace',
+                              background: 'rgba(56, 189, 248, 0.1)',
+                              padding: '2px 7px',
+                              borderRadius: 4,
+                              border: '1px solid rgba(56, 189, 248, 0.25)',
+                              display: 'inline-block'
+                            }}>
+                              ⚖️ {b.peso_kg} kg
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--slate-500)', fontSize: '0.74rem' }}>-</span>
+                          )}
                         </td>
 
                         {/* Status e Regra */}

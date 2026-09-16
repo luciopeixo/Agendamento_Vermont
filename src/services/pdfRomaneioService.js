@@ -1,5 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import { formatarCNPJ, limparNomeEmpresa, PEDREIRAS_CEARA, MATERIAIS_POR_PEDREIRA } from './agendamentoService.js';
+import { formatarCNPJ, limparNomeEmpresa, PEDREIRAS_CEARA, MATERIAIS_POR_PEDREIRA, consultarCNPJReceita } from './agendamentoService.js';
 
 // Configurar o worker do PDF.js para funcionar perfeitamente em navegadores
 try {
@@ -364,11 +364,39 @@ export const extrairObservacoesEEnvelopamento = (textoCompleto) => {
 };
 
 /**
+ * Extrai o peso em Kg do bloco a partir do restante da linha da tabela de romaneio
+ * (Exemplos na tabela Vermont: MED.BRT, MED.LIQ, MTS BR, PESO (Kg), MTS LIQ...)
+ */
+export const extrairPesoKgLinha = (restanteLinha) => {
+  if (!restanteLinha) return '';
+  
+  // Padrão 1: Após dimensões e MTS BR (ex: "3,420 x 2,030 x 1,880 3,300 x 1,850 x 1,650 13,052 34.849,11 10,073 ...")
+  const matchDims = restanteLinha.match(/\d+[,.]\d+\s*x\s*\d+[,.]\d+\s*x\s*\d+[,.]\d+\s+(\d+[,.]\d+)\s+([\d.]+,\d{2}|\d+)/i);
+  if (matchDims && matchDims[2]) {
+    return matchDims[2].trim();
+  }
+
+  // Padrão 2: Se vier com uma dimensão apenas e MTS BR + PESO
+  const matchUmaDim = restanteLinha.match(/\d+[,.]\d+\s*x\s*\d+[,.]\d+\s*x\s*\d+[,.]\d+\s+([\d.]+,\d{2})/i);
+  if (matchUmaDim && matchUmaDim[1]) {
+    return matchUmaDim[1].trim();
+  }
+
+  // Padrão 3: Procurar número com formato de milhares brasileiro (ex: 34.849,11 ou 21.274,56 ou 38.295,68)
+  const matchMilhares = restanteLinha.match(/\b(\d{1,3}(?:\.\d{3})+,\d{2})\b/);
+  if (matchMilhares && matchMilhares[1]) {
+    return matchMilhares[1].trim();
+  }
+
+  return '';
+};
+
+/**
  * Parser principal de Romaneios em PDF da Vermont Mineração.
  * Recebe o texto extraído do PDF e aplica todas as regras de negócio para reconhecimento
- * de cabeçalho, blocos e status de envelopamento em documentos de uma ou múltiplas páginas.
+ * de cabeçalho, blocos, peso (kg) e status de envelopamento em documentos de uma ou múltiplas páginas.
  */
-export const processarRomaneioPdfTexto = (textoCompleto) => {
+export const processarRomaneioPdfTexto = async (textoCompleto) => {
   if (!textoCompleto || typeof textoCompleto !== 'string') {
     throw new Error('Conteúdo do documento não pôde ser lido.');
   }
@@ -407,6 +435,23 @@ export const processarRomaneioPdfTexto = (textoCompleto) => {
   const matchCnpj = textoCompleto.match(/CNPJ\/CPF:\s*(\d{11,14}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/i);
   if (matchCnpj) {
     clienteCnpj = formatarCNPJ(matchCnpj[1]);
+  }
+
+  let clienteNomeOriginalPdf = clienteNome;
+  let fonteCliente = 'Romaneio PDF';
+
+  // Consulta em tempo real na API gratuita da Receita Federal pelo CNPJ
+  const cnpjLimpo = (clienteCnpj || '').replace(/\D/g, '');
+  if (cnpjLimpo.length === 14) {
+    try {
+      const consultaReceita = await consultarCNPJReceita(cnpjLimpo);
+      if (consultaReceita?.valido && consultaReceita?.empresa?.razao_social) {
+        clienteNome = consultaReceita.empresa.razao_social.toUpperCase().trim();
+        fonteCliente = consultaReceita.fonte || 'Receita Federal (Oficial)';
+      }
+    } catch (eCnpj) {
+      console.warn('[PDF Romaneio] Consulta de CNPJ na Receita:', eCnpj);
+    }
   }
 
   // 6. Extrair Seção de Observações e Mapeamento de Valores de Envelopamento
@@ -465,6 +510,9 @@ export const processarRomaneioPdfTexto = (textoCompleto) => {
       // Normalizar o material comparando com a base oficial de materiais das pedreiras
       const materialNormalizado = normalizarMaterialVermont(materialBruto, pedreiraDetectada.id);
 
+      // Extrair o Peso em Kg da coluna PESO (Kg)
+      const pesoKgExtraido = extrairPesoKgLinha(restanteLinha);
+
       // Extrair valores monetários no final da linha para identificar a coluna ENVELOPAMENTO
       // Na ordem da tabela: [DESCONTO, FRETE, ENVELOPAMENTO, TOTAL GERAL R$]
       const valoresMonetarios = restanteLinha.match(/[\d.]+,\d{2}/g) || [];
@@ -520,6 +568,7 @@ export const processarRomaneioPdfTexto = (textoCompleto) => {
         numero_bloco: numeroBloco,
         material: materialNormalizado,
         material_original: materialBruto,
+        peso_kg: pesoKgExtraido,
         pedreira_id: pedreiraDetectada.id,
         pedreira_nome: pedreiraDetectada.nome,
         cliente_nome: clienteNome,
@@ -541,7 +590,9 @@ export const processarRomaneioPdfTexto = (textoCompleto) => {
     pedreira: pedreiraDetectada,
     cliente: {
       nome: clienteNome,
-      cnpj: clienteCnpj
+      nome_original_pdf: clienteNomeOriginalPdf,
+      cnpj: clienteCnpj,
+      fonte: fonteCliente
     },
     observacoes: infoObservacoes.textoObservacoes,
     totalBlocos: blocosDetectados.length,
@@ -554,5 +605,5 @@ export const processarRomaneioPdfTexto = (textoCompleto) => {
  */
 export const lerEProcessarRomaneioPdf = async (arquivoOuBuffer) => {
   const texto = await extrairTextoDoPdf(arquivoOuBuffer);
-  return processarRomaneioPdfTexto(texto);
+  return await processarRomaneioPdfTexto(texto);
 };
