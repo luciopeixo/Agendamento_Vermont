@@ -321,7 +321,9 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
   // 2. Sincronizar na nuvem (Supabase)
   if (isSupabaseConfigurado()) {
     // A. Tentar na tabela 'envelopamentos'
-    supabase.from('envelopamentos').upsert(registroCompleto).catch(() => {});
+    try {
+      await supabase.from('envelopamentos').upsert(registroCompleto);
+    } catch (e) {}
     // B. Sincronizar no espelho em tempo real
     sincronizarEnvelopamentosNuvem(locais);
   }
@@ -331,10 +333,12 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
 
   // Também registra automaticamente o cliente na base de clientes se informado
   if (registroCompleto.cliente_nome) {
-    salvarClienteCadastrado({
-      nome: registroCompleto.cliente_nome,
-      cnpj: registroCompleto.cliente_cnpj
-    }).catch(() => {});
+    try {
+      await salvarClienteCadastrado({
+        nome: registroCompleto.cliente_nome,
+        cnpj: registroCompleto.cliente_cnpj
+      });
+    } catch (e) {}
   }
 
   return registroCompleto;
@@ -648,7 +652,9 @@ export const salvarClienteCadastrado = async (dadosCliente) => {
 
   // Sincronizar no Supabase
   if (isSupabaseConfigurado()) {
-    supabase.from('clientes').upsert(clienteObj).catch(() => {});
+    try {
+      await supabase.from('clientes').upsert(clienteObj);
+    } catch (e) {}
     sincronizarClientesNuvem(locais);
   }
 

@@ -300,19 +300,38 @@ export function ModalCadastrarBlocoEnvelopamento({
   };
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(5, 10, 8, 0.88)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onFechar();
+      }}
+    >
       <div 
-        className="glass-panel" 
+        className="glass-panel animate-fade" 
         style={{
           maxWidth: 620,
           width: '100%',
           maxHeight: '90vh',
           overflowY: 'auto',
-          padding: 24,
-          borderRadius: 14,
-          border: '1px solid rgba(0, 118, 44, 0.4)',
-          boxShadow: '0 20px 45px rgba(0,0,0,0.7)',
-          background: 'var(--slate-900)'
+          padding: '24px 28px',
+          borderRadius: 16,
+          border: '1px solid rgba(0, 168, 62, 0.4)',
+          boxShadow: '0 25px 55px rgba(0,0,0,0.85)',
+          background: '#0d1310',
+          position: 'relative'
         }}
       >
         {/* Cabeçalho do Modal */}
