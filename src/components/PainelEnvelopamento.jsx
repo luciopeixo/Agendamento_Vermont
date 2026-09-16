@@ -127,13 +127,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
     return Array.from(mapa.values()).sort((a, b) => b.metricas.total - a.metricas.total);
   }, [envelopamentos]);
 
-  // Se houver poucos clientes (até 3), expande automaticamente
-  useEffect(() => {
-    if (gruposPorCliente.length > 0 && gruposPorCliente.length <= 3 && clientesExpandidos.size === 0) {
-      setClientesExpandidos(new Set(gruposPorCliente.map(g => g.clienteNome)));
-    }
-  }, [gruposPorCliente]);
-
   const toggleCliente = (cliNome) => {
     setClientesExpandidos(prev => {
       const novo = new Set(prev);
