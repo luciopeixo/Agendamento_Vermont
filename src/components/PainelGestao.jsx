@@ -2357,38 +2357,69 @@ export function PainelGestao({
                           </span>
                           {(() => {
                             const infoEnv = verificarStatusEnvelopamentoAgendamento(ag, envelopamentos);
+                            const pesoBloco = infoEnv?.registro?.peso_kg || ag.peso_kg || ag.peso;
+
                             return (
-                              <span 
-                                title={`Status do Bloco: ${infoEnv.label} (${infoEnv.descricao})`}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 5,
-                                  background: infoEnv.bg,
-                                  border: `1px solid ${infoEnv.border}`,
-                                  color: infoEnv.cor,
-                                  fontSize: '0.68rem',
-                                  fontWeight: 700,
-                                  padding: '1px 6px',
-                                  borderRadius: 4,
-                                  whiteSpace: 'nowrap',
-                                  cursor: 'help'
-                                }}
-                              >
+                              <>
+                                {/* Indicador discreto de Peso para Admin (?) com Tooltip e Hover */}
+                                {isAcessoAdminGeral && Boolean(pesoBloco) && (
+                                  <span 
+                                    title={`⚖️ Peso Cadastrado: ${pesoBloco} kg`}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 17,
+                                      height: 17,
+                                      borderRadius: '50%',
+                                      background: 'rgba(56, 189, 248, 0.15)',
+                                      border: '1px solid rgba(56, 189, 248, 0.45)',
+                                      color: '#38bdf8',
+                                      fontSize: '0.68rem',
+                                      fontWeight: 800,
+                                      cursor: 'help',
+                                      userSelect: 'none',
+                                      lineHeight: 1
+                                    }}
+                                  >
+                                    ?
+                                  </span>
+                                )}
+
                                 <span 
+                                  title={`Status do Bloco: ${infoEnv.label} (${infoEnv.descricao})`}
                                   style={{
-                                    width: 7,
-                                    height: 7,
-                                    borderRadius: '50%',
-                                    backgroundColor: infoEnv.cor,
-                                    boxShadow: infoEnv.isEnvelopadoOuLiberado 
-                                      ? '0 0 6px rgba(34, 197, 94, 0.9)' 
-                                      : '0 0 6px rgba(239, 68, 68, 0.9)',
-                                    display: 'inline-block'
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    background: infoEnv.bg,
+                                    border: `1px solid ${infoEnv.border}`,
+                                    color: infoEnv.cor,
+                                    fontSize: '0.68rem',
+                                    fontWeight: 700,
+                                    padding: '1px 6px',
+                                    borderRadius: 4,
+                                    whiteSpace: 'nowrap',
+                                    cursor: 'help'
                                   }}
-                                />
-                                {infoEnv.label}
-                              </span>
+                                >
+                                  <span 
+                                    style={{
+                                      width: 7,
+                                      height: 7,
+                                      borderRadius: '50%',
+                                      backgroundColor: infoEnv.cor,
+                                      boxShadow: infoEnv.isEnvelopadoOuLiberado 
+                                        ? '0 0 6px rgba(34, 197, 94, 0.9)' 
+                                        : infoEnv.status === 'nao_registrado'
+                                          ? 'none'
+                                          : '0 0 6px rgba(239, 68, 68, 0.9)',
+                                      display: 'inline-block'
+                                    }}
+                                  />
+                                  {infoEnv.label}
+                                </span>
+                              </>
                             );
                           })()}
                         </div>

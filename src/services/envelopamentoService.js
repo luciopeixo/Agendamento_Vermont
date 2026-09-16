@@ -471,12 +471,13 @@ export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelo
     return {
       encontrado: false,
       isEnvelopadoOuLiberado: false,
-      status: 'pendente_envelopamento',
-      label: 'Não Envelopado',
-      cor: '#ef4444',
-      bg: 'rgba(239, 68, 68, 0.15)',
-      border: '#dc2626',
-      descricao: 'Bloco sem registro de envelopamento'
+      status: 'nao_registrado',
+      label: 'Não Registrado',
+      cor: '#94a3b8',
+      bg: 'rgba(148, 163, 184, 0.12)',
+      border: 'rgba(148, 163, 184, 0.35)',
+      descricao: 'Bloco sem registro de envelopamento',
+      registro: null
     };
   }
 
@@ -514,12 +515,13 @@ export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelo
     return {
       encontrado: false,
       isEnvelopadoOuLiberado: false,
-      status: 'pendente_envelopamento',
-      label: 'Não Envelopado',
-      cor: '#ef4444',
-      bg: 'rgba(239, 68, 68, 0.15)',
-      border: '#dc2626',
-      descricao: 'Bloco não cadastrado no módulo de envelopamento'
+      status: 'nao_registrado',
+      label: 'Não Registrado',
+      cor: '#94a3b8',
+      bg: 'rgba(148, 163, 184, 0.12)',
+      border: 'rgba(148, 163, 184, 0.35)',
+      descricao: 'Bloco não cadastrado no módulo de envelopamento',
+      registro: null
     };
   }
 
@@ -540,18 +542,35 @@ export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelo
     };
   } else {
     let label = 'Não Envelopado';
-    if (st === 'em_andamento') label = 'Em andamento';
-    else if (st === 'aguardando_corte_reparo') label = 'Aguardando corte/reparo';
-    else if (st === 'pendente_envelopamento' || st === 'pendente') label = 'Pendente';
+    let cor = '#ef4444';
+    let bg = 'rgba(239, 68, 68, 0.15)';
+    let border = '#dc2626';
+
+    if (st === 'em_andamento') {
+      label = 'Em andamento';
+      cor = '#f59e0b';
+      bg = 'rgba(245, 158, 11, 0.15)';
+      border = '#d97706';
+    } else if (st === 'aguardando_corte_reparo') {
+      label = 'Aguardando corte/reparo';
+      cor = '#f87171';
+      bg = 'rgba(239, 68, 68, 0.15)';
+      border = '#dc2626';
+    } else if (st === 'pendente_envelopamento' || st === 'pendente') {
+      label = 'Não Envelopado';
+      cor = '#ef4444';
+      bg = 'rgba(239, 68, 68, 0.15)';
+      border = '#dc2626';
+    }
 
     return {
       encontrado: true,
       isEnvelopadoOuLiberado: false,
       status: st,
       label,
-      cor: '#ef4444',
-      bg: 'rgba(239, 68, 68, 0.15)',
-      border: '#dc2626',
+      cor,
+      bg,
+      border,
       descricao: STATUS_ENVELOPAMENTO[st?.toUpperCase()]?.descricao || 'Bloco não liberado para carregamento',
       registro: correspondente
     };

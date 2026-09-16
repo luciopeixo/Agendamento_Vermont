@@ -477,7 +477,32 @@ export function ModalEditarAgendamento({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <div className="form-group">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 4 }}>
-                  <label className="form-label form-label-required" style={{ margin: 0 }}>Número do Bloco</label>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <label className="form-label form-label-required" style={{ margin: 0 }}>Número do Bloco</label>
+                    {infoEnvelopamento?.registro?.peso_kg && (
+                      <span
+                        title={`⚖️ Peso Cadastrado: ${infoEnvelopamento.registro.peso_kg} kg`}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 17,
+                          height: 17,
+                          borderRadius: '50%',
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          border: '1px solid rgba(56, 189, 248, 0.45)',
+                          color: '#38bdf8',
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          cursor: 'help',
+                          userSelect: 'none',
+                          lineHeight: 1
+                        }}
+                      >
+                        ?
+                      </span>
+                    )}
+                  </div>
                   {infoEnvelopamento && (
                     <span
                       title={`Status Envelopamento: ${infoEnvelopamento.label} (${infoEnvelopamento.descricao})`}
@@ -500,7 +525,11 @@ export function ModalEditarAgendamento({
                           height: 6,
                           borderRadius: '50%',
                           backgroundColor: infoEnvelopamento.cor,
-                          boxShadow: infoEnvelopamento.isEnvelopadoOuLiberado ? '0 0 5px rgba(34, 197, 94, 0.8)' : '0 0 5px rgba(239, 68, 68, 0.8)',
+                          boxShadow: infoEnvelopamento.isEnvelopadoOuLiberado 
+                            ? '0 0 5px rgba(34, 197, 94, 0.8)' 
+                            : infoEnvelopamento.status === 'nao_registrado'
+                              ? 'none'
+                              : '0 0 5px rgba(239, 68, 68, 0.8)',
                           display: 'inline-block'
                         }}
                       />
