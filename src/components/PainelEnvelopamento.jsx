@@ -31,6 +31,7 @@ import {
 import { 
   listarEnvelopamentos, 
   atualizarStatusEnvelopamento, 
+  atualizarStatusEnvelopamentosEmLote,
   excluirEnvelopamento, 
   excluirEnvelopamentosEmLote,
   calcularMetricasEnvelopamento, 
@@ -58,6 +59,10 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [modoVisualizacao, setModoVisualizacao] = useState('matriz');
   const [clientesExpandidos, setClientesExpandidos] = useState(new Set());
   const [romaneiosExpandidos, setRomaneiosExpandidos] = useState(new Set());
+
+  // Seleção múltipla de blocos para alteração de status em lote
+  const [blocosSelecionados, setBlocosSelecionados] = useState(new Set());
+  const [executandoLote, setExecutandoLote] = useState(false);
 
   const usuarioNome = usuario?.user_metadata?.nome || usuario?.email?.split('@')[0] || 'Equipe Vermont';
 
@@ -236,6 +241,75 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         await carregarDados();
       } catch (err) {
         console.error('Erro ao excluir:', err);
+      }
+    }
+  };
+
+  // Funções de Seleção Múltipla de Blocos para Ações em Lote
+  const toggleSelecionarBloco = (id) => {
+    setBlocosSelecionados(prev => {
+      const novo = new Set(prev);
+      if (novo.has(id)) novo.delete(id);
+      else novo.add(id);
+      return novo;
+    });
+  };
+
+  const toggleSelecionarRomaneio = (rom) => {
+    const idsRom = (rom.blocos || []).map(b => b.id);
+    setBlocosSelecionados(prev => {
+      const novo = new Set(prev);
+      const todosJaSelecionados = idsRom.length > 0 && idsRom.every(id => novo.has(id));
+      if (todosJaSelecionados) {
+        idsRom.forEach(id => novo.delete(id));
+      } else {
+        idsRom.forEach(id => novo.add(id));
+      }
+      return novo;
+    });
+  };
+
+  const desmarcarTodosBlocos = () => {
+    setBlocosSelecionados(new Set());
+  };
+
+  const handleAlterarStatusLote = async (novoStatus) => {
+    if (blocosSelecionados.size === 0) return;
+    const statusObj = STATUS_ENVELOPAMENTO[novoStatus?.toUpperCase()] || { label: novoStatus };
+    const count = blocosSelecionados.size;
+
+    if (window.confirm(`Deseja alterar o status de ${count} bloco(s) selecionado(s) para "${statusObj.label}"?`)) {
+      setExecutandoLote(true);
+      try {
+        const ids = Array.from(blocosSelecionados);
+        await atualizarStatusEnvelopamentosEmLote(ids, novoStatus, usuarioNome);
+        setBlocosSelecionados(new Set());
+        await carregarDados();
+      } catch (err) {
+        console.error('Erro ao atualizar status em lote:', err);
+        alert('Erro ao atualizar status em lote.');
+      } finally {
+        setExecutandoLote(false);
+      }
+    }
+  };
+
+  const handleExcluirLoteSelecionados = async () => {
+    if (blocosSelecionados.size === 0) return;
+    const count = blocosSelecionados.size;
+
+    if (window.confirm(`⚠️ ATENÇÃO: Deseja realmente EXCLUIR os ${count} bloco(s) selecionado(s)?`)) {
+      setExecutandoLote(true);
+      try {
+        const ids = Array.from(blocosSelecionados);
+        await excluirEnvelopamentosEmLote(ids);
+        setBlocosSelecionados(new Set());
+        await carregarDados();
+      } catch (err) {
+        console.error('Erro ao excluir em lote:', err);
+        alert('Erro ao excluir blocos selecionados.');
+      } finally {
+        setExecutandoLote(false);
       }
     }
   };
@@ -1157,6 +1231,31 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                 📦 {rom.blocos.length} Bloco{rom.blocos.length > 1 ? 's' : ''}
                               </span>
 
+                              {/* BOTÃO PARA SELECIONAR TODOS OS BLOCOS DO ROMANEIO */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleSelecionarRomaneio(rom);
+                                }}
+                                className="btn btn-secondary"
+                                style={{
+                                  padding: '3px 8px',
+                                  fontSize: '0.72rem',
+                                  color: rom.blocos.length > 0 && rom.blocos.every(b => blocosSelecionados.has(b.id)) ? '#38bdf8' : 'var(--slate-300)',
+                                  borderColor: rom.blocos.length > 0 && rom.blocos.every(b => blocosSelecionados.has(b.id)) ? '#38bdf8' : 'rgba(255,255,255,0.18)',
+                                  background: rom.blocos.length > 0 && rom.blocos.every(b => blocosSelecionados.has(b.id)) ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255,255,255,0.04)',
+                                  fontWeight: 700,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}
+                                title="Selecionar ou desmarcar todos os blocos deste romaneio para alterar status em lote"
+                              >
+                                <CheckCheck size={12} />
+                                {rom.blocos.length > 0 && rom.blocos.every(b => blocosSelecionados.has(b.id)) ? 'Desmarcar Romaneio' : 'Selecionar Romaneio'}
+                              </button>
+
                               {/* BOTÃO PARA DELETAR BLOCOS ENVELOPADOS DO ROMANEIO */}
                               {rom.metricas.envelopado > 0 && (
                                 <button
@@ -1211,26 +1310,50 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                               <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                   <tr style={{ background: 'rgba(0,0,0,0.25)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                                    <th style={{ padding: '8px 10px', width: '38px', textAlign: 'center' }}>
+                                      <input 
+                                        type="checkbox"
+                                        style={{ cursor: 'pointer', width: 16, height: 16, accentColor: '#0284c7' }}
+                                        checked={rom.blocos.length > 0 && rom.blocos.every(b => blocosSelecionados.has(b.id))}
+                                        onChange={() => toggleSelecionarRomaneio(rom)}
+                                        title="Selecionar / Desmarcar todos os blocos deste romaneio"
+                                      />
+                                    </th>
                                     <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'left', width: '16%' }}>BLOCO / ROCHA</th>
-                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'left', width: '18%' }}>PEDREIRA</th>
-                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'center', width: '22%' }}>STATUS ENVELOPAMENTO</th>
+                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'left', width: '17%' }}>PEDREIRA</th>
+                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'center', width: '21%' }}>STATUS ENVELOPAMENTO</th>
                                     <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'left', width: '24%' }}>HISTÓRICO & RESPONSÁVEIS</th>
-                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'center', width: '20%' }}>AÇÕES DE PÁTIO</th>
+                                    <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'center', width: '18%' }}>AÇÕES DE PÁTIO</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {rom.blocos.map((b) => {
                                     const statusInfo = STATUS_ENVELOPAMENTO[b.status?.toUpperCase()] || STATUS_ENVELOPAMENTO.PENDENTE_ENVELOPAMENTO;
                                     const executando = executandoAcaoId === b.id;
+                                    const isSelecionado = blocosSelecionados.has(b.id);
 
                                     return (
                                       <tr 
                                         key={b.id}
                                         style={{ 
                                           borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                          background: b.status === 'envelopado' ? 'rgba(34, 197, 94, 0.03)' : undefined
+                                          background: isSelecionado 
+                                            ? 'rgba(56, 189, 248, 0.12)' 
+                                            : b.status === 'envelopado' 
+                                              ? 'rgba(34, 197, 94, 0.03)' 
+                                              : undefined
                                         }}
                                       >
+                                        {/* Checkbox de Seleção do Bloco */}
+                                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                          <input 
+                                            type="checkbox"
+                                            style={{ cursor: 'pointer', width: 16, height: 16, accentColor: '#0284c7' }}
+                                            checked={isSelecionado}
+                                            onChange={() => toggleSelecionarBloco(b.id)}
+                                            title={`Selecionar bloco ${b.numero_bloco}`}
+                                          />
+                                        </td>
                                         {/* Bloco */}
                                         <td style={{ padding: '8px 12px' }}>
                                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -1462,6 +1585,24 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                  <th style={{ padding: '12px 10px', width: '38px', textAlign: 'center' }}>
+                    <input 
+                      type="checkbox"
+                      style={{ cursor: 'pointer', width: 16, height: 16, accentColor: '#0284c7' }}
+                      checked={envelopamentos.length > 0 && envelopamentos.every(b => blocosSelecionados.has(b.id))}
+                      onChange={() => {
+                        const todosIds = envelopamentos.map(b => b.id);
+                        setBlocosSelecionados(prev => {
+                          const novo = new Set(prev);
+                          const todosMarcados = todosIds.length > 0 && todosIds.every(id => novo.has(id));
+                          if (todosMarcados) todosIds.forEach(id => novo.delete(id));
+                          else todosIds.forEach(id => novo.add(id));
+                          return novo;
+                        });
+                      }}
+                      title="Selecionar / Desmarcar todos os blocos visíveis"
+                    />
+                  </th>
                   <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'left' }}>BLOCO / ROCHA</th>
                   <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'left' }}>PEDREIRA</th>
                   <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'left' }}>CLIENTE COMPRADOR</th>
@@ -1474,15 +1615,29 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                 {envelopamentos.map((b) => {
                   const statusInfo = STATUS_ENVELOPAMENTO[b.status?.toUpperCase()] || STATUS_ENVELOPAMENTO.PENDENTE_ENVELOPAMENTO;
                   const executando = executandoAcaoId === b.id;
+                  const isSelecionado = blocosSelecionados.has(b.id);
 
                   return (
                     <tr 
                       key={b.id} 
                       style={{ 
                         borderBottom: '1px solid rgba(255,255,255,0.04)',
-                        background: b.status === 'envelopado' ? 'rgba(34, 197, 94, 0.03)' : undefined
+                        background: isSelecionado 
+                          ? 'rgba(56, 189, 248, 0.12)' 
+                          : b.status === 'envelopado' 
+                            ? 'rgba(34, 197, 94, 0.03)' 
+                            : undefined
                       }}
                     >
+                      <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                        <input 
+                          type="checkbox"
+                          style={{ cursor: 'pointer', width: 16, height: 16, accentColor: '#0284c7' }}
+                          checked={isSelecionado}
+                          onChange={() => toggleSelecionarBloco(b.id)}
+                          title={`Selecionar bloco ${b.numero_bloco}`}
+                        />
+                      </td>
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span style={{
@@ -1715,6 +1870,220 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          BARRA FLUTUANTE DE AÇÕES EM LOTE (STATUS E EXCLUSÃO)
+          ========================================================================= */}
+      {blocosSelecionados.size > 0 && (
+        <div 
+          className="animate-fade"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.95)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(56, 189, 248, 0.4)',
+            boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.8), 0 0 20px rgba(56, 189, 248, 0.25)',
+            borderRadius: 14,
+            padding: '10px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+            maxWidth: '95vw'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{
+              background: 'rgba(56, 189, 248, 0.2)',
+              color: '#38bdf8',
+              fontWeight: 800,
+              fontSize: '0.82rem',
+              padding: '4px 10px',
+              borderRadius: 20,
+              border: '1px solid rgba(56, 189, 248, 0.5)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5
+            }}>
+              <CheckCheck size={14} />
+              {blocosSelecionados.size} Bloco{blocosSelecionados.size > 1 ? 's' : ''} Selecionado{blocosSelecionados.size > 1 ? 's' : ''}
+            </span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--slate-300)', fontWeight: 600 }}>
+              Alterar status para:
+            </span>
+          </div>
+
+          {/* Botões de Alteração Rápida de Status em Lote */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              disabled={executandoLote}
+              onClick={() => handleAlterarStatusLote('envelopado')}
+              className="btn"
+              style={{
+                background: 'rgba(34, 197, 94, 0.2)',
+                color: '#4ade80',
+                border: '1px solid rgba(34, 197, 94, 0.5)',
+                padding: '6px 11px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                borderRadius: 7,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                cursor: 'pointer'
+              }}
+              title="Marcar todos os blocos selecionados como Envelopado"
+            >
+              <CheckCircle2 size={13} /> Envelopado
+            </button>
+
+            <button
+              type="button"
+              disabled={executandoLote}
+              onClick={() => handleAlterarStatusLote('sem_envelopamento')}
+              className="btn"
+              style={{
+                background: 'rgba(56, 189, 248, 0.2)',
+                color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.5)',
+                padding: '6px 11px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                borderRadius: 7,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                cursor: 'pointer'
+              }}
+              title="Marcar todos os selecionados como Sem Envelopamento"
+            >
+              <Ban size={13} /> Sem Envelopamento
+            </button>
+
+            <button
+              type="button"
+              disabled={executandoLote}
+              onClick={() => handleAlterarStatusLote('em_andamento')}
+              className="btn"
+              style={{
+                background: 'rgba(245, 158, 11, 0.2)',
+                color: '#fbbf24',
+                border: '1px solid rgba(245, 158, 11, 0.5)',
+                padding: '6px 11px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                borderRadius: 7,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                cursor: 'pointer'
+              }}
+              title="Marcar todos os selecionados como Em Andamento"
+            >
+              <Layers size={13} /> Em Andamento
+            </button>
+
+            <button
+              type="button"
+              disabled={executandoLote}
+              onClick={() => handleAlterarStatusLote('aguardando_corte_reparo')}
+              className="btn"
+              style={{
+                background: 'rgba(239, 68, 68, 0.18)',
+                color: '#f87171',
+                border: '1px solid rgba(239, 68, 68, 0.45)',
+                padding: '6px 11px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                borderRadius: 7,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                cursor: 'pointer'
+              }}
+              title="Marcar todos os selecionados como Aguardando Corte/Reparo"
+            >
+              <Scissors size={13} /> Corte/Reparo
+            </button>
+
+            <button
+              type="button"
+              disabled={executandoLote}
+              onClick={() => handleAlterarStatusLote('pendente_envelopamento')}
+              className="btn"
+              style={{
+                background: 'rgba(148, 163, 184, 0.15)',
+                color: '#cbd5e1',
+                border: '1px solid rgba(148, 163, 184, 0.35)',
+                padding: '6px 11px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                borderRadius: 7,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                cursor: 'pointer'
+              }}
+              title="Marcar todos os selecionados como Não Envelopado / Pendente"
+            >
+              <Clock size={13} /> Não Envelopado
+            </button>
+          </div>
+
+          {/* Separador vertical */}
+          <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)' }} />
+
+          {/* Excluir Selecionados */}
+          <button
+            type="button"
+            disabled={executandoLote}
+            onClick={handleExcluirLoteSelecionados}
+            className="btn"
+            style={{
+              background: 'rgba(239, 68, 68, 0.25)',
+              color: '#fca5a5',
+              border: '1px solid rgba(239, 68, 68, 0.6)',
+              padding: '6px 11px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              borderRadius: 7,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              cursor: 'pointer'
+            }}
+            title="Excluir todos os blocos selecionados"
+          >
+            <Trash2 size={13} /> Excluir ({blocosSelecionados.size})
+          </button>
+
+          {/* Desmarcar Todos */}
+          <button
+            type="button"
+            onClick={desmarcarTodosBlocos}
+            className="btn"
+            style={{
+              background: 'transparent',
+              color: 'var(--slate-400)',
+              border: 'none',
+              padding: '6px 8px',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4
+            }}
+            title="Desmarcar todos os blocos selecionados"
+          >
+            <X size={14} /> Cancelar
+          </button>
         </div>
       )}
 

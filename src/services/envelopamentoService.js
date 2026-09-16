@@ -375,6 +375,54 @@ export const atualizarStatusEnvelopamento = async (id, novoStatus, usuarioNome =
 };
 
 /**
+ * Atualiza o status de múltiplos registros de envelopamento em lote
+ */
+export const atualizarStatusEnvelopamentosEmLote = async (ids = [], novoStatus, usuarioNome = 'Equipe Vermont') => {
+  if (!Array.isArray(ids) || ids.length === 0 || !novoStatus) return true;
+
+  const setIds = new Set(ids);
+  const locais = carregarEnvelopamentosLocais();
+  const agora = new Date().toISOString();
+
+  const itensAtualizados = [];
+
+  const novaLista = locais.map(item => {
+    if (!setIds.has(item.id)) return item;
+
+    const atualizacoes = {
+      status: novoStatus,
+      updated_at: agora
+    };
+
+    if (novoStatus === 'em_andamento') {
+      atualizacoes.responsavel_envelopamento = usuarioNome;
+      atualizacoes.data_envelopamento = agora;
+    } else if (novoStatus === 'envelopado' || novoStatus === 'sem_envelopamento') {
+      atualizacoes.responsavel_liberacao = usuarioNome;
+      atualizacoes.data_liberacao = agora;
+    }
+
+    const atualizado = { ...item, ...atualizacoes };
+    itensAtualizados.push(atualizado);
+    return atualizado;
+  });
+
+  salvarEnvelopamentosLocais(novaLista);
+
+  if (isSupabaseConfigurado()) {
+    try {
+      await supabase.from('envelopamentos').upsert(itensAtualizados, { onConflict: 'id' });
+    } catch (err) {
+      console.warn('Erro ao atualizar lote no Supabase envelopamentos:', err);
+    }
+    sincronizarEnvelopamentosNuvem(novaLista);
+  }
+
+  notificarAlteracaoEnvelopamento();
+  return true;
+};
+
+/**
  * Exclui um registro de envelopamento
  */
 export const excluirEnvelopamento = async (id) => {
