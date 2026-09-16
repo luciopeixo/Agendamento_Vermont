@@ -40,6 +40,7 @@ import {
   obterStatusConformidadeCavalo,
   obterStatusConformidadeCarreta
 } from '../services/agendamentoService';
+import { buscarStatusEnvelopamentoPorBloco } from '../services/envelopamentoService';
 
 export function AgendamentoForm({ onAgendamentoSucesso }) {
   const { dataHoje } = obterDataHoraAtualBrasil();
@@ -218,6 +219,21 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   const [alertaDuplicidade1, setAlertaDuplicidade1] = useState(null);
   const [alertaDuplicidade2, setAlertaDuplicidade2] = useState(null);
   const [alertaDuplicidade3, setAlertaDuplicidade3] = useState(null);
+
+  // Status de envelopamento do bloco consultado no pátio
+  const [statusEnvelopamento1, setStatusEnvelopamento1] = useState(null);
+
+  useEffect(() => {
+    let ativo = true;
+    if (formData.numero_bloco && formData.numero_bloco.length >= 2) {
+      buscarStatusEnvelopamentoPorBloco(formData.numero_bloco, formData.cliente).then(res => {
+        if (ativo) setStatusEnvelopamento1(res);
+      }).catch(() => {});
+    } else {
+      setStatusEnvelopamento1(null);
+    }
+    return () => { ativo = false; };
+  }, [formData.numero_bloco, formData.cliente]);
 
   // Validação em tempo real de formato de bloco para Taj Mahal (Thor/Argos exige "/", outros proíbe "/")
   const alertaTajMahal1 = useMemo(() => {
@@ -1604,6 +1620,29 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     }}>
                       <AlertTriangle size={16} color="#ef4444" style={{ flexShrink: 0 }} />
                       <span>{alertaTajMahal1.mensagem}</span>
+                    </div>
+                  )}
+
+                  {/* Status de Envelopamento do Bloco Identificado no Pátio */}
+                  {statusEnvelopamento1 && (
+                    <div className="animate-fade" style={{
+                      marginTop: 8,
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      fontSize: '0.80rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      background: statusEnvelopamento1.status === 'liberado' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+                      border: `1px solid ${statusEnvelopamento1.status === 'liberado' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(56, 189, 248, 0.4)'}`,
+                      color: statusEnvelopamento1.status === 'liberado' ? '#4ade80' : '#38bdf8'
+                    }}>
+                      {statusEnvelopamento1.status === 'liberado' ? <CheckCircle size={15} /> : <Layers size={15} />}
+                      <span>
+                        {statusEnvelopamento1.status === 'liberado' 
+                          ? `✅ Bloco ${statusEnvelopamento1.numero_bloco} conferido e liberado pela Vermont para agendamento.` 
+                          : `ℹ️ Bloco ${statusEnvelopamento1.numero_bloco} registrado no pátio (Status: ${statusEnvelopamento1.status}).`}
+                      </span>
                     </div>
                   )}
                 </div>

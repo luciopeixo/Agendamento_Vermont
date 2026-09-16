@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, ListChecks, Lock, LogOut, Palette } from 'lucide-react';
+import { Calendar, ListChecks, Lock, LogOut, Palette, Layers } from 'lucide-react';
 
 export function Navbar({ 
   abaAtiva, 
@@ -116,6 +116,16 @@ export function Navbar({
           >
             {isAdmin ? <ListChecks size={17} /> : <Lock size={15} color="#4ade80" />}
             <span>Painel de Carregamento</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('envelopamento')}
+            className={`btn navbar-btn ${abaAtiva === 'envelopamento' ? 'btn-vermont' : 'btn-secondary'}`}
+            title="Acessar o Controle de Envelopamento de Blocos"
+          >
+            {isAdmin ? <Layers size={17} /> : <Lock size={15} color="#4ade80" />}
+            <span>Envelopamento</span>
           </button>
 
           {isAdmin && (
