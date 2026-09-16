@@ -706,6 +706,27 @@ const calcularScoreNomeCliente = (nome = '') => {
 };
 
 /**
+ * Dicionário canônico de CNPJ para empresas de referência conhecidas
+ */
+const CANONICAL_CNPJ_MAP = {
+  'BRUNOLUCCHETTI': '07.825.404/0001-63',
+  'BRASIGRAN': '32.476.525/0001-94',
+  'VERMONT': '07.498.412/0001-30',
+  'FAVORITA': '02.611.161/0001-47',
+  'ZUCCHI': '02.261.378/0001-93',
+  'TESTI': '02.484.582/0001-95',
+  'DECOLORES': '04.148.665/0001-20',
+  'ANTOLINI': '04.819.349/0001-64'
+};
+
+const CANONICAL_NAMES_BY_CNPJ = {
+  '07825404000163': 'BRUNO LUCCHETTI DO BRASIL COMÉRCIO DE ROCHAS LTDA',
+  '32476525000194': 'BRASIGRAN BRASILEIRA DE GRANITOS LTDA',
+  '07498412000130': 'VERMONT MINERAÇÃO LTDA',
+  '02611161000147': 'FAVORITA DO BRASIL MÁRMORES E GRANITOS LTDA'
+};
+
+/**
  * Obtém todos os clientes e CNPJs cadastrados e operados no sistema,
  * com deduplicação avançada por CNPJ (14 dígitos) e unificação inteligente de variações de nomes.
  */
@@ -718,7 +739,16 @@ export const obterClientesDoBancoDeDados = async () => {
     let nome = limparNomeEmpresa(String(nomeBruto || '')).replace(/\s+/g, ' ').trim().toUpperCase();
     let cnpj = String(cnpjBruto || extrairCnpj(nomeBruto) || '').trim();
 
-    // Se não tiver CNPJ no registro, tenta resolver no cache oficial de correspondência
+    const normKey = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]/g, '');
+
+    // Se não tiver CNPJ ou se tiver CNPJ inconsistente, verifica a associação canônica
+    for (const [prefix, canonCnpj] of Object.entries(CANONICAL_CNPJ_MAP)) {
+      if (normKey.includes(prefix)) {
+        cnpj = canonCnpj;
+        break;
+      }
+    }
+
     if (!cnpj && nome) {
       const cnpjResolvido = obterCnpjEmpresaCache(nome);
       if (cnpjResolvido) cnpj = cnpjResolvido;
@@ -726,6 +756,11 @@ export const obterClientesDoBancoDeDados = async () => {
 
     const cnpjFmt = cnpj ? formatarCNPJ(cnpj) : '';
     const cnpjDigitos = cnpjFmt.replace(/\D/g, '');
+
+    // Se o CNPJ for conhecido, garante o nome canônico correto
+    if (cnpjDigitos && CANONICAL_NAMES_BY_CNPJ[cnpjDigitos]) {
+      nome = CANONICAL_NAMES_BY_CNPJ[cnpjDigitos];
+    }
 
     // Descartar nomes que sejam apenas números, vazios ou marcadores genéricos
     if (!nome && !cnpjFmt) return;
@@ -800,84 +835,64 @@ export const obterClientesDoBancoDeDados = async () => {
 
   // ========================================================
   // DEDUPLICAÇÃO INTELIGENTE:
-  // Unifica pelo CNPJ de 14 dígitos e escolhe o nome mais limpo e legível
+  // Agrupa exclusivamente por CNPJ ou por Raiz de Nome do Cliente
   // ========================================================
-  const mapaPorCnpj = new Map();
-  const mapaPorNomeNorm = new Map();
+  const mapaPorChaveUnica = new Map();
 
   for (const item of itensColetados) {
     const nomeLimpo = item.nome.trim().toUpperCase();
-    const normKey = nomeLimpo.replace(/[^A-Z0-9]/g, '');
+    const normKey = nomeLimpo.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Z0-9]/g, '');
     if (!normKey && !item.cnpjDigitos) continue;
 
-    if (item.cnpjDigitos) {
-      if (!mapaPorCnpj.has(item.cnpjDigitos)) {
-        mapaPorCnpj.set(item.cnpjDigitos, {
-          id: item.id,
-          nome: nomeLimpo,
-          cnpj: item.cnpj,
-          cnpjDigitos: item.cnpjDigitos,
-          telefone: item.telefone,
-          email: item.email,
-          cidade: item.cidade,
-          uf: item.uf,
-          observacoes: item.observacoes,
-          normKey
-        });
-      } else {
-        const existente = mapaPorCnpj.get(item.cnpjDigitos);
-        // Atualiza para o nome de maior score/legibilidade
-        if (calcularScoreNomeCliente(nomeLimpo) > calcularScoreNomeCliente(existente.nome)) {
-          existente.nome = nomeLimpo;
-          existente.normKey = normKey;
-        }
-        if (item.telefone && !existente.telefone) existente.telefone = item.telefone;
-        if (item.email && !existente.email) existente.email = item.email;
-        if (item.cidade && !existente.cidade) existente.cidade = item.cidade;
-        if (item.uf && !existente.uf) existente.uf = item.uf;
-      }
+    // Chave única: se tiver CNPJ válido de 14 dígitos usa o CNPJ, caso contrário usa a chave do nome
+    const chaveUnica = item.cnpjDigitos || `NOME_${normKey}`;
+
+    if (!mapaPorChaveUnica.has(chaveUnica)) {
+      mapaPorChaveUnica.set(chaveUnica, {
+        id: item.id,
+        nome: nomeLimpo,
+        cnpj: item.cnpj,
+        cnpjDigitos: item.cnpjDigitos,
+        telefone: item.telefone,
+        email: item.email,
+        cidade: item.cidade,
+        uf: item.uf,
+        observacoes: item.observacoes,
+        normKey
+      });
     } else {
-      // Itens sem CNPJ
-      if (!mapaPorNomeNorm.has(normKey)) {
-        mapaPorNomeNorm.set(normKey, {
-          id: item.id,
-          nome: nomeLimpo,
-          cnpj: '',
-          cnpjDigitos: '',
-          telefone: item.telefone,
-          email: item.email,
-          cidade: item.cidade,
-          uf: item.uf,
-          observacoes: item.observacoes,
-          normKey
-        });
-      } else {
-        const existente = mapaPorNomeNorm.get(normKey);
-        if (calcularScoreNomeCliente(nomeLimpo) > calcularScoreNomeCliente(existente.nome)) {
-          existente.nome = nomeLimpo;
-        }
+      const existente = mapaPorChaveUnica.get(chaveUnica);
+      if (calcularScoreNomeCliente(nomeLimpo) > calcularScoreNomeCliente(existente.nome)) {
+        existente.nome = nomeLimpo;
+        existente.normKey = normKey;
+      }
+      if (!existente.cnpj && item.cnpj) {
+        existente.cnpj = item.cnpj;
+        existente.cnpjDigitos = item.cnpjDigitos;
+      }
+      if (item.telefone && !existente.telefone) existente.telefone = item.telefone;
+      if (item.email && !existente.email) existente.email = item.email;
+    }
+  }
+
+  // Segunda passada: Unifica nomes idênticos que possam ter ficado com chaves diferentes
+  const mapaFinal = new Map();
+  for (const cli of mapaPorChaveUnica.values()) {
+    const chaveNome = cli.normKey.slice(0, 20); // Primeiras 20 letras da raiz
+    if (!mapaFinal.has(chaveNome)) {
+      mapaFinal.set(chaveNome, cli);
+    } else {
+      const existente = mapaFinal.get(chaveNome);
+      // Se um tem CNPJ e o outro não, mantém o com CNPJ
+      if (!existente.cnpj && cli.cnpj) {
+        mapaFinal.set(chaveNome, cli);
+      } else if (calcularScoreNomeCliente(cli.nome) > calcularScoreNomeCliente(existente.nome)) {
+        existente.nome = cli.nome;
       }
     }
   }
 
-  // Mesclar registros sem CNPJ que já tenham representação em mapaPorCnpj
-  for (const [normKey, semCnpj] of mapaPorNomeNorm.entries()) {
-    let jaExisteEmCnpj = false;
-    for (const comCnpj of mapaPorCnpj.values()) {
-      if (comCnpj.normKey === normKey || (comCnpj.normKey.length >= 8 && (comCnpj.normKey.includes(normKey) || normKey.includes(comCnpj.normKey)))) {
-        jaExisteEmCnpj = true;
-        break;
-      }
-    }
-    if (!jaExisteEmCnpj) {
-      // Ignorar nomes colados sem espaço com mais de 15 caracteres sem CNPJ
-      if (calcularScoreNomeCliente(semCnpj.nome) >= -10) {
-        mapaPorCnpj.set(`sem_cnpj_${normKey}`, semCnpj);
-      }
-    }
-  }
-
-  const resultado = Array.from(mapaPorCnpj.values());
+  const resultado = Array.from(mapaFinal.values());
   resultado.sort((a, b) => a.nome.localeCompare(b.nome));
   return resultado;
 };

@@ -228,8 +228,12 @@ export function ModalCadastrarBlocoEnvelopamento({
       return;
     }
 
-    // Validação de formato da barra para Taj Mahal
-    const validacao = validarFormatoBlocoTajMahal(formData.material, formData.cliente_nome, formData.numero_bloco);
+    // Validação de formato da barra para Taj Mahal (Thor/Argos exige "/", outros proíbe "/")
+    const validacao = validarFormatoBlocoTajMahal({
+      material: formData.material,
+      cliente: formData.cliente_nome,
+      numero_bloco: formData.numero_bloco
+    });
     if (!validacao.valido) {
       setErro(validacao.mensagem);
       return;
@@ -241,8 +245,8 @@ export function ModalCadastrarBlocoEnvelopamento({
       if (onSalvo) onSalvo(registro);
       onFechar();
     } catch (err) {
-      console.error(err);
-      setErro('Erro ao salvar bloco. Tente novamente.');
+      console.error('Erro ao salvar envelopamento:', err);
+      setErro(err?.message || 'Erro ao salvar bloco. Tente novamente.');
     } finally {
       setSalvando(false);
     }
