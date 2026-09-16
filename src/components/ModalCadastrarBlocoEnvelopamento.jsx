@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Layers, Box, Building2, Search, CheckCircle2, AlertTriangle, UploadCloud, Plus, UserPlus, Hash } from 'lucide-react';
+import { X, Layers, Box, Building2, Search, CheckCircle2, AlertTriangle, UploadCloud, Plus, UserPlus, Hash, FileText } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
   obterMateriaisPorPedreira, 
@@ -16,6 +16,7 @@ import {
   obterClientesDoBancoDeDados
 } from '../services/envelopamentoService';
 import { ModalGestaoClientes } from './ModalGestaoClientes';
+import { ModalImportarRomaneioPdf } from './ModalImportarRomaneioPdf';
 
 export function ModalCadastrarBlocoEnvelopamento({
   blocoEdicao = null,
@@ -23,8 +24,9 @@ export function ModalCadastrarBlocoEnvelopamento({
   onSalvo,
   usuarioNome = 'Equipe Vermont'
 }) {
-  const [modoAba, setModoAba] = useState('individual'); // 'individual' ou 'lote'
+  const [modoAba, setModoAba] = useState('individual'); // 'individual' | 'lote' | 'pdf'
   const [modalGestaoClientesAberto, setModalGestaoClientesAberto] = useState(false);
+  const [modalPdfAberto, setModalPdfAberto] = useState(false);
   
   // Estado Individual
   const [formData, setFormData] = useState({
@@ -368,26 +370,35 @@ export function ModalCadastrarBlocoEnvelopamento({
           </button>
         </div>
 
-        {/* Abas: Individual vs Lote (apenas para novos cadastros) */}
+        {/* Abas: Individual vs Lote vs PDF (apenas para novos cadastros) */}
         {!blocoEdicao && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 18, background: 'rgba(0,0,0,0.3)', padding: 4, borderRadius: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18, background: 'rgba(0,0,0,0.3)', padding: 4, borderRadius: 8, flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={() => setModoAba('individual')}
               className={`btn ${modoAba === 'individual' ? 'btn-vermont' : 'btn-secondary'}`}
-              style={{ flex: 1, padding: '7px 12px', fontSize: '0.82rem', gap: 6 }}
+              style={{ flex: 1, padding: '7px 12px', fontSize: '0.82rem', gap: 6, minWidth: 140 }}
             >
               <Plus size={15} />
-              Cadastro Individual
+              Individual
             </button>
             <button
               type="button"
               onClick={() => setModoAba('lote')}
               className={`btn ${modoAba === 'lote' ? 'btn-vermont' : 'btn-secondary'}`}
-              style={{ flex: 1, padding: '7px 12px', fontSize: '0.82rem', gap: 6 }}
+              style={{ flex: 1, padding: '7px 12px', fontSize: '0.82rem', gap: 6, minWidth: 140 }}
             >
               <UploadCloud size={15} />
-              Importação em Lote (Múltiplos)
+              Lote Manual
+            </button>
+            <button
+              type="button"
+              onClick={() => setModalPdfAberto(true)}
+              className="btn btn-secondary"
+              style={{ flex: 1, padding: '7px 12px', fontSize: '0.82rem', gap: 6, minWidth: 140, color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)', background: 'rgba(56, 189, 248, 0.1)' }}
+            >
+              <FileText size={15} color="#38bdf8" />
+              Importar PDF
             </button>
           </div>
         )}
@@ -831,6 +842,19 @@ export function ModalCadastrarBlocoEnvelopamento({
               handleSelecionarCliente(cli);
               carregarClientes();
               setModalGestaoClientesAberto(false);
+            }}
+          />
+        )}
+
+        {/* Modal de Importação de Romaneio PDF */}
+        {modalPdfAberto && (
+          <ModalImportarRomaneioPdf
+            usuarioNome={usuarioNome}
+            onFechar={() => setModalPdfAberto(false)}
+            onSucesso={(qtd) => {
+              setModalPdfAberto(false);
+              if (onSalvo) onSalvo(null, qtd);
+              onFechar();
             }}
           />
         )}

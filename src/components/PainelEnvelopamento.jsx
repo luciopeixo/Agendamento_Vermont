@@ -16,7 +16,9 @@ import {
   Scissors, 
   CheckCheck, 
   Ban, 
-  Play
+  Play,
+  FileText,
+  Sparkles
 } from 'lucide-react';
 import { 
   listarEnvelopamentos, 
@@ -29,11 +31,13 @@ import {
 import { PEDREIRAS_CEARA, formatarDataHoraBR } from '../services/agendamentoService';
 import { ModalCadastrarBlocoEnvelopamento } from './ModalCadastrarBlocoEnvelopamento';
 import { ModalGestaoClientes } from './ModalGestaoClientes';
+import { ModalImportarRomaneioPdf } from './ModalImportarRomaneioPdf';
 
 export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [envelopamentos, setEnvelopamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
+  const [modalPdfAberto, setModalPdfAberto] = useState(false);
   const [modalClientesAberto, setModalClientesAberto] = useState(false);
   const [blocoEmEdicao, setBlocoEmEdicao] = useState(null);
   const [filtroPedreira, setFiltroPedreira] = useState(pedreiraOperador || '');
@@ -191,6 +195,17 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           >
             <Download size={15} />
             Exportar CSV
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setModalPdfAberto(true)}
+            className="btn btn-secondary"
+            title="Importar Romaneio padrão em PDF da Vermont"
+            style={{ padding: '8px 14px', gap: 6, fontSize: '0.84rem', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)' }}
+          >
+            <FileText size={16} color="#38bdf8" />
+            Importar Romaneio PDF
           </button>
 
           <button
@@ -692,6 +707,18 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         <ModalGestaoClientes
           onFechar={() => {
             setModalClientesAberto(false);
+          }}
+        />
+      )}
+
+      {/* Modal de Importação de Romaneio PDF */}
+      {modalPdfAberto && (
+        <ModalImportarRomaneioPdf
+          usuarioNome={usuarioNome}
+          onFechar={() => setModalPdfAberto(false)}
+          onSucesso={async (qtd) => {
+            await carregarDados();
+            alert(`${qtd} bloco${qtd > 1 ? 's' : ''} do romaneio importado${qtd > 1 ? 's' : ''} com sucesso no envelopamento!`);
           }}
         />
       )}
