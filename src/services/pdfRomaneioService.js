@@ -156,47 +156,94 @@ export const identificarPedreiraDoDocumento = (textoCompleto) => {
 };
 
 /**
+ * Gera conjunto de chaves de comparação para correspondência inteligente de blocos
+ * (ex: "747/26" -> ["747/26", "74726", "747"])
+ * (ex: "74726" -> ["74726", "747/26", "747"])
+ * (ex: "1826" -> ["1826"])
+ */
+export const extrairChavesComparacaoBloco = (numeroBloco) => {
+  if (!numeroBloco) return [];
+  const limpo = String(numeroBloco).trim().toUpperCase();
+  const apenasAlfaNum = limpo.replace(/[^0-9A-Z]/g, '');
+  const chaves = new Set([limpo, apenasAlfaNum]);
+
+  // Se tem barra (ex: 747/26)
+  if (limpo.includes('/')) {
+    const partes = limpo.split('/');
+    if (partes[0]) chaves.add(partes[0].trim()); // "747"
+    if (partes[0] && partes[1]) chaves.add(`${partes[0].trim()}${partes[1].trim()}`); // "74726"
+  }
+
+  // Se é número de 5 dígitos sem barra com final de ano (ex: 74726 -> 747/26)
+  if (/^\d{5}$/.test(apenasAlfaNum) && (apenasAlfaNum.endsWith('24') || apenasAlfaNum.endsWith('25') || apenasAlfaNum.endsWith('26') || apenasAlfaNum.endsWith('27'))) {
+    const base = apenasAlfaNum.slice(0, 3);
+    const ano = apenasAlfaNum.slice(3);
+    chaves.add(`${base}/${ano}`);
+    chaves.add(base);
+  }
+
+  // Se for 6 dígitos (ex: 125626 -> 1256/26)
+  if (/^\d{6}$/.test(apenasAlfaNum) && (apenasAlfaNum.endsWith('24') || apenasAlfaNum.endsWith('25') || apenasAlfaNum.endsWith('26') || apenasAlfaNum.endsWith('27'))) {
+    const base = apenasAlfaNum.slice(0, 4);
+    const ano = apenasAlfaNum.slice(4);
+    chaves.add(`${base}/${ano}`);
+    chaves.add(base);
+  }
+
+  return Array.from(chaves).filter(Boolean);
+};
+
+/**
  * Analisa a seção OBSERVAÇÕES do romaneio e mapeia valores de envelopamento por bloco
+ * com suporte a múltiplas páginas e variações de notação (ex: 74726 vs 747/26).
  */
 export const extrairObservacoesEEnvelopamento = (textoCompleto) => {
   const resultado = {
     textoObservacoes: '',
     semEnvelopamentoGeral: false,
-    envelopamentoPorBloco: new Map() // bloco -> { valor, detalhe }
+    envelopamentoPorBloco: new Map() // chaveNormalizada -> { numeroOriginal, valor, detalhe }
   };
 
-  const idxObs = textoCompleto.search(/OBSERVA[ÇC][ÕO]ES/i);
-  if (idxObs === -1) return resultado;
+  // Pode haver mais de uma seção OBSERVAÇÕES em PDFs com múltiplas páginas
+  const regexObsGeral = /OBSERVA[ÇC][ÕO]ES([\s\S]*?)(?:Confirma[çc][ãa]o do Or[çc]amento|Assinatura:|Nome Leg[íi]vel:|--- NOVA PAGINA ---|$)/gi;
+  let matchSecao;
+  let textosAcumulados = [];
 
-  let textoObs = textoCompleto.substring(idxObs);
-  
-  // Limpar rodapé de assinaturas se presente
-  const idxAssinatura = textoObs.search(/Confirma[çc][ãa]o do Or[çc]amento|Assinatura:|Nome Leg[íi]vel:/i);
-  if (idxAssinatura !== -1) {
-    textoObs = textoObs.substring(0, idxAssinatura);
+  while ((matchSecao = regexObsGeral.exec(textoCompleto)) !== null) {
+    if (matchSecao[1]) {
+      textosAcumulados.push(matchSecao[1].trim());
+    }
   }
 
-  resultado.textoObservacoes = textoObs.trim();
+  const textoObsFinal = textosAcumulados.join('\n\n');
+  resultado.textoObservacoes = textoObsFinal;
 
-  // Verificar se há declaração explícita "Sem envelopamento"
-  if (/sem\s+envelopamento/i.test(textoObs)) {
+  // Verificar declaração explícita "Sem envelopamento"
+  if (/sem\s+envelopamento/i.test(textoObsFinal)) {
     resultado.semEnvelopamentoGeral = true;
   }
 
-  // Buscar linhas do tipo: "1826- R$ 3.617,60" ou "1926: R$ 3.740,88" ou "1826 - 3.617,60"
-  // Aceita formatos de bloco como 1826, 839/26, etc.
-  const regexBlocoValor = /(?:^|[\s\n\r])([0-9]{3,5}(?:\/[0-9]{2})?)\s*[-:]?\s*R?\$?\s*([\d.]+,\d{2})/gmi;
-  let match;
-  while ((match = regexBlocoValor.exec(textoObs)) !== null) {
-    const numeroBloco = match[1].trim().toUpperCase();
-    const valorStr = match[2].trim();
+  // Buscar linhas de envelopamento por bloco:
+  // Ex: "74726 - R$ 2.042,88" ou "1826- R$ 3.617,60" ou "747/26 - R$ 2.042,88" ou "1826: R$ 3.617,60"
+  const regexLinhaBlocoValor = /(?:^|[\s\n\r])([0-9]{3,6}(?:\/[0-9]{2})?)\s*[-:]?\s*R?\$?\s*([\d.]+,\d{2})/gmi;
+  let matchItem;
+
+  while ((matchItem = regexLinhaBlocoValor.exec(textoObsFinal)) !== null) {
+    const blocoBruto = matchItem[1].trim().toUpperCase();
+    const valorStr = matchItem[2].trim();
     const valorFloat = converterValorMonetarioParaFloat(valorStr);
-    
+
     if (valorFloat > 0) {
-      resultado.envelopamentoPorBloco.set(numeroBloco, {
+      const chaves = extrairChavesComparacaoBloco(blocoBruto);
+      const info = {
+        blocoOriginal: blocoBruto,
         valor: valorFloat,
         valorFormatado: valorStr,
         detalhe: `Envelopamento nas Observações (R$ ${valorStr})`
+      };
+
+      chaves.forEach(k => {
+        resultado.envelopamentoPorBloco.set(k, info);
       });
     }
   }
@@ -207,7 +254,7 @@ export const extrairObservacoesEEnvelopamento = (textoCompleto) => {
 /**
  * Parser principal de Romaneios em PDF da Vermont Mineração.
  * Recebe o texto extraído do PDF e aplica todas as regras de negócio para reconhecimento
- * de cabeçalho, blocos e status de envelopamento.
+ * de cabeçalho, blocos e status de envelopamento em documentos de uma ou múltiplas páginas.
  */
 export const processarRomaneioPdfTexto = (textoCompleto) => {
   if (!textoCompleto || typeof textoCompleto !== 'string') {
@@ -240,7 +287,6 @@ export const processarRomaneioPdfTexto = (textoCompleto) => {
       .replace(/\s*Endereço:.*$/i, '')
       .replace(/\s*ROD\s+ES.*$/i, '')
       .trim();
-    // Limpar sufixos indesejados
     clienteNome = limparNomeEmpresa(clienteNome).toUpperCase();
   }
 
@@ -251,42 +297,59 @@ export const processarRomaneioPdfTexto = (textoCompleto) => {
     clienteCnpj = formatarCNPJ(matchCnpj[1]);
   }
 
-  // 6. Extrair Seção de Observações e Valores de Envelopamento
+  // 6. Extrair Seção de Observações e Mapeamento de Valores de Envelopamento
   const infoObservacoes = extrairObservacoesEEnvelopamento(textoCompleto);
 
-  // 7. Extrair Itens / Blocos da Tabela
+  // 7. Extrair Itens / Blocos da Tabela através de todas as páginas
   const linhas = textoCompleto.split('\n').map(l => l.trim()).filter(Boolean);
   const blocosDetectados = [];
+  const blocosJaAdicionados = new Set();
 
-  // Localizar o cabeçalho da tabela de blocos
-  let inicioTabelaIdx = -1;
   for (let i = 0; i < linhas.length; i++) {
-    if (/BLOCO\s+MATERIAL/i.test(linhas[i])) {
-      inicioTabelaIdx = i + 1;
-      break;
-    }
-  }
-
-  // Se não achar o cabeçalho explícito, buscar a partir do início
-  const idxComeco = inicioTabelaIdx !== -1 ? inicioTabelaIdx : 0;
-
-  for (let i = idxComeco; i < linhas.length; i++) {
     const linha = linhas[i];
 
-    // Fim da tabela ao atingir "Qtd:", "M2 / M3", "Cotação", "OBSERVAÇÕES", "TOTAL"
-    if (/^(Qtd:|M2\s*\/|Cota[çc][ãa]o|OBSERVA[ÇC][ÕO]ES|TOTAL\s+GERAL)/i.test(linha)) {
-      break;
+    // Ignorar linhas de cabeçalho, rodapé ou quebras de página
+    if (
+      linha.startsWith('--- NOVA PAGINA') ||
+      linha.startsWith('ROMANEIO Nº') ||
+      linha.startsWith('VERMONT MINERACAO') ||
+      linha.startsWith('FAZ ') ||
+      linha.startsWith('Cliente:') ||
+      linha.startsWith('Endereço:') ||
+      linha.startsWith('Cidade:') ||
+      linha.startsWith('CNPJ/CPF:') ||
+      linha.startsWith('Fone/Fax:') ||
+      linha.startsWith('BLOCO MATERIAL') ||
+      linha.startsWith('Qtd:') ||
+      linha.startsWith('M2 /') ||
+      linha.startsWith('Cotação') ||
+      linha.startsWith('Dólar') ||
+      linha.startsWith('OBSERVAÇÕES') ||
+      linha.startsWith('Prazo:') ||
+      linha.startsWith('Envelopamento ') ||
+      linha.startsWith('TOTAL ') ||
+      linha.startsWith('Desconto ') ||
+      linha.startsWith('Confirmação') ||
+      linha.startsWith('Nome Legível')
+    ) {
+      continue;
     }
 
     // Padrão de linha de bloco Vermont:
-    // Começa com número do bloco (ex: 839/26 ou 1826 ou 0326), seguido do nome do material
-    const matchLinhaBloco = linha.match(/^([0-9]{3,5}(?:\/[0-9]{2})?|[0-9A-Z/-]+)\s+([A-ZÀ-Ú\s]+?)\s+(\d+[,.]\d{2,3}\s*x\s*.*)$/i);
+    // Começa com número do bloco (ex: 839/26 ou 747/26 ou 1826 ou 0326), seguido do nome do material e dimensões
+    const matchLinhaBloco = linha.match(/^([0-9]{3,6}(?:\/[0-9]{2})?|[0-9A-Z/-]+)\s+([A-ZÀ-Ú\s]+?)\s+(\d+[,.]\d{2,3}\s*x\s*.*)$/i);
     
     if (matchLinhaBloco) {
       const numeroBloco = matchLinhaBloco[1].trim().toUpperCase();
       const materialBruto = matchLinhaBloco[2].trim();
       const restanteLinha = matchLinhaBloco[3].trim();
       
+      // Evitar blocos duplicados acidentais
+      if (blocosJaAdicionados.has(numeroBloco)) {
+        continue;
+      }
+      blocosJaAdicionados.add(numeroBloco);
+
       const materialNormalizado = normalizarMaterialVermont(materialBruto);
 
       // Extrair valores monetários no final da linha para identificar a coluna ENVELOPAMENTO
@@ -314,18 +377,29 @@ export const processarRomaneioPdfTexto = (textoCompleto) => {
         valorCobrado = valorColunaEnvelopamento;
       } 
       // REGRA 2: Se a coluna for 0,00 mas o bloco constar nas OBSERVAÇÕES com valor em R$
-      else if (infoObservacoes.envelopamentoPorBloco.has(numeroBloco)) {
-        const infoObsBloco = infoObservacoes.envelopamentoPorBloco.get(numeroBloco);
-        statusCalculado = 'pendente_envelopamento';
-        motivoStatus = `Regra 2: ${infoObsBloco.detalhe}`;
-        valorCobrado = infoObsBloco.valor;
-      } 
-      // REGRA 3: Não consta na coluna nem nas observações (ou observações dizem "Sem envelopamento")
       else {
-        statusCalculado = 'sem_envelopamento';
-        motivoStatus = infoObservacoes.semEnvelopamentoGeral
-          ? 'Regra 3: Declarado "Sem envelopamento" nas observações'
-          : 'Regra 3: Sem valor de envelopamento no romaneio';
+        // Testar todas as chaves possíveis de correspondência (ex: "747/26", "74726", "747")
+        const chavesBloco = extrairChavesComparacaoBloco(numeroBloco);
+        let infoObsBloco = null;
+        for (const chave of chavesBloco) {
+          if (infoObservacoes.envelopamentoPorBloco.has(chave)) {
+            infoObsBloco = infoObservacoes.envelopamentoPorBloco.get(chave);
+            break;
+          }
+        }
+
+        if (infoObsBloco) {
+          statusCalculado = 'pendente_envelopamento';
+          motivoStatus = `Regra 2: ${infoObsBloco.detalhe}`;
+          valorCobrado = infoObsBloco.valor;
+        } 
+        // REGRA 3: Não consta na coluna nem nas observações (ou observações dizem "Sem envelopamento")
+        else {
+          statusCalculado = 'sem_envelopamento';
+          motivoStatus = infoObservacoes.semEnvelopamentoGeral
+            ? 'Regra 3: Declarado "Sem envelopamento" nas observações'
+            : 'Regra 3: Sem cobrança de envelopamento para este bloco';
+        }
       }
 
       blocosDetectados.push({
