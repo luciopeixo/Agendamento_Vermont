@@ -2488,11 +2488,11 @@ export function sanitizarNumeroBloco(texto = '') {
   // 2. Remove conteúdos explicativos entre parênteses (ex: "1256926 (QUARTZITO)" -> "1256926")
   str = str.replace(/\s*\([^)]*\)/g, '');
   
-  // 3. Se contiver traço ou barra com texto explicativo e não outro número de bloco
+  // 3. Se contiver traço com texto explicativo e não outro número de bloco
   // Ex: "1256926 - TAJ MAHAL" -> "1256926"
   const partesTraco = str.split(/\s*[-–]\s*/);
   if (partesTraco.length > 1) {
-    if (!/^\d+$/.test(partesTraco[1]) && !/^VT-/i.test(partesTraco[1]) && !/^\d{2,}\/\d{2,}$/.test(partesTraco[1])) {
+    if (!/^\d+$/.test(partesTraco[1]) && !/^VT-/i.test(partesTraco[1]) && !/^\d{1,}\/\d{2,}$/.test(partesTraco[1])) {
       str = partesTraco[0];
     }
   }
@@ -2500,8 +2500,8 @@ export function sanitizarNumeroBloco(texto = '') {
   // 4. Remove palavras descritivas comuns caso fiquem soltas no texto (ex: "1256926 TAJ MAHAL" -> "1256926")
   str = str.replace(/\s+(?:TAJ\s+MAHAL|QUARTZITO|GRANITO|MARMORE|CARGA\s*\d*|MATERIAL).*$/i, '');
 
-  // 5. Remove pontuações desnecessárias no início ou fim
-  str = str.replace(/^[^\w]+|[^\w]+$/g, '');
+  // 5. Remove pontuações desnecessárias no início ou fim (preserva letras, dígitos e '/')
+  str = str.replace(/^[^\w/]+|[^\w/]+$/g, '');
   
   return str.trim();
 }
@@ -2530,28 +2530,43 @@ export function limparObservacoesDuplicadas(obs = '') {
 /**
  * Extrai números de blocos individuais se o usuário digitou múltiplos blocos no mesmo campo
  * Exemplos aceitos: "1256926 - 1256972", "1256926 e 1256972", "1256926 / 1256972", "1256926, 1256972"
+ * Suporta blocos com formato Bloco/Ano (ex: "11/26", "11 / 26", "123/26", "11/2026") como bloco único
  */
 export function extrairBlocosDigitados(texto = '') {
   if (!texto || typeof texto !== 'string') return [];
   const limpo = texto.trim();
   if (!limpo) return [];
 
+  // Se o texto for do formato bloco/ano (ex: "11/26", "11/2026", "123/26", "11 / 26"), trata como 1 ÚNICO bloco
+  if (/^\s*(\d+|[A-Z0-9_-]+)\s*\/\s*(\d{2,4})\s*$/i.test(limpo)) {
+    const limpoSemEspacos = limpo.replace(/\s*\/\s*/g, '/');
+    return [sanitizarNumeroBloco(limpoSemEspacos)];
+  }
+
   let partes = [];
 
-  // 1. Separadores textuais explícitos com espaços: ' e ', ' E ', ' & ', ' + ', ' / ', ' - ', ' – '
+  // 1. Separadores textuais explícitos com espaços: ' e ', ' E ', ' & ', ' + ', ' - ', ' – '
+  // Obs: Para '/', só divide se NÃO for padrão bloco/ano (ex: "1256926 / 1256972" divide, mas "11/26" não)
   if (/\s+(?:e|E|&|\+|\/|-|–)\s+/.test(limpo)) {
-    partes = limpo.split(/\s+(?:e|E|&|\+|\/|-|–)\s+/);
+    if (!/^\s*\d{1,5}\s*\/\s*(?:\d{2}|\d{4})\s*$/.test(limpo)) {
+      partes = limpo.split(/\s+(?:e|E|&|\+|\/|-|–)\s+/);
+    }
   } 
   // 2. Separadores por vírgula ou ponto-e-vírgula
-  else if (/[,;]/.test(limpo)) {
+  if (partes.length === 0 && /[,;]/.test(limpo)) {
     partes = limpo.split(/[,;]+/);
   } 
   // 3. Padrão numérico duplo (ex: "1256926-1256972" ou "1256926/1256972" onde ambos são números longos)
-  else if (/(\d{3,})\s*[-/–]\s*(\d{3,})/.test(limpo)) {
-    partes = limpo.split(/\s*[-/–]\s*/);
-  } 
+  if (partes.length === 0 && /(\d{3,})\s*[-–]\s*(\d{3,})/.test(limpo)) {
+    partes = limpo.split(/\s*[-–]\s*/);
+  } else if (partes.length === 0 && /(\d{3,})\s*\/\s*(\d{3,})/.test(limpo)) {
+    const m = limpo.match(/(\d+)\s*\/\s*(\d+)/);
+    if (m && m[2].length >= 3 && !['2024','2025','2026','2027','2028','2029','2030'].includes(m[2])) {
+      partes = limpo.split(/\s*\/\s*/);
+    }
+  }
   // 4. Espaço simples entre dois códigos numéricos longos (ex: "1256926 1256972")
-  else if (/\s+/.test(limpo) && !limpo.toUpperCase().startsWith('BLOCO')) {
+  if (partes.length === 0 && /\s+/.test(limpo) && !limpo.toUpperCase().startsWith('BLOCO')) {
     const pedacos = limpo.split(/\s+/);
     if (pedacos.length >= 2 && pedacos.every(p => p.length >= 3 && /^\d+$/.test(p))) {
       partes = pedacos;
@@ -3846,6 +3861,12 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
               const clienteLimpo = limparNomeEmpresa(item.cliente || loc?.cliente || '');
               const transpLimpa = limparNomeEmpresa(item.transportadora || loc?.transportadora || '');
 
+              const dadosNfSup = extrairDadosNotaFiscal(item);
+              const dadosNfLoc = extrairDadosNotaFiscal(loc);
+              const nfEmitida = dadosNfSup.nota_fiscal_emitida || dadosNfLoc.nota_fiscal_emitida;
+              const nfData = dadosNfSup.nota_fiscal_data || dadosNfLoc.nota_fiscal_data || null;
+              const nfUsuario = dadosNfSup.nota_fiscal_usuario || dadosNfLoc.nota_fiscal_usuario || null;
+
               return {
                 ...(loc || {}),
                 ...item,
@@ -3853,6 +3874,9 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
                 cliente_cnpj: clienteCnpj || null,
                 transportadora: transpLimpa || item.transportadora,
                 transportadora_cnpj: transpCnpj || null,
+                nota_fiscal_emitida: nfEmitida,
+                nota_fiscal_data: nfData,
+                nota_fiscal_usuario: nfUsuario,
                 historico_status: historicoFinal,
                 ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || (historicoFinal.length > 0 ? historicoFinal[0].usuario_nome : null)
               };
@@ -3869,13 +3893,19 @@ export async function obterPendenciasAnteriores({ pedreira = 'todas', dataRefere
       }
     }
 
-    const locais = obterAgendamentosLocais().filter(l => !idsExcluidos.has(String(l.id).trim())).map(item => ({
-      ...item,
-      cliente: limparNomeEmpresa(item.cliente),
-      cliente_cnpj: item.cliente_cnpj || resolverCnpjCliente(item) || null,
-      transportadora: limparNomeEmpresa(item.transportadora),
-      transportadora_cnpj: item.transportadora_cnpj || resolverCnpjTransportadora(item) || null
-    }));
+    const locais = obterAgendamentosLocais().filter(l => !idsExcluidos.has(String(l.id).trim())).map(item => {
+      const dadosNf = extrairDadosNotaFiscal(item);
+      return {
+        ...item,
+        cliente: limparNomeEmpresa(item.cliente),
+        cliente_cnpj: item.cliente_cnpj || resolverCnpjCliente(item) || null,
+        transportadora: limparNomeEmpresa(item.transportadora),
+        transportadora_cnpj: item.transportadora_cnpj || resolverCnpjTransportadora(item) || null,
+        nota_fiscal_emitida: dadosNf.nota_fiscal_emitida,
+        nota_fiscal_data: dadosNf.nota_fiscal_data,
+        nota_fiscal_usuario: dadosNf.nota_fiscal_usuario
+      };
+    });
 
     return locais.filter(item => {
       const isAnterior = item.data_agendamento && item.data_agendamento < hoje;
@@ -3978,6 +4008,12 @@ export async function listarAgendamentos(filtros = {}) {
             const clienteLimpo = limparNomeEmpresa(item.cliente || loc?.cliente || '');
             const transpLimpa = limparNomeEmpresa(item.transportadora || loc?.transportadora || '');
 
+            const dadosNfSup = extrairDadosNotaFiscal(item);
+            const dadosNfLoc = extrairDadosNotaFiscal(loc);
+            const nfEmitida = dadosNfSup.nota_fiscal_emitida || dadosNfLoc.nota_fiscal_emitida;
+            const nfData = dadosNfSup.nota_fiscal_data || dadosNfLoc.nota_fiscal_data || null;
+            const nfUsuario = dadosNfSup.nota_fiscal_usuario || dadosNfLoc.nota_fiscal_usuario || null;
+
             return {
               ...(loc || {}),
               ...item,
@@ -3985,6 +4021,9 @@ export async function listarAgendamentos(filtros = {}) {
               cliente_cnpj: clienteCnpj || item.cliente_cnpj || loc?.cliente_cnpj || null,
               transportadora: transpLimpa || item.transportadora,
               transportadora_cnpj: transpCnpj || item.transportadora_cnpj || loc?.transportadora_cnpj || null,
+              nota_fiscal_emitida: nfEmitida,
+              nota_fiscal_data: nfData,
+              nota_fiscal_usuario: nfUsuario,
               historico_status: historicoFinal,
               ultimo_editor: item.ultimo_editor || loc?.ultimo_editor || (historicoFinal.length > 0 ? historicoFinal[0].usuario_nome : null)
             };
@@ -4008,13 +4047,19 @@ export async function listarAgendamentos(filtros = {}) {
       }
     }
 
-    let resultado = obterAgendamentosLocais().filter(l => !idsExcluidos.has(String(l.id).trim())).map(item => ({
-      ...item,
-      cliente: limparNomeEmpresa(item.cliente),
-      cliente_cnpj: item.cliente_cnpj || resolverCnpjCliente(item) || null,
-      transportadora: limparNomeEmpresa(item.transportadora),
-      transportadora_cnpj: item.transportadora_cnpj || resolverCnpjTransportadora(item) || null
-    }));
+    let resultado = obterAgendamentosLocais().filter(l => !idsExcluidos.has(String(l.id).trim())).map(item => {
+      const dadosNf = extrairDadosNotaFiscal(item);
+      return {
+        ...item,
+        cliente: limparNomeEmpresa(item.cliente),
+        cliente_cnpj: item.cliente_cnpj || resolverCnpjCliente(item) || null,
+        transportadora: limparNomeEmpresa(item.transportadora),
+        transportadora_cnpj: item.transportadora_cnpj || resolverCnpjTransportadora(item) || null,
+        nota_fiscal_emitida: dadosNf.nota_fiscal_emitida,
+        nota_fiscal_data: dadosNf.nota_fiscal_data,
+        nota_fiscal_usuario: dadosNf.nota_fiscal_usuario
+      };
+    });
     if (filtros.pedreira && filtros.pedreira !== 'todas') {
       resultado = resultado.filter(item => saoMesmaPedreira(item.pedreira, filtros.pedreira));
     }
@@ -4226,6 +4271,150 @@ export function formatarDataBR(dataStr) {
     return `${dia}/${mes}/${ano2digitos}`;
   }
   return dataStr;
+}
+
+/**
+ * Converte string ISO para data e hora brasileira (DD/MM/AAAA às HH:MM)
+ */
+export function formatarDataHoraBR(isoStr = '') {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const ano = d.getFullYear();
+    const hora = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${dia}/${mes}/${ano} às ${hora}:${min}`;
+  } catch (e) {
+    return isoStr;
+  }
+}
+
+/**
+ * Remove tags técnicas invisíveis embutidas nas observações (como histórico e nota fiscal)
+ */
+export function limparTagsInternasObservacoes(obs = '') {
+  if (!obs || typeof obs !== 'string') return '';
+  return obs
+    .replace(/<!-- VERMONT_HIST:[\s\S]*?:VERMONT_HIST -->/g, '')
+    .replace(/<!-- VERMONT_NF:[\s\S]*?:VERMONT_NF -->/g, '')
+    .trim();
+}
+
+/**
+ * Extrai dados consolidados da Nota Fiscal do agendamento (coluna dedicada ou tag embutida)
+ */
+export function extrairDadosNotaFiscal(item) {
+  if (!item) return { nota_fiscal_emitida: false, nota_fiscal_data: null, nota_fiscal_usuario: null };
+  let emitida = Boolean(item.nota_fiscal_emitida);
+  let data = item.nota_fiscal_data || null;
+  let usuario = item.nota_fiscal_usuario || null;
+
+  if (typeof item.observacoes === 'string' && item.observacoes.includes('<!-- VERMONT_NF:')) {
+    const match = item.observacoes.match(/<!-- VERMONT_NF:([\s\S]*?):VERMONT_NF -->/);
+    if (match && match[1]) {
+      try {
+        const parsed = JSON.parse(match[1]);
+        if (parsed.emitida !== undefined) emitida = Boolean(parsed.emitida);
+        if (parsed.data) data = parsed.data;
+        if (parsed.usuario) usuario = parsed.usuario;
+      } catch (e) {}
+    }
+  }
+
+  return {
+    nota_fiscal_emitida: emitida,
+    nota_fiscal_data: data,
+    nota_fiscal_usuario: usuario
+  };
+}
+
+/**
+ * Alterna o status de emissão da Nota Fiscal do bloco (Exclusivo para Administrador Geral)
+ */
+export async function alternarNotaFiscalEmitida(agendamentoId, statusAtual = false, usuarioInfo = {}) {
+  try {
+    if (!agendamentoId) throw new Error('ID do agendamento não informado.');
+    const idStr = String(agendamentoId).trim();
+    const novoStatus = !statusAtual;
+    const agoraIso = new Date().toISOString();
+    const usuarioNome = usuarioInfo.nome || usuarioInfo.email || (usuarioInfo.isAdmin ? 'ADMIN' : 'Sistema');
+
+    // 1. Atualiza no cache local
+    const locais = obterAgendamentosLocais();
+    let itemLocalAtualizado = null;
+    const novosLocais = locais.map(item => {
+      if (String(item.id).trim() === idStr) {
+        itemLocalAtualizado = {
+          ...item,
+          nota_fiscal_emitida: novoStatus,
+          nota_fiscal_data: novoStatus ? agoraIso : null,
+          nota_fiscal_usuario: novoStatus ? usuarioNome : null
+        };
+        return itemLocalAtualizado;
+      }
+      return item;
+    });
+
+    if (itemLocalAtualizado) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(novosLocais));
+      } catch (e) {}
+    }
+
+    // 2. Atualiza no Supabase
+    if (isSupabaseConfigurado()) {
+      try {
+        // Tenta atualizar as colunas dedicadas
+        const payloadNF = {
+          nota_fiscal_emitida: novoStatus,
+          nota_fiscal_data: novoStatus ? agoraIso : null,
+          nota_fiscal_usuario: novoStatus ? usuarioNome : null
+        };
+
+        const { data, error } = await supabase
+          .from('agendamentos_pedreira')
+          .update(payloadNF)
+          .eq('id', idStr)
+          .select()
+          .single();
+
+        if (error) {
+          console.warn('Coluna nota_fiscal_emitida ainda não existe no Supabase, gravando em observações como fallback:', error.message);
+          // Fallback seguro: embute tag na coluna observações
+          const { data: itemAtual } = await supabase
+            .from('agendamentos_pedreira')
+            .select('observacoes')
+            .eq('id', idStr)
+            .single();
+
+          const obsAtual = itemAtual?.observacoes || itemLocalAtualizado?.observacoes || '';
+          const obsLimpa = obsAtual.replace(/<!-- VERMONT_NF:[\s\S]*?:VERMONT_NF -->/g, '').trim();
+          const nfTag = `<!-- VERMONT_NF:{"emitida":${novoStatus},"data":${novoStatus ? JSON.stringify(agoraIso) : 'null'},"usuario":${novoStatus ? JSON.stringify(usuarioNome) : 'null'}}:VERMONT_NF -->`;
+          const obsFinal = `${obsLimpa}${obsLimpa ? '\n\n' : ''}${nfTag}`;
+
+          await supabase
+            .from('agendamentos_pedreira')
+            .update({ observacoes: obsFinal })
+            .eq('id', idStr);
+        }
+      } catch (eSup) {
+        console.warn('Erro ao atualizar nota fiscal no Supabase:', eSup);
+      }
+    }
+
+    return {
+      success: true,
+      nota_fiscal_emitida: novoStatus,
+      nota_fiscal_data: novoStatus ? agoraIso : null,
+      nota_fiscal_usuario: novoStatus ? usuarioNome : null
+    };
+  } catch (err) {
+    console.error('Erro ao alternar status da Nota Fiscal:', err);
+    return { success: false, error: err.message };
+  }
 }
 
 // Cache seguro em memória para evitar disparos concorrentes ou em duplicidade

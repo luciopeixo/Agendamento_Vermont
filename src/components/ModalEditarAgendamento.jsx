@@ -13,6 +13,7 @@ import {
   resolverCnpjTransportadora,
   limparNomeEmpresa,
   sanitizarNumeroBloco,
+  limparTagsInternasObservacoes,
   obterStatusConformidadeCNH,
   obterStatusConformidadeCavalo,
   obterStatusConformidadeCarreta
@@ -28,10 +29,9 @@ export function ModalEditarAgendamento({
   if (!agendamento) return null;
 
   const [formData, setFormData] = useState({
-    ...agendamento,
-    numero_bloco: agendamento.numero_bloco || '',
+    pedreira: agendamento.pedreira || '',
     material: agendamento.material || '',
-    pedreira: agendamento.pedreira || PEDREIRAS_CEARA[0].nome,
+    numero_bloco: agendamento.numero_bloco || '',
     cliente_cnpj: agendamento.cliente_cnpj || resolverCnpjCliente(agendamento) || '',
     cliente: limparNomeEmpresa(agendamento.cliente) || '',
     transportadora_cnpj: agendamento.transportadora_cnpj || resolverCnpjTransportadora(agendamento) || '',
@@ -46,7 +46,7 @@ export function ModalEditarAgendamento({
     data_agendamento: agendamento.data_agendamento || '',
     horario_agendamento: agendamento.horario_agendamento || '07:40',
     justificativa_outros: agendamento.justificativa_outros || '',
-    observacoes: agendamento.observacoes || '',
+    observacoes: limparTagsInternasObservacoes(agendamento.observacoes || ''),
     status: agendamento.status || STATUS_AGENDAMENTO.AGUARDANDO
   });
 

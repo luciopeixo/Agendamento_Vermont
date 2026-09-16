@@ -687,12 +687,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
   const handleChange = (campo, valor) => {
     let valorFinal = valor;
-    if (campo === 'numero_bloco' && valor) {
-      // Se contiver prefixos como "BLOCO", "Nº", ou texto explicativo extra, sanitiza automaticamente
-      const limpo = sanitizarNumeroBloco(valor);
-      if (limpo && limpo !== valor.trim().toUpperCase()) {
-        valorFinal = limpo;
-      }
+    if (campo === 'numero_bloco') {
+      valorFinal = valor ? valor.toUpperCase() : '';
     }
     setFormData(prev => ({ ...prev, [campo]: valorFinal }));
     if (mensagemErro) setMensagemErro('');
@@ -711,11 +707,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
   const handlePonto2Change = (campo, valor) => {
     let valorFinal = valor;
-    if (campo === 'numero_bloco' && valor) {
-      const limpo = sanitizarNumeroBloco(valor);
-      if (limpo && limpo !== valor.trim().toUpperCase()) {
-        valorFinal = limpo;
-      }
+    if (campo === 'numero_bloco') {
+      valorFinal = valor ? valor.toUpperCase() : '';
     }
     setPonto2(prev => ({ ...prev, [campo]: valorFinal }));
     if (mensagemErro) setMensagemErro('');
@@ -734,11 +727,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
   const handlePonto3Change = (campo, valor) => {
     let valorFinal = valor;
-    if (campo === 'numero_bloco' && valor) {
-      const limpo = sanitizarNumeroBloco(valor);
-      if (limpo && limpo !== valor.trim().toUpperCase()) {
-        valorFinal = limpo;
-      }
+    if (campo === 'numero_bloco') {
+      valorFinal = valor ? valor.toUpperCase() : '';
     }
     setPonto3(prev => ({ ...prev, [campo]: valorFinal }));
     if (mensagemErro) setMensagemErro('');

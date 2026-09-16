@@ -14,6 +14,7 @@ import {
   dispararEmailConfirmacao,
   formatarPlacasExibicao,
   formatarDataBR,
+  formatarDataHoraBR,
   formatarCNPJ,
   normalizarHistoricoStatus,
   obterDataHoraAtualBrasil,
@@ -26,6 +27,8 @@ import {
   resolverCnpjCliente,
   resolverCnpjTransportadora,
   limparNomeEmpresa,
+  limparTagsInternasObservacoes,
+  alternarNotaFiscalEmitida,
   verificarConformidadeDocumental,
   obterBaseMotoristas,
   carregarBaseMotoristasUnificada,
@@ -230,6 +233,9 @@ export function PainelGestao({
   const [modalGestaoFrotaAberto, setModalGestaoFrotaAberto] = useState(false);
   const [motoristaParaConformidade, setMotoristaParaConformidade] = useState(null);
   const [versaoBaseMotoristas, setVersaoBaseMotoristas] = useState(0);
+
+  // Estado de processamento da alteração de Nota Fiscal (Exclusivo Admin)
+  const [salvandoNFId, setSalvandoNFId] = useState(null);
 
   const handleAbrirConformidadeDireta = (ag) => {
     const cpfLimpo = String(ag.motorista_cpf || '').replace(/\D/g, '');
@@ -478,6 +484,8 @@ export function PainelGestao({
       'Placa Carreta 1',
       'Placa Carreta 2',
       'Status Atual',
+      'Nota Fiscal Emitida',
+      'Data Emissão NF',
       'Último Editor',
       'Histórico de Alterações',
       'Observações / Ocorrências'
@@ -524,9 +532,11 @@ export function PainelGestao({
         'Placa Carreta 1': ag.placa_carreta || '',
         'Placa Carreta 2': ag.placa_carreta_2 || '',
         'Status Atual': ag.status || '',
+        'Nota Fiscal Emitida': ag.nota_fiscal_emitida ? 'SIM' : 'NÃO',
+        'Data Emissão NF': ag.nota_fiscal_data ? formatarDataHoraBR(ag.nota_fiscal_data) : '',
         'Último Editor': ultimoEditor,
         'Histórico de Alterações': histTexto,
-        'Observações / Ocorrências': (ag.observacoes || '').replace(/[\r\n]+/g, ' ')
+        'Observações / Ocorrências': limparTagsInternasObservacoes(ag.observacoes || '').replace(/[\r\n]+/g, ' ')
       };
     });
 
@@ -638,6 +648,40 @@ export function PainelGestao({
 
     setMensagemAviso(`Informações do Bloco ${itemFormatado.numero_bloco} atualizadas com sucesso!`);
     setTimeout(() => setMensagemAviso(''), 6000);
+  };
+
+  const handleAlternarNotaFiscal = async (ag) => {
+    if (!isAdmin) {
+      alert('Apenas o Administrador Geral pode alterar o status de emissão da Nota Fiscal.');
+      return;
+    }
+    const idStr = String(ag.id).trim();
+    setSalvandoNFId(idStr);
+
+    const statusAtual = Boolean(ag.nota_fiscal_emitida);
+    const res = await alternarNotaFiscalEmitida(idStr, statusAtual, usuarioInfo);
+    setSalvandoNFId(null);
+
+    if (res.success) {
+      const agAtualizado = {
+        ...ag,
+        nota_fiscal_emitida: res.nota_fiscal_emitida,
+        nota_fiscal_data: res.nota_fiscal_data,
+        nota_fiscal_usuario: res.nota_fiscal_usuario
+      };
+
+      setAgendamentos(prev => prev.map(item => String(item.id).trim() === idStr ? agAtualizado : item));
+      setTodosAgendamentos(prev => prev.map(item => String(item.id).trim() === idStr ? agAtualizado : item));
+      setPendenciasAnteriores(prev => prev.map(item => String(item.id).trim() === idStr ? agAtualizado : item));
+
+      const textoAviso = res.nota_fiscal_emitida
+        ? `Nota Fiscal do Bloco ${ag.numero_bloco} marcada como EMITIDA com sucesso!`
+        : `Nota Fiscal do Bloco ${ag.numero_bloco} desmarcada com sucesso.`;
+      setMensagemAviso(textoAviso);
+      setTimeout(() => setMensagemAviso(''), 5000);
+    } else {
+      alert('Erro ao atualizar status da Nota Fiscal: ' + (res.error || 'Falha na comunicação'));
+    }
   };
 
   const handleExcluir = async (ag) => {
@@ -2447,7 +2491,7 @@ export function PainelGestao({
                         )}
                         {ag.observacoes ? (
                           <div style={{ fontSize: '0.78rem', color: '#e2e8f0', lineHeight: '1.3' }}>
-                            {ag.observacoes}
+                            {limparTagsInternasObservacoes(ag.observacoes)}
                           </div>
                         ) : !ag.justificativa_outros ? (
                           <span style={{ fontSize: '0.75rem', color: 'var(--slate-500)', fontStyle: 'italic' }}>
@@ -2471,6 +2515,75 @@ export function PainelGestao({
                             <Edit3 size={14} />
                             Editar
                           </button>
+
+                          {/* BOTÃO DE CONTROLE DE EMISSÃO DE NOTA FISCAL (Apenas Admin edita, todos visualizam) */}
+                          {isAcessoAdminGeral ? (
+                            <button
+                              type="button"
+                              onClick={() => handleAlternarNotaFiscal(ag)}
+                              className="btn"
+                              disabled={salvandoNFId === String(ag.id).trim()}
+                              style={{
+                                padding: '6px 10px',
+                                fontSize: '0.78rem',
+                                gap: 5,
+                                transition: 'all 0.2s',
+                                background: ag.nota_fiscal_emitida ? 'rgba(34, 197, 94, 0.18)' : 'rgba(255, 255, 255, 0.05)',
+                                borderColor: ag.nota_fiscal_emitida ? '#22c55e' : 'rgba(255, 255, 255, 0.2)',
+                                color: ag.nota_fiscal_emitida ? '#4ade80' : 'var(--slate-300)',
+                                fontWeight: ag.nota_fiscal_emitida ? 700 : 500,
+                                cursor: 'pointer'
+                              }}
+                              title={
+                                ag.nota_fiscal_emitida
+                                  ? `Nota Fiscal Emitida${ag.nota_fiscal_data ? ' em ' + formatarDataHoraBR(ag.nota_fiscal_data) : ''}${ag.nota_fiscal_usuario ? ' por ' + ag.nota_fiscal_usuario : ''}. Clique para desmarcar.`
+                                  : 'Clique para marcar que a Nota Fiscal deste bloco foi emitida (Exclusivo Admin)'
+                              }
+                            >
+                              {salvandoNFId === String(ag.id).trim() ? (
+                                <span className="spinner" style={{ width: 12, height: 12, borderWidth: 1.5 }} />
+                              ) : ag.nota_fiscal_emitida ? (
+                                <CheckCircle2 size={14} color="#4ade80" />
+                              ) : (
+                                <FileCheck size={14} color="var(--slate-400)" />
+                              )}
+                              <span>{ag.nota_fiscal_emitida ? 'NF OK' : 'NF'}</span>
+                            </button>
+                          ) : (
+                            /* Visualização para Usuários da Pedreira (Somente Leitura) */
+                            <div
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                padding: '5px 8px',
+                                borderRadius: 6,
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                background: ag.nota_fiscal_emitida ? 'rgba(34, 197, 94, 0.15)' : 'rgba(148, 163, 184, 0.08)',
+                                border: `1px solid ${ag.nota_fiscal_emitida ? 'rgba(34, 197, 94, 0.35)' : 'rgba(148, 163, 184, 0.2)'}`,
+                                color: ag.nota_fiscal_emitida ? '#4ade80' : 'var(--slate-400)',
+                                cursor: 'default'
+                              }}
+                              title={
+                                ag.nota_fiscal_emitida
+                                  ? `Nota Fiscal deste bloco já emitida${ag.nota_fiscal_data ? ' em ' + formatarDataHoraBR(ag.nota_fiscal_data) : ''}`
+                                  : 'Aguardando emissão da Nota Fiscal'
+                              }
+                            >
+                              {ag.nota_fiscal_emitida ? (
+                                <>
+                                  <CheckCircle2 size={13} color="#4ade80" />
+                                  <span>NF OK</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Clock size={13} color="var(--slate-400)" />
+                                  <span>Sem NF</span>
+                                </>
+                              )}
+                            </div>
+                          )}
 
                           {/* BOTÃO VER COMPROVANTE (Exclusivo Administrador Geral) */}
                           {isAcessoAdminGeral && onVisualizarComprovante && (
