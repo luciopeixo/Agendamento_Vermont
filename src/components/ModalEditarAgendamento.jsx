@@ -13,6 +13,8 @@ import {
   resolverCnpjTransportadora,
   limparNomeEmpresa,
   sanitizarNumeroBloco,
+  validarFormatoBlocoTajMahal,
+  isClienteThorOuArgos,
   limparTagsInternasObservacoes,
   obterStatusConformidadeCNH,
   obterStatusConformidadeCavalo,
@@ -78,6 +80,14 @@ export function ModalEditarAgendamento({
     return obterStatusConformidadeCarreta(formData.placa_carreta_2, formData.data_agendamento, '', formData.motorista_cpf, formData.motorista_nome);
   }, [formData.placa_carreta_2, formData.data_agendamento, formData.motorista_cpf, formData.motorista_nome]);
 
+  const alertaTajMahal = useMemo(() => {
+    return validarFormatoBlocoTajMahal({
+      material: formData.material,
+      cliente: formData.cliente,
+      numero_bloco: formData.numero_bloco
+    });
+  }, [formData.material, formData.cliente, formData.numero_bloco]);
+
   const handleChange = (campo, valor) => {
     setFormData(prev => {
       const novo = { ...prev, [campo]: valor };
@@ -102,6 +112,18 @@ export function ModalEditarAgendamento({
       setSalvando(false);
       return;
     }
+
+    const valTaj = validarFormatoBlocoTajMahal({
+      material: formData.material,
+      cliente: formData.cliente,
+      numero_bloco: blocoLimpo
+    });
+    if (!valTaj.valido) {
+      setErro(valTaj.mensagem);
+      setSalvando(false);
+      return;
+    }
+
     const dadosParaSalvar = { ...formData, numero_bloco: blocoLimpo };
 
     if (!isAdmin && agendamento.status === 'Aguardando Liberação' && formData.status !== 'Aguardando Liberação') {
@@ -255,6 +277,11 @@ export function ModalEditarAgendamento({
                   onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value))}
                   required
                 />
+                {!alertaTajMahal.valido && (
+                  <span className="animate-fade" style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
+                    ⚠️ {alertaTajMahal.mensagem}
+                  </span>
+                )}
               </div>
 
               <div className="form-group">

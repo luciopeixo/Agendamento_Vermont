@@ -2593,6 +2593,57 @@ export function detectarMultiplosBlocos(texto = '') {
 }
 
 /**
+ * Verifica se o cliente é THOR ou ARGOS
+ */
+export function isClienteThorOuArgos(cliente = '') {
+  if (!cliente || typeof cliente !== 'string') return false;
+  const c = cliente.toUpperCase().trim();
+  return /\bTHOR\b/i.test(c) || /\bARGOS\b/i.test(c);
+}
+
+/**
+ * Valida a regra de formatação de bloco para Taj Mahal:
+ * - Se Material for Taj Mahal e Cliente for THOR ou ARGOS: o número do bloco DEVE conter '/' (ex: 11/26)
+ * - Se Material for Taj Mahal e Cliente for outro: o número do bloco NÃO PODE conter '/'
+ * Retorna { valido: boolean, mensagem: string | null }
+ */
+export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numero_bloco = '' }) {
+  if (!material || !numero_bloco) return { valido: true };
+
+  const matUpper = material.toUpperCase().trim();
+  if (!matUpper.includes('TAJ MAHAL') && matUpper !== 'TAJ MAHAL') {
+    return { valido: true };
+  }
+
+  const blocoTrim = numero_bloco.trim();
+  const contemBarra = blocoTrim.includes('/');
+  const isThorArgos = isClienteThorOuArgos(cliente);
+
+  // Se o cliente ainda não foi informado, não valida restrição ainda
+  if (!cliente || !cliente.trim()) {
+    return { valido: true };
+  }
+
+  if (isThorArgos) {
+    if (!contemBarra) {
+      return {
+        valido: false,
+        mensagem: `Para o material Taj Mahal com o cliente ${cliente.toUpperCase().trim()}, o número do bloco deve conter a barra com o ano (ex: 11/26 ou 123/26).`
+      };
+    }
+  } else {
+    if (contemBarra) {
+      return {
+        valido: false,
+        mensagem: 'Para o material Taj Mahal deste cliente, o número do bloco não pode conter a barra "/" (informe apenas a numeração do bloco, ex: 1256926).'
+      };
+    }
+  }
+
+  return { valido: true };
+}
+
+/**
  * Verifica se já existe um agendamento ativo cadastrado para o mesmo cliente, número de bloco, pedreira e material
  * Retorna { duplicado: boolean, agendamentoExistente: object | null, blocoDuplicado: string | null, mensagem: string | null }
  */
@@ -3366,6 +3417,15 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
       });
       if (checkDuplicado.duplicado) {
         return { success: false, error: checkDuplicado.mensagem };
+      }
+
+      const valTaj = validarFormatoBlocoTajMahal({
+        material: agendamentoAtualizado.material,
+        cliente: agendamentoAtualizado.cliente,
+        numero_bloco: agendamentoAtualizado.numero_bloco
+      });
+      if (!valTaj.valido) {
+        return { success: false, error: valTaj.mensagem };
       }
     }
 
@@ -4736,6 +4796,16 @@ export async function salvarAgendamento(dados) {
       throw new Error(checkDuplicado.mensagem);
     }
 
+    // Validação de formato de bloco Taj Mahal (Thor/Argos exige '/', outros proíbe '/')
+    const valTaj = validarFormatoBlocoTajMahal({
+      material: dados.material,
+      cliente: dados.cliente,
+      numero_bloco: dados.numero_bloco
+    });
+    if (!valTaj.valido) {
+      throw new Error(valTaj.mensagem);
+    }
+
     const configPlacas = obterConfigPlacas(dados.tipo_veiculo);
 
     const placaCavaloLimpa = dados.placa_cavalo ? dados.placa_cavalo.toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
@@ -4913,6 +4983,16 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
       });
       if (checkDuplicado.duplicado) {
         throw new Error(`[${numPonto}º Carregamento] ${checkDuplicado.mensagem}`);
+      }
+
+      // Validação de formato de bloco Taj Mahal (Thor/Argos exige '/', outros proíbe '/')
+      const valTaj = validarFormatoBlocoTajMahal({
+        material: p.material,
+        cliente: clientePonto,
+        numero_bloco: p.numero_bloco
+      });
+      if (!valTaj.valido) {
+        throw new Error(`[${numPonto}º Carregamento] ${valTaj.mensagem}`);
       }
 
       // Rastreia blocos para checar duplicidade entre os pontos da mesma carga combinada

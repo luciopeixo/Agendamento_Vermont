@@ -29,6 +29,8 @@ import {
   extrairBlocosDigitados,
   sanitizarNumeroBloco,
   verificarBlocoDuplicado,
+  validarFormatoBlocoTajMahal,
+  isClienteThorOuArgos,
   validarCPF,
   consultarMotoristaPorCPF,
   validarCNPJ,
@@ -216,6 +218,33 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   const [alertaDuplicidade1, setAlertaDuplicidade1] = useState(null);
   const [alertaDuplicidade2, setAlertaDuplicidade2] = useState(null);
   const [alertaDuplicidade3, setAlertaDuplicidade3] = useState(null);
+
+  // Validação em tempo real de formato de bloco para Taj Mahal (Thor/Argos exige "/", outros proíbe "/")
+  const alertaTajMahal1 = useMemo(() => {
+    return validarFormatoBlocoTajMahal({
+      material: formData.material,
+      cliente: formData.cliente,
+      numero_bloco: formData.numero_bloco
+    });
+  }, [formData.material, formData.cliente, formData.numero_bloco]);
+
+  const alertaTajMahal2 = useMemo(() => {
+    if (tipoCarregamento !== 'combinado') return { valido: true };
+    return validarFormatoBlocoTajMahal({
+      material: ponto2.material,
+      cliente: ponto2.cliente || formData.cliente,
+      numero_bloco: ponto2.numero_bloco
+    });
+  }, [tipoCarregamento, ponto2.material, ponto2.cliente, formData.cliente, ponto2.numero_bloco]);
+
+  const alertaTajMahal3 = useMemo(() => {
+    if (tipoCarregamento !== 'combinado' || qtdBlocosCombinados !== 3) return { valido: true };
+    return validarFormatoBlocoTajMahal({
+      material: ponto3.material,
+      cliente: ponto3.cliente || formData.cliente,
+      numero_bloco: ponto3.numero_bloco
+    });
+  }, [tipoCarregamento, qtdBlocosCombinados, ponto3.material, ponto3.cliente, formData.cliente, ponto3.numero_bloco]);
 
   // Verificação automática de conformidade documental com a base interna da pedreira
   useEffect(() => {
@@ -1080,6 +1109,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         setMensagemErro(checkDuplicado.mensagem);
         return;
       }
+
+      const valTaj = validarFormatoBlocoTajMahal({
+        material: formData.material,
+        cliente: formData.cliente,
+        numero_bloco: formData.numero_bloco
+      });
+      if (!valTaj.valido) {
+        setMensagemErro(valTaj.mensagem);
+        return;
+      }
     } else {
       const checkDuplicado1 = await verificarBlocoDuplicado({
         pedreira: formData.pedreira,
@@ -1090,6 +1129,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       });
       if (checkDuplicado1.duplicado) {
         setMensagemErro(`[1º Carregamento] ${checkDuplicado1.mensagem}`);
+        return;
+      }
+
+      const valTaj1 = validarFormatoBlocoTajMahal({
+        material: formData.material,
+        cliente: formData.cliente,
+        numero_bloco: formData.numero_bloco
+      });
+      if (!valTaj1.valido) {
+        setMensagemErro(`[1º Carregamento] ${valTaj1.mensagem}`);
         return;
       }
 
@@ -1105,6 +1154,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         return;
       }
 
+      const valTaj2 = validarFormatoBlocoTajMahal({
+        material: ponto2.material,
+        cliente: ponto2.cliente || formData.cliente,
+        numero_bloco: ponto2.numero_bloco
+      });
+      if (!valTaj2.valido) {
+        setMensagemErro(`[2º Carregamento] ${valTaj2.mensagem}`);
+        return;
+      }
+
       if (qtdBlocosCombinados === 3) {
         const checkDuplicado3 = await verificarBlocoDuplicado({
           pedreira: ponto3.pedreira,
@@ -1115,6 +1174,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         });
         if (checkDuplicado3.duplicado) {
           setMensagemErro(`[3º Carregamento] ${checkDuplicado3.mensagem}`);
+          return;
+        }
+
+        const valTaj3 = validarFormatoBlocoTajMahal({
+          material: ponto3.material,
+          cliente: ponto3.cliente || formData.cliente,
+          numero_bloco: ponto3.numero_bloco
+        });
+        if (!valTaj3.valido) {
+          setMensagemErro(`[3º Carregamento] ${valTaj3.mensagem}`);
           return;
         }
       }
@@ -1517,6 +1586,26 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       <span>{alertaDuplicidade1.mensagem}</span>
                     </div>
                   )}
+
+                  {/* Alerta em tempo real de Regra de Formato Taj Mahal (Thor/Argos exige '/', outros proíbe '/') */}
+                  {!alertaTajMahal1.valido && (
+                    <div className="animate-fade" style={{
+                      marginTop: 8,
+                      padding: '10px 12px',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.45)',
+                      borderRadius: 8,
+                      color: '#f87171',
+                      fontSize: '0.82rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontWeight: 600
+                    }}>
+                      <AlertTriangle size={16} color="#ef4444" style={{ flexShrink: 0 }} />
+                      <span>{alertaTajMahal1.mensagem}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1807,7 +1896,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   </select>
                 </div>
 
-                {/* Bloco 1 */}
+                  {/* Bloco 1 */}
                 <div className="form-group">
                   <label className="form-label form-label-required">Nº do 1º Bloco</label>
                   <input
@@ -1841,6 +1930,24 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     }}>
                       <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
                       <span>{alertaDuplicidade1.mensagem}</span>
+                    </div>
+                  )}
+                  {!alertaTajMahal1.valido && (
+                    <div className="animate-fade" style={{
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.45)',
+                      borderRadius: 6,
+                      color: '#f87171',
+                      fontSize: '0.78rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 600
+                    }}>
+                      <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
+                      <span>{alertaTajMahal1.mensagem}</span>
                     </div>
                   )}
                 </div>
@@ -2060,6 +2167,24 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     }}>
                       <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
                       <span>{alertaDuplicidade2.mensagem}</span>
+                    </div>
+                  )}
+                  {!alertaTajMahal2.valido && (
+                    <div className="animate-fade" style={{
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      border: '1px solid rgba(239, 68, 68, 0.45)',
+                      borderRadius: 6,
+                      color: '#f87171',
+                      fontSize: '0.78rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 600
+                    }}>
+                      <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
+                      <span>{alertaTajMahal2.mensagem}</span>
                     </div>
                   )}
                 </div>
@@ -2389,6 +2514,24 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       }}>
                         <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
                         <span>{alertaDuplicidade3.mensagem}</span>
+                      </div>
+                    )}
+                    {!alertaTajMahal3.valido && (
+                      <div className="animate-fade" style={{
+                        marginTop: 8,
+                        padding: '8px 10px',
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.45)',
+                        borderRadius: 6,
+                        color: '#f87171',
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontWeight: 600
+                      }}>
+                        <AlertTriangle size={15} color="#ef4444" style={{ flexShrink: 0 }} />
+                        <span>{alertaTajMahal3.mensagem}</span>
                       </div>
                     )}
                   </div>
