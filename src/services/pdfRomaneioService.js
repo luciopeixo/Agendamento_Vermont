@@ -1,5 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import { formatarCNPJ, limparNomeEmpresa, PEDREIRAS_CEARA } from './agendamentoService.js';
+import { formatarCNPJ, limparNomeEmpresa, PEDREIRAS_CEARA, MATERIAIS_POR_PEDREIRA } from './agendamentoService.js';
 
 // Configurar o worker do PDF.js para funcionar perfeitamente em navegadores
 try {
@@ -84,38 +84,126 @@ export const extrairTextoDoPdf = async (arquivoOuBuffer) => {
   return paginasTexto.join('\n\n--- NOVA PAGINA ---\n\n');
 };
 
+// Lista linear de todos os materiais oficialmente cadastrados nas pedreiras Vermont
+const TODOS_MATERIAIS_OFICIAIS = Object.entries(MATERIAIS_POR_PEDREIRA).flatMap(([pedId, mats]) =>
+  mats.map(nome => ({
+    nome,
+    nomeUpper: nome.toUpperCase(),
+    pedId
+  }))
+);
+
 /**
- * Normaliza o nome do material para o padrão das pedreiras Vermont
+ * Normaliza e mapeia o texto bruto do material do Romaneio PDF para o nome oficial
+ * cadastrado nas pedreiras da Vermont Mineração.
+ * 
+ * Exemplos:
+ * - "BASALTO PRETO NEGRESCO" -> "Negresco"
+ * - "GRANITO NEGRESCO" -> "Negresco"
+ * - "BASALTO NEGRESCO" -> "Negresco"
+ * - "QUARTZITO BRANCO TAJ MAHAL" -> "Taj Mahal"
+ * - "QUARTZITO TAJ MAHAL" -> "Taj Mahal"
+ * - "GRANITO DEL MARE" -> "Del Mare"
+ * - "QUARTZITO INFINITY BROWN" -> "Infinity Brown"
  */
-export const normalizarMaterialVermont = (materialBruto) => {
+export const normalizarMaterialVermont = (materialBruto, pedreiraId = '') => {
   if (!materialBruto) return 'Taj Mahal';
-  const matUpper = String(materialBruto).toUpperCase();
+  const matLimpo = String(materialBruto).trim();
+  const matUpper = matLimpo.toUpperCase();
   
+  // Regras de aliases prioritários conhecidos
+  if (matUpper.includes('NEGRESCO')) {
+    return 'Negresco';
+  }
   if (matUpper.includes('TAJ MAHAL') || matUpper.includes('TAJMAHAL')) {
     return 'Taj Mahal';
   }
-  if (matUpper.includes('BASALTO') || matUpper.includes('NEGRESCO')) {
-    return 'Basalto / Donatello';
+  if (matUpper.includes('DEL MARE') || matUpper.includes('DELMARE')) {
+    return 'Del Mare';
   }
-  if (matUpper.includes('DONATELLO')) {
-    return 'Donatello';
+  if (matUpper.includes('CHATEAU BLANC')) {
+    return 'Chateau Blanc';
   }
-  if (matUpper.includes('PERLA') || matUpper.includes('SANTANA')) {
-    return 'Perla Santana';
+  if (matUpper.includes('BRECCIA VIOLA')) {
+    return 'Breccia Viola';
   }
-  if (matUpper.includes('MACAMBIRA')) {
-    return 'Macambira';
+  if (matUpper.includes('BRECCIA IMPERIALE')) {
+    return 'Breccia Imperiale';
   }
-  return materialBruto.trim();
+  if (matUpper.includes('INFINITY BROWN')) {
+    return 'Infinity Brown';
+  }
+  if (matUpper.includes('INFINITY BLACK')) {
+    return 'Infinity Black';
+  }
+  if (matUpper.includes('ROMA IMPERIALE')) {
+    return 'Roma Imperiale';
+  }
+  if (matUpper.includes('BLUE DEEP')) {
+    return 'Blue Deep';
+  }
+  if (matUpper.includes('BLUE MARE')) {
+    return 'Blue Mare';
+  }
+  if (matUpper.includes('BLUE ROMA')) {
+    return 'Blue Roma';
+  }
+  if (matUpper.includes('TELLUS BLUE')) {
+    return 'Tellus Blue';
+  }
+  if (matUpper.includes('ATLANTIC BLUE')) {
+    return 'Atlantic Blue';
+  }
+  if (matUpper.includes('BROWN STRINGS')) {
+    return 'Brown Strings';
+  }
+  if (matUpper.includes('JJ BROWN')) {
+    return 'JJ Brown';
+  }
+
+  // Se uma pedreira específica foi informada, verificar primeiro seus materiais
+  if (pedreiraId && MATERIAIS_POR_PEDREIRA[pedreiraId]) {
+    const matsPedreira = MATERIAIS_POR_PEDREIRA[pedreiraId];
+    for (const m of matsPedreira) {
+      const mUpper = m.toUpperCase();
+      if (matUpper.includes(mUpper) || mUpper.includes(matUpper)) {
+        return m;
+      }
+    }
+  }
+
+  // Comparar contra todos os materiais oficiais cadastrados
+  for (const item of TODOS_MATERIAIS_OFICIAIS) {
+    if (matUpper.includes(item.nomeUpper) || item.nomeUpper.includes(matUpper)) {
+      return item.nome;
+    }
+  }
+
+  // Se não encontrar correspondência exata, remover prefixos geológicos comuns
+  const limpoSemPrefixos = matLimpo
+    .replace(/^(QUARTZITO|GRANITO|BASALTO|MARMORE|MÁRMORE|PEGMATITO)\s+(BRANCO|PRETO|VERDE|CINZA|AMARELO)?\s*/i, '')
+    .trim();
+
+  if (limpoSemPrefixos && limpoSemPrefixos.length >= 3) {
+    for (const item of TODOS_MATERIAIS_OFICIAIS) {
+      if (limpoSemPrefixos.toUpperCase().includes(item.nomeUpper) || item.nomeUpper.includes(limpoSemPrefixos.toUpperCase())) {
+        return item.nome;
+      }
+    }
+  }
+
+  return matLimpo;
 };
 
 /**
  * Identifica a pedreira Vermont a partir das informações de cabeçalho do documento
+ * e do material detectado
  */
-export const identificarPedreiraDoDocumento = (textoCompleto) => {
+export const identificarPedreiraDoDocumento = (textoCompleto, materialDetectado = '') => {
   const t = (textoCompleto || '').toUpperCase();
+  const matUpper = String(materialDetectado || '').toUpperCase();
   
-  if (t.includes('MACAMBIRA') || t.includes('SERRA DA GOIANA') || t.includes('URUOCA')) {
+  if (t.includes('MACAMBIRA') || t.includes('SERRA DA GOIANA') || t.includes('URUOCA') || matUpper.includes('TAJ MAHAL')) {
     const p = PEDREIRAS_CEARA.find(item => item.id === 'uruoca');
     return {
       id: 'uruoca',
@@ -123,19 +211,27 @@ export const identificarPedreiraDoDocumento = (textoCompleto) => {
     };
   }
 
-  if (t.includes('BOA VISTA') || t.includes('MASSAPE') || t.includes('MASSAPÊ')) {
-    const p = PEDREIRAS_CEARA.find(item => item.id === 'massape');
+  if (t.includes('BOA VISTA') || t.includes('MASSAPE') || t.includes('MASSAPÊ') || matUpper.includes('NEGRESCO') || matUpper.includes('DEL MARE')) {
+    // Distinguir entre Massapê (Negresco) e Massapê (Del Mare)
+    if (matUpper.includes('DEL MARE') || matUpper.includes('CHATEAU') || matUpper.includes('BRECCIA VIOLA') || matUpper.includes('EVORA')) {
+      const p = PEDREIRAS_CEARA.find(item => item.id === 'massape_delmare');
+      return {
+        id: 'massape_delmare',
+        nome: p ? p.nome : 'Massapê - CE (Del Mare)'
+      };
+    }
+    const p = PEDREIRAS_CEARA.find(item => item.id === 'massape_negresco');
     return {
-      id: 'massape',
-      nome: p ? p.nome : 'Massapê - CE (Basalto / Donatello)'
+      id: 'massape_negresco',
+      nome: p ? p.nome : 'Massapê - CE (Negresco)'
     };
   }
 
-  if (t.includes('SOBRAL')) {
-    const p = PEDREIRAS_CEARA.find(item => item.id === 'sobral');
+  if (t.includes('SOBRAL') || t.includes('JAIBARAS') || matUpper.includes('BRECCIA IMPERIALE') || matUpper.includes('ZITAN') || matUpper.includes('SCENARIO')) {
+    const p = PEDREIRAS_CEARA.find(item => item.id === 'sobral_jaibaras');
     return {
-      id: 'sobral',
-      nome: p ? p.nome : 'Sobral - CE'
+      id: 'sobral_jaibaras',
+      nome: p ? p.nome : 'Sobral - CE (Jaibaras)'
     };
   }
 
@@ -144,6 +240,22 @@ export const identificarPedreiraDoDocumento = (textoCompleto) => {
     return {
       id: 'santa_quiteria',
       nome: p ? p.nome : 'Santa Quitéria - CE'
+    };
+  }
+
+  if (t.includes('SERROTE') || t.includes('SÃO GONÇALO') || t.includes('SAO GONCALO') || matUpper.includes('BLUE DEEP') || matUpper.includes('ROMA IMPERIALE')) {
+    const p = PEDREIRAS_CEARA.find(item => item.id === 'serrote');
+    return {
+      id: 'serrote',
+      nome: p ? p.nome : 'São Gonçalo do Amarante - CE (Serrote)'
+    };
+  }
+
+  if (t.includes('BEBERIBE') || matUpper.includes('RAFFINATO') || matUpper.includes('NAURIKA') || matUpper.includes('GUINESS')) {
+    const p = PEDREIRAS_CEARA.find(item => item.id === 'beberibe');
+    return {
+      id: 'beberibe',
+      nome: p ? p.nome : 'Beberibe - CE'
     };
   }
 
@@ -350,7 +462,8 @@ export const processarRomaneioPdfTexto = (textoCompleto) => {
       }
       blocosJaAdicionados.add(numeroBloco);
 
-      const materialNormalizado = normalizarMaterialVermont(materialBruto);
+      // Normalizar o material comparando com a base oficial de materiais das pedreiras
+      const materialNormalizado = normalizarMaterialVermont(materialBruto, pedreiraDetectada.id);
 
       // Extrair valores monetários no final da linha para identificar a coluna ENVELOPAMENTO
       // Na ordem da tabela: [DESCONTO, FRETE, ENVELOPAMENTO, TOTAL GERAL R$]
