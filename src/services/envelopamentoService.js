@@ -75,41 +75,101 @@ export const salvarEnvelopamentosLocais = (lista) => {
   }
 };
 
+const SYNC_ENV_CPF = 'ENV_STORAGE_VERMONT';
+const SYNC_CLI_CPF = 'CLI_STORAGE_VERMONT';
+
 /**
- * Lista todos os envelopamentos (Supabase com fallback para LocalStorage)
+ * Persiste a lista completa de envelopamentos na nuvem (Supabase) garantindo sincronização instantânea
+ * mesmo caso a tabela dedicada 'envelopamentos' ainda não tenha sido criada via SQL Editor.
+ */
+const sincronizarEnvelopamentosNuvem = async (lista) => {
+  if (!isSupabaseConfigurado() || !Array.isArray(lista)) return;
+  try {
+    await supabase.from('base_motoristas').upsert({
+      cpf: SYNC_ENV_CPF,
+      nome: 'SISTEMA_ENVELOPAMENTO_VERMONT',
+      observacoes: JSON.stringify(lista),
+      status_documental: 'REGULAR',
+      atualizado_por: 'Sistema Envelopamento Vermont',
+      atualizado_em: new Date().toISOString()
+    }, { onConflict: 'cpf' });
+  } catch (err) {
+    console.warn('[Envelopamento] Falha ao sincronizar espelho na nuvem:', err);
+  }
+};
+
+/**
+ * Consulta a lista de envelopamentos na nuvem com failover inteligente
+ */
+const consultarEnvelopamentosNuvem = async () => {
+  if (!isSupabaseConfigurado()) return null;
+
+  // 1. Tentar primeiro na tabela oficial 'envelopamentos'
+  try {
+    const { data, error } = await supabase
+      .from('envelopamentos')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data) && data.length > 0) {
+      return data;
+    }
+  } catch (e) {}
+
+  // 2. Fallback na nuvem via espelho de sincronização em 'base_motoristas'
+  try {
+    const { data, error } = await supabase
+      .from('base_motoristas')
+      .select('observacoes')
+      .eq('cpf', SYNC_ENV_CPF)
+      .maybeSingle();
+
+    if (!error && data?.observacoes) {
+      const parsed = JSON.parse(data.observacoes);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+
+  return null;
+};
+
+/**
+ * Lista todos os envelopamentos (Supabase com fallback para LocalStorage e mesclagem bidirecional)
  */
 export const listarEnvelopamentos = async (filtros = {}) => {
   let dados = [];
+  const dadosLocais = carregarEnvelopamentosLocais();
 
   if (isSupabaseConfigurado()) {
-    try {
-      let query = supabase.from('envelopamentos').select('*').order('created_at', { ascending: false });
-
-      if (filtros.pedreira) {
-        query = query.eq('pedreira_nome', filtros.pedreira);
+    const dadosNuvem = await consultarEnvelopamentosNuvem();
+    if (Array.isArray(dadosNuvem) && dadosNuvem.length > 0) {
+      // Mesclar nuvem com local (priorizando os registros mais recentes pelo updated_at)
+      const mapa = new Map();
+      dadosLocais.forEach(item => { if (item?.id) mapa.set(item.id, item); });
+      dadosNuvem.forEach(item => {
+        if (!item?.id) return;
+        const local = mapa.get(item.id);
+        if (!local || new Date(item.updated_at || item.created_at || 0) >= new Date(local.updated_at || local.created_at || 0)) {
+          mapa.set(item.id, item);
+        }
+      });
+      dados = Array.from(mapa.values());
+      salvarEnvelopamentosLocais(dados);
+    } else {
+      dados = dadosLocais;
+      if (dadosLocais.length > 0) {
+        // Envia os dados locais existentes para a nuvem para que outros usuários recebam
+        sincronizarEnvelopamentosNuvem(dadosLocais);
       }
-      if (filtros.status) {
-        query = query.eq('status', filtros.status);
-      }
-      if (filtros.cliente) {
-        query = query.ilike('cliente_nome', `%${filtros.cliente}%`);
-      }
-
-      const { data, error } = await query;
-      if (!error && Array.isArray(data)) {
-        dados = data;
-      } else {
-        dados = carregarEnvelopamentosLocais();
-      }
-    } catch (err) {
-      dados = carregarEnvelopamentosLocais();
     }
   } else {
-    dados = carregarEnvelopamentosLocais();
+    dados = dadosLocais;
   }
 
   if (dados.length === 0) {
-    dados = carregarEnvelopamentosLocais();
+    dados = dadosLocais;
   }
 
   // Normalizar status legados caso existam
@@ -120,6 +180,9 @@ export const listarEnvelopamentos = async (filtros = {}) => {
     if (st === 'conferido' || st === 'liberado') st = 'envelopado';
     return { ...item, status: st };
   });
+
+  // Ordenar por data mais recente
+  dados.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
   // Aplicar filtros em memória
   return dados.filter(item => {
@@ -149,7 +212,7 @@ export const notificarAlteracaoEnvelopamento = () => {
 
 /**
  * Inscreve um callback para ser notificado sempre que houver alterações nos envelopamentos
- * (via Supabase Realtime, eventos da janela local e Storage entre abas).
+ * (via Supabase Realtime em 'envelopamentos' e 'base_motoristas', eventos da janela local e Storage entre abas).
  */
 export const inscreverEnvelopamentosRealtime = (callback) => {
   let supabaseChannel = null;
@@ -164,6 +227,15 @@ export const inscreverEnvelopamentosRealtime = (callback) => {
           { event: '*', schema: 'public', table: 'envelopamentos' },
           (payload) => {
             if (typeof callback === 'function') callback(payload);
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'base_motoristas' },
+          (payload) => {
+            if (payload?.new?.cpf === SYNC_ENV_CPF || payload?.new?.cpf === SYNC_CLI_CPF) {
+              if (typeof callback === 'function') callback(payload);
+            }
           }
         )
         .subscribe();
@@ -246,6 +318,14 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
   }
   salvarEnvelopamentosLocais(locais);
 
+  // 2. Sincronizar na nuvem (Supabase)
+  if (isSupabaseConfigurado()) {
+    // A. Tentar na tabela 'envelopamentos'
+    supabase.from('envelopamentos').upsert(registroCompleto).catch(() => {});
+    // B. Sincronizar no espelho em tempo real
+    sincronizarEnvelopamentosNuvem(locais);
+  }
+
   // Notificar ouvintes locais imediatamente
   notificarAlteracaoEnvelopamento();
 
@@ -255,18 +335,6 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
       nome: registroCompleto.cliente_nome,
       cnpj: registroCompleto.cliente_cnpj
     }).catch(() => {});
-  }
-
-  // 2. Tentar persistir no Supabase se disponível
-  if (isSupabaseConfigurado()) {
-    try {
-      const { error } = await supabase.from('envelopamentos').upsert(registroCompleto);
-      if (error) {
-        console.warn('[Envelopamento] Aviso ao sincronizar com Supabase:', error.message);
-      }
-    } catch (err) {
-      console.warn('[Envelopamento] Falha ao persistir no Supabase (salvo apenas localmente):', err);
-    }
   }
 
   return registroCompleto;
@@ -307,16 +375,14 @@ export const excluirEnvelopamento = async (id) => {
   const novaLista = locais.filter(item => item.id !== id);
   salvarEnvelopamentosLocais(novaLista);
 
-  notificarAlteracaoEnvelopamento();
-
   if (isSupabaseConfigurado()) {
     try {
       await supabase.from('envelopamentos').delete().eq('id', id);
-    } catch (err) {
-      console.warn('[Envelopamento] Falha ao excluir do Supabase:', err);
-    }
+    } catch (err) {}
+    sincronizarEnvelopamentosNuvem(novaLista);
   }
 
+  notificarAlteracaoEnvelopamento();
   return true;
 };
 
@@ -475,9 +541,53 @@ export const calcularMetricasEnvelopamento = (lista = []) => {
   };
 };
 
-// ==========================================
-// CADASTRO E GESTÃO DE CLIENTES
-// ==========================================
+/**
+ * Persiste clientes na nuvem
+ */
+const sincronizarClientesNuvem = async (lista) => {
+  if (!isSupabaseConfigurado() || !Array.isArray(lista)) return;
+  try {
+    await supabase.from('base_motoristas').upsert({
+      cpf: SYNC_CLI_CPF,
+      nome: 'SISTEMA_CLIENTES_VERMONT',
+      observacoes: JSON.stringify(lista),
+      status_documental: 'REGULAR',
+      atualizado_por: 'Sistema Envelopamento Vermont',
+      atualizado_em: new Date().toISOString()
+    }, { onConflict: 'cpf' });
+  } catch (err) {}
+};
+
+/**
+ * Consulta clientes cadastrados na nuvem
+ */
+const consultarClientesCadastradosNuvem = async () => {
+  if (!isSupabaseConfigurado()) return [];
+
+  // 1. Tentar tabela 'clientes'
+  try {
+    const { data, error } = await supabase.from('clientes').select('*').limit(3000);
+    if (!error && Array.isArray(data) && data.length > 0) {
+      return data;
+    }
+  } catch (e) {}
+
+  // 2. Fallback via espelho de sincronização em 'base_motoristas'
+  try {
+    const { data, error } = await supabase
+      .from('base_motoristas')
+      .select('observacoes')
+      .eq('cpf', SYNC_CLI_CPF)
+      .maybeSingle();
+
+    if (!error && data?.observacoes) {
+      const parsed = JSON.parse(data.observacoes);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {}
+
+  return [];
+};
 
 /**
  * Lê os clientes cadastrados localmente
@@ -536,13 +646,13 @@ export const salvarClienteCadastrado = async (dadosCliente) => {
   }
   salvarClientesLocais(locais);
 
-  // Tentar salvar no Supabase
+  // Sincronizar no Supabase
   if (isSupabaseConfigurado()) {
-    try {
-      await supabase.from('clientes').upsert(clienteObj);
-    } catch (err) {}
+    supabase.from('clientes').upsert(clienteObj).catch(() => {});
+    sincronizarClientesNuvem(locais);
   }
 
+  notificarAlteracaoEnvelopamento();
   return clienteObj;
 };
 
@@ -558,87 +668,99 @@ export const excluirClienteCadastrado = async (idOuNome) => {
     try {
       await supabase.from('clientes').delete().or(`id.eq.${idOuNome},nome.eq.${idOuNome}`);
     } catch (err) {}
+    sincronizarClientesNuvem(filtrados);
   }
 
+  notificarAlteracaoEnvelopamento();
   return true;
 };
 
 import { 
-  CNPJ_CONHECIDOS_PADRAO, 
   formatarCNPJ, 
   limparNomeEmpresa, 
   resolverCnpjCliente, 
-  extrairCnpj 
+  extrairCnpj,
+  obterCnpjEmpresaCache
 } from './agendamentoService.js';
 
 /**
- * Obtém todos os clientes e CNPJs únicos existentes em todas as bases do sistema
+ * Pontua a qualidade e legibilidade de um nome de empresa.
+ * Dá preferência a nomes com espaçamento adequado, palavras completas e sufixos legais (LTDA, S.A.),
+ * descartando nomes grudados/concatenados sem espaços (ex: FAVORITADOBRASILMARMORESEGRANITOSLTDA).
+ */
+const calcularScoreNomeCliente = (nome = '') => {
+  if (!nome) return -999;
+  const texto = String(nome).trim();
+  const semEspacos = texto.replace(/\s+/g, '');
+  const qtdEspacos = (texto.match(/\s+/g) || []).length;
+  
+  // Nomes longos totalmente sem espaços (concatenados) recebem pontuação muito baixa
+  if (qtdEspacos === 0 && semEspacos.length >= 14) {
+    return -50;
+  }
+  
+  let score = qtdEspacos * 15 + texto.length;
+  if (/\bLTDA\b|\bS\/A\b|\bSA\b|\bEIRELI\b|\bME\b|\bEPP\b/i.test(texto)) score += 30;
+  if (texto.includes(' - ')) score -= 5;
+  return score;
+};
+
+/**
+ * Obtém todos os clientes e CNPJs cadastrados e operados no sistema,
+ * com deduplicação avançada por CNPJ (14 dígitos) e unificação inteligente de variações de nomes.
  */
 export const obterClientesDoBancoDeDados = async () => {
-  const mapaClientes = new Map();
+  const itensColetados = [];
 
-  const adicionarCliente = (nome, cnpj, extra = {}) => {
-    if (!nome && !cnpj) return;
-    
-    // Tenta extrair CNPJ se estiver dentro do nome
-    const cnpjExtraido = cnpj || extrairCnpj(nome) || '';
-    const nomeLimpo = limparNomeEmpresa(String(nome || '')).trim().toUpperCase();
-    const cnpjFmt = cnpjExtraido ? formatarCNPJ(cnpjExtraido) : '';
+  const coletar = (nomeBruto, cnpjBruto, extra = {}) => {
+    if (!nomeBruto && !cnpjBruto) return;
 
-    if (!nomeLimpo && !cnpjFmt) return;
-    
-    // Chave única primária por nome ou por CNPJ
-    const chave = nomeLimpo || cnpjFmt;
+    let nome = limparNomeEmpresa(String(nomeBruto || '')).replace(/\s+/g, ' ').trim().toUpperCase();
+    let cnpj = String(cnpjBruto || extrairCnpj(nomeBruto) || '').trim();
 
-    if (!mapaClientes.has(chave)) {
-      mapaClientes.set(chave, {
-        id: extra.id || `cli_${Math.random().toString(36).substr(2, 6)}`,
-        nome: nomeLimpo || `EMPRESA CNPJ ${cnpjFmt}`,
-        cnpj: cnpjFmt,
-        telefone: extra.telefone || '',
-        email: extra.email || '',
-        observacoes: extra.observacoes || ''
-      });
-    } else {
-      const existente = mapaClientes.get(chave);
-      if (cnpjFmt && !existente.cnpj) existente.cnpj = cnpjFmt;
-      if (nomeLimpo && (!existente.nome || existente.nome.startsWith('EMPRESA CNPJ'))) existente.nome = nomeLimpo;
-      if (extra.telefone && !existente.telefone) existente.telefone = extra.telefone;
-      if (extra.email && !existente.email) existente.email = extra.email;
+    // Se não tiver CNPJ no registro, tenta resolver no cache oficial de correspondência
+    if (!cnpj && nome) {
+      const cnpjResolvido = obterCnpjEmpresaCache(nome);
+      if (cnpjResolvido) cnpj = cnpjResolvido;
     }
+
+    const cnpjFmt = cnpj ? formatarCNPJ(cnpj) : '';
+    const cnpjDigitos = cnpjFmt.replace(/\D/g, '');
+
+    // Descartar nomes que sejam apenas números, vazios ou marcadores genéricos
+    if (!nome && !cnpjFmt) return;
+    if (/^\d+$/.test(nome)) return;
+    if (nome.startsWith('TESTE') || nome.startsWith('UNDEFINED') || nome === 'NULL') return;
+
+    itensColetados.push({
+      id: extra.id || `cli_${Math.random().toString(36).substr(2, 6)}`,
+      nome: nome || (cnpjFmt ? `EMPRESA CNPJ ${cnpjFmt}` : ''),
+      cnpj: cnpjFmt,
+      cnpjDigitos: cnpjDigitos.length === 14 ? cnpjDigitos : '',
+      telefone: extra.telefone || '',
+      email: extra.email || '',
+      cidade: extra.cidade || '',
+      uf: extra.uf || '',
+      observacoes: extra.observacoes || ''
+    });
   };
 
-  // 1. Clientes da lista oficial conhecida
-  if (typeof CNPJ_CONHECIDOS_PADRAO === 'object') {
-    Object.entries(CNPJ_CONHECIDOS_PADRAO).forEach(([chave, cnpj]) => {
-      let nomeFormatado = chave
-        .replace(/([A-Z])/g, ' $1')
-        .replace(/\bLTDA\b/g, ' LTDA')
-        .replace(/\bEIRELI\b/g, ' EIRELI')
-        .replace(/\bSA\b/g, ' S/A')
-        .trim();
-      adicionarCliente(nomeFormatado, cnpj);
-    });
+  // 1. Clientes cadastrados explicitamente pelo usuário (LocalStorage e Nuvem)
+  const locaisCadastrados = carregarClientesLocais();
+  locaisCadastrados.forEach(c => coletar(c.nome, c.cnpj, c));
+
+  if (isSupabaseConfigurado()) {
+    try {
+      const nuvemCadastrados = await consultarClientesCadastradosNuvem();
+      nuvemCadastrados.forEach(c => coletar(c.nome, c.cnpj, c));
+    } catch (e) {}
   }
 
-  // 2. Cache persistente de CNPJs de empresas (vermont_cnpj_empresas_cache)
-  try {
-    const rawCache = localStorage.getItem('vermont_cnpj_empresas_cache');
-    if (rawCache) {
-      const mapaCache = JSON.parse(rawCache);
-      if (typeof mapaCache === 'object') {
-        Object.entries(mapaCache).forEach(([k, cnpj]) => {
-          adicionarCliente(k, cnpj);
-        });
-      }
-    }
-  } catch (err) {}
+  // 2. Clientes do módulo de envelopamentos
+  const envsLocais = carregarEnvelopamentosLocais();
+  envsLocais.forEach(e => coletar(e.cliente_nome, e.cliente_cnpj));
 
-  // 3. Clientes cadastrados explicitamente pelo usuário
-  const clientesCadastrados = carregarClientesLocais();
-  clientesCadastrados.forEach(c => adicionarCliente(c.nome, c.cnpj, c));
-
-  // 4. Ler de todos os agendamentos locais (vermont_agendamentos_local e variantes)
+  // 3. Clientes de agendamentos no LocalStorage
   const chavesAgendamentos = ['vermont_agendamentos_local', 'vermont_agendamentos_locais', 'vermont_agendamentos'];
   chavesAgendamentos.forEach(chaveStorage => {
     try {
@@ -649,60 +771,113 @@ export const obterClientesDoBancoDeDados = async () => {
           lista.forEach(ag => {
             if (!ag) return;
             const cnpjAg = ag.cliente_cnpj || resolverCnpjCliente(ag) || ag.destinatario_cnpj || ag.cnpj_cliente;
-            adicionarCliente(ag.cliente, cnpjAg);
-            
-            // Ponto 2 e Ponto 3 de cargas combinadas
-            if (ag.ponto2 && ag.ponto2.cliente) {
-              adicionarCliente(ag.ponto2.cliente, ag.ponto2.cliente_cnpj);
-            }
-            if (ag.ponto3 && ag.ponto3.cliente) {
-              adicionarCliente(ag.ponto3.cliente, ag.ponto3.cliente_cnpj);
-            }
+            coletar(ag.cliente, cnpjAg);
+            if (ag.ponto2?.cliente) coletar(ag.ponto2.cliente, ag.ponto2.cliente_cnpj);
+            if (ag.ponto3?.cliente) coletar(ag.ponto3.cliente, ag.ponto3.cliente_cnpj);
           });
         }
       }
     } catch (e) {}
   });
 
-  // 5. Ler dos Envelopamentos locais
-  const envLocais = carregarEnvelopamentosLocais();
-  envLocais.forEach(e => adicionarCliente(e.cliente_nome, e.cliente_cnpj));
-
-  // 6. Consultar no Supabase se conectado
+  // 4. Clientes reais registrados no Supabase (tabela 'agendamentos_pedreira')
   if (isSupabaseConfigurado()) {
     try {
-      const { data: cliSupabase } = await supabase.from('clientes').select('*').limit(2000);
-      if (Array.isArray(cliSupabase)) {
-        cliSupabase.forEach(c => adicionarCliente(c.nome, c.cnpj, c));
-      }
-    } catch (err) {}
-
-    try {
       const { data: agsSupabase } = await supabase
-        .from('agendamentos')
-        .select('*')
+        .from('agendamentos_pedreira')
+        .select('cliente, cliente_cnpj, observacoes')
         .limit(3000);
 
       if (Array.isArray(agsSupabase)) {
         agsSupabase.forEach(ag => {
-          if (!ag) return;
-          const cnpjAg = ag.cliente_cnpj || ag.destinatario_cnpj || ag.cnpj_cliente || resolverCnpjCliente(ag);
-          adicionarCliente(ag.cliente, cnpjAg);
-          if (ag.ponto2?.cliente) adicionarCliente(ag.ponto2.cliente, ag.ponto2.cliente_cnpj);
-          if (ag.ponto3?.cliente) adicionarCliente(ag.ponto3.cliente, ag.ponto3.cliente_cnpj);
+          if (!ag || !ag.cliente) return;
+          const cnpjAg = ag.cliente_cnpj || resolverCnpjCliente(ag);
+          coletar(ag.cliente, cnpjAg);
         });
-      }
-    } catch (err) {}
-
-    try {
-      const { data: envSupabase } = await supabase.from('envelopamentos').select('cliente_nome, cliente_cnpj').limit(3000);
-      if (Array.isArray(envSupabase)) {
-        envSupabase.forEach(e => adicionarCliente(e.cliente_nome, e.cliente_cnpj));
       }
     } catch (err) {}
   }
 
-  const resultado = Array.from(mapaClientes.values());
+  // ========================================================
+  // DEDUPLICAÇÃO INTELIGENTE:
+  // Unifica pelo CNPJ de 14 dígitos e escolhe o nome mais limpo e legível
+  // ========================================================
+  const mapaPorCnpj = new Map();
+  const mapaPorNomeNorm = new Map();
+
+  for (const item of itensColetados) {
+    const nomeLimpo = item.nome.trim().toUpperCase();
+    const normKey = nomeLimpo.replace(/[^A-Z0-9]/g, '');
+    if (!normKey && !item.cnpjDigitos) continue;
+
+    if (item.cnpjDigitos) {
+      if (!mapaPorCnpj.has(item.cnpjDigitos)) {
+        mapaPorCnpj.set(item.cnpjDigitos, {
+          id: item.id,
+          nome: nomeLimpo,
+          cnpj: item.cnpj,
+          cnpjDigitos: item.cnpjDigitos,
+          telefone: item.telefone,
+          email: item.email,
+          cidade: item.cidade,
+          uf: item.uf,
+          observacoes: item.observacoes,
+          normKey
+        });
+      } else {
+        const existente = mapaPorCnpj.get(item.cnpjDigitos);
+        // Atualiza para o nome de maior score/legibilidade
+        if (calcularScoreNomeCliente(nomeLimpo) > calcularScoreNomeCliente(existente.nome)) {
+          existente.nome = nomeLimpo;
+          existente.normKey = normKey;
+        }
+        if (item.telefone && !existente.telefone) existente.telefone = item.telefone;
+        if (item.email && !existente.email) existente.email = item.email;
+        if (item.cidade && !existente.cidade) existente.cidade = item.cidade;
+        if (item.uf && !existente.uf) existente.uf = item.uf;
+      }
+    } else {
+      // Itens sem CNPJ
+      if (!mapaPorNomeNorm.has(normKey)) {
+        mapaPorNomeNorm.set(normKey, {
+          id: item.id,
+          nome: nomeLimpo,
+          cnpj: '',
+          cnpjDigitos: '',
+          telefone: item.telefone,
+          email: item.email,
+          cidade: item.cidade,
+          uf: item.uf,
+          observacoes: item.observacoes,
+          normKey
+        });
+      } else {
+        const existente = mapaPorNomeNorm.get(normKey);
+        if (calcularScoreNomeCliente(nomeLimpo) > calcularScoreNomeCliente(existente.nome)) {
+          existente.nome = nomeLimpo;
+        }
+      }
+    }
+  }
+
+  // Mesclar registros sem CNPJ que já tenham representação em mapaPorCnpj
+  for (const [normKey, semCnpj] of mapaPorNomeNorm.entries()) {
+    let jaExisteEmCnpj = false;
+    for (const comCnpj of mapaPorCnpj.values()) {
+      if (comCnpj.normKey === normKey || (comCnpj.normKey.length >= 8 && (comCnpj.normKey.includes(normKey) || normKey.includes(comCnpj.normKey)))) {
+        jaExisteEmCnpj = true;
+        break;
+      }
+    }
+    if (!jaExisteEmCnpj) {
+      // Ignorar nomes colados sem espaço com mais de 15 caracteres sem CNPJ
+      if (calcularScoreNomeCliente(semCnpj.nome) >= -10) {
+        mapaPorCnpj.set(`sem_cnpj_${normKey}`, semCnpj);
+      }
+    }
+  }
+
+  const resultado = Array.from(mapaPorCnpj.values());
   resultado.sort((a, b) => a.nome.localeCompare(b.nome));
   return resultado;
 };
