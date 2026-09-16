@@ -3371,11 +3371,14 @@ export function atualizarAgendamentoLocalCompleto(agendamentoAtualizado, usuario
 
 export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo = {}, agendamentoOriginal = null) {
   try {
-    if (!agendamentoAtualizado || !agendamentoAtualizado.id) {
+    const id = agendamentoAtualizado?.id || agendamentoOriginal?.id;
+    if (!id) {
       throw new Error('ID do agendamento inválido para edição.');
     }
+    if (!agendamentoAtualizado.id) {
+      agendamentoAtualizado.id = id;
+    }
 
-    const id = agendamentoAtualizado.id;
     const idStr = String(id).trim();
 
     // 1. Obtém o item anterior de forma 100% confiável

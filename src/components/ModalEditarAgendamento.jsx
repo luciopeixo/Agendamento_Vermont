@@ -31,6 +31,7 @@ export function ModalEditarAgendamento({
   if (!agendamento) return null;
 
   const [formData, setFormData] = useState({
+    id: agendamento.id,
     pedreira: agendamento.pedreira || '',
     material: agendamento.material || '',
     numero_bloco: agendamento.numero_bloco || '',
@@ -124,7 +125,12 @@ export function ModalEditarAgendamento({
       return;
     }
 
-    const dadosParaSalvar = { ...formData, numero_bloco: blocoLimpo };
+    const dadosParaSalvar = {
+      ...agendamento,
+      ...formData,
+      id: agendamento.id,
+      numero_bloco: blocoLimpo
+    };
 
     if (!isAdmin && agendamento.status === 'Aguardando Liberação' && formData.status !== 'Aguardando Liberação') {
       setErro('Acesso restrito: Agendamentos com status "Aguardando Liberação" só podem ser liberados ou alterados pelo Administrador Geral.');
