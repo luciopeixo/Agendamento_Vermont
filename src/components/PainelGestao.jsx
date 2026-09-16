@@ -283,6 +283,9 @@ export function PainelGestao({
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(20);
 
+  // Filtro exclusivo para visualizar apenas agendamentos finalizados sem NF
+  const [exibindoApenasSemNF, setExibindoApenasSemNF] = useState(false);
+
   // Agendamentos Finalizados sem confirmação de emissão de Nota Fiscal (para alerta ao Admin)
   const finalizadosSemNF = useMemo(() => {
     const base = todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos;
@@ -805,7 +808,15 @@ export function PainelGestao({
     }
   };
 
-  const listaBase = exibindoPendenciasAnteriores ? pendenciasAnteriores : agendamentos;
+  const listaBase = exibindoApenasSemNF
+    ? (todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos).filter(a => {
+        const st = (a.status || '').trim();
+        const isFinalizado = st === 'Finalizado' || st === 'Carregado';
+        return isFinalizado && !a.nota_fiscal_emitida;
+      })
+    : exibindoPendenciasAnteriores
+      ? pendenciasAnteriores
+      : agendamentos;
 
   const agendamentosFiltrados = listaBase.filter(ag => {
     if (!termoBusca.trim()) return true;
@@ -833,7 +844,7 @@ export function PainelGestao({
   // Reseta para a primeira página quando qualquer filtro ou termo de busca for alterado
   useEffect(() => {
     setPaginaAtual(1);
-  }, [filtroPedreira, filtroStatus, filtroData, termoBusca, exibindoPendenciasAnteriores]);
+  }, [filtroPedreira, filtroStatus, filtroData, termoBusca, exibindoPendenciasAnteriores, exibindoApenasSemNF]);
 
   // Cálculos de Paginação
   const totalItens = agendamentosFiltrados.length;
@@ -1535,14 +1546,13 @@ export function PainelGestao({
           <button
             type="button"
             onClick={() => {
-              setFiltroStatus(['Finalizado', 'Carregado']);
-              setFiltroData('');
+              setExibindoApenasSemNF(prev => !prev);
               setExibindoPendenciasAnteriores(false);
             }}
             className="btn"
             style={{
-              background: '#f59e0b',
-              color: '#000',
+              background: exibindoApenasSemNF ? '#22c55e' : '#f59e0b',
+              color: exibindoApenasSemNF ? '#fff' : '#000',
               fontWeight: 700,
               fontSize: '0.80rem',
               padding: '7px 14px',
@@ -1556,7 +1566,7 @@ export function PainelGestao({
             }}
           >
             <FileCheck size={14} />
-            Filtrar Finalizados ({finalizadosSemNF.length} sem NF)
+            {exibindoApenasSemNF ? 'Voltar para Todos' : `Ver Apenas os ${finalizadosSemNF.length} Sem NF`}
           </button>
         </div>
       )}
@@ -1851,7 +1861,10 @@ export function PainelGestao({
           {pendenciasAnteriores.length > 0 && (
             <button
               type="button"
-              onClick={() => setExibindoPendenciasAnteriores(prev => !prev)}
+              onClick={() => {
+                setExibindoPendenciasAnteriores(prev => !prev);
+                setExibindoApenasSemNF(false);
+              }}
               className="btn"
               style={{
                 padding: '9px 14px',
@@ -1869,6 +1882,33 @@ export function PainelGestao({
             >
               <AlertTriangle size={14} />
               {exibindoPendenciasAnteriores ? 'Voltar para o Dia' : `Pendências Anteriores (${pendenciasAnteriores.length})`}
+            </button>
+          )}
+
+          {isAdmin && finalizadosSemNF.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setExibindoApenasSemNF(prev => !prev);
+                setExibindoPendenciasAnteriores(false);
+              }}
+              className="btn"
+              style={{
+                padding: '9px 14px',
+                fontSize: '0.8rem',
+                whiteSpace: 'nowrap',
+                background: exibindoApenasSemNF ? '#f59e0b' : 'rgba(245, 158, 11, 0.18)',
+                color: exibindoApenasSemNF ? '#111827' : '#fbbf24',
+                border: '1px solid #f59e0b',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+              title="Filtrar e visualizar apenas os agendamentos Finalizados que estão sem confirmação de Nota Fiscal"
+            >
+              <FileCheck size={14} />
+              {exibindoApenasSemNF ? 'Voltar para Todos' : `Sem Nota Fiscal (${finalizadosSemNF.length})`}
             </button>
           )}
         </div>
@@ -2068,6 +2108,35 @@ export function PainelGestao({
               style={{ padding: '4px 10px', fontSize: '0.76rem', gap: 4 }}
             >
               <RotateCcw size={12} /> Voltar para Carregamentos de Hoje
+            </button>
+          </div>
+        )}
+
+        {/* Aviso de contextualização quando filtrando agendamentos sem nota fiscal */}
+        {exibindoApenasSemNF && (
+          <div className="no-print" style={{
+            padding: '10px 20px',
+            background: 'rgba(245, 158, 11, 0.12)',
+            borderBottom: '1px solid rgba(245, 158, 11, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 10
+          }}>
+            <div style={{ fontSize: '0.84rem', color: '#fef3c7', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <FileCheck size={16} color="#fbbf24" />
+              <span>
+                Exibindo exclusivamente os <strong>{agendamentosFiltrados.length} agendamentos finalizados com Nota Fiscal pendente</strong>.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExibindoApenasSemNF(false)}
+              className="btn btn-secondary"
+              style={{ padding: '4px 10px', fontSize: '0.76rem', gap: 4 }}
+            >
+              <RotateCcw size={12} /> Voltar para Todos os Agendamentos
             </button>
           </div>
         )}
