@@ -390,83 +390,139 @@ export const excluirClienteCadastrado = async (idOuNome) => {
   return true;
 };
 
+import { 
+  CNPJ_CONHECIDOS_PADRAO, 
+  formatarCNPJ, 
+  limparNomeEmpresa, 
+  resolverCnpjCliente, 
+  extrairCnpj 
+} from './agendamentoService.js';
+
 /**
- * Obtém todos os clientes únicos existentes no banco de dados / cadastro / agendamentos / envelopamentos
+ * Obtém todos os clientes e CNPJs únicos existentes em todas as bases do sistema
  */
 export const obterClientesDoBancoDeDados = async () => {
   const mapaClientes = new Map();
 
   const adicionarCliente = (nome, cnpj, extra = {}) => {
-    if (!nome) return;
-    const nomeLimpo = String(nome).trim().toUpperCase();
-    if (!nomeLimpo || nomeLimpo.length < 2) return;
+    if (!nome && !cnpj) return;
+    
+    // Tenta extrair CNPJ se estiver dentro do nome
+    const cnpjExtraido = cnpj || extrairCnpj(nome) || '';
+    const nomeLimpo = limparNomeEmpresa(String(nome || '')).trim().toUpperCase();
+    const cnpjFmt = cnpjExtraido ? formatarCNPJ(cnpjExtraido) : '';
 
-    const cnpjLimpo = cnpj ? String(cnpj).trim() : '';
-    const chave = nomeLimpo;
+    if (!nomeLimpo && !cnpjFmt) return;
+    
+    // Chave única primária por nome ou por CNPJ
+    const chave = nomeLimpo || cnpjFmt;
 
     if (!mapaClientes.has(chave)) {
       mapaClientes.set(chave, {
         id: extra.id || `cli_${Math.random().toString(36).substr(2, 6)}`,
-        nome: nomeLimpo,
-        cnpj: cnpjLimpo,
+        nome: nomeLimpo || `EMPRESA CNPJ ${cnpjFmt}`,
+        cnpj: cnpjFmt,
         telefone: extra.telefone || '',
         email: extra.email || '',
         observacoes: extra.observacoes || ''
       });
     } else {
       const existente = mapaClientes.get(chave);
-      if (cnpjLimpo && !existente.cnpj) existente.cnpj = cnpjLimpo;
+      if (cnpjFmt && !existente.cnpj) existente.cnpj = cnpjFmt;
+      if (nomeLimpo && (!existente.nome || existente.nome.startsWith('EMPRESA CNPJ'))) existente.nome = nomeLimpo;
       if (extra.telefone && !existente.telefone) existente.telefone = extra.telefone;
       if (extra.email && !existente.email) existente.email = extra.email;
     }
   };
 
-  // 1. Clientes cadastrados explicitamente
-  const clientesCadastrados = carregarClientesLocais();
-  clientesCadastrados.forEach(c => adicionarCliente(c.nome, c.cnpj, c));
+  // 1. Clientes da lista oficial conhecida
+  if (typeof CNPJ_CONHECIDOS_PADRAO === 'object') {
+    Object.entries(CNPJ_CONHECIDOS_PADRAO).forEach(([chave, cnpj]) => {
+      let nomeFormatado = chave
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/\bLTDA\b/g, ' LTDA')
+        .replace(/\bEIRELI\b/g, ' EIRELI')
+        .replace(/\bSA\b/g, ' S/A')
+        .trim();
+      adicionarCliente(nomeFormatado, cnpj);
+    });
+  }
 
-  // 2. Clientes padrão conhecidos da Vermont
-  const clientesPadrao = [
-    { nome: 'THOR GRANITOS LTDA', cnpj: '08.234.567/0001-89' },
-    { nome: 'ARGOS GRANITOS E ROCHAS LTDA', cnpj: '10.987.654/0001-32' },
-    { nome: 'GRANITOS DO BRASIL S/A', cnpj: '' },
-    { nome: 'MINERAÇÃO SANTA LUZIA', cnpj: '' }
-  ];
-  clientesPadrao.forEach(c => adicionarCliente(c.nome, c.cnpj));
-
-  // 3. Ler dos Envelopamentos locais
-  const envLocais = carregarEnvelopamentosLocais();
-  envLocais.forEach(e => adicionarCliente(e.cliente_nome, e.cliente_cnpj));
-
-  // 4. Ler dos Agendamentos locais
+  // 2. Cache persistente de CNPJs de empresas (vermont_cnpj_empresas_cache)
   try {
-    const rawAg = localStorage.getItem('vermont_agendamentos_locais');
-    if (rawAg) {
-      const ags = JSON.parse(rawAg);
-      if (Array.isArray(ags)) {
-        ags.forEach(a => adicionarCliente(a.cliente, a.cliente_cnpj));
+    const rawCache = localStorage.getItem('vermont_cnpj_empresas_cache');
+    if (rawCache) {
+      const mapaCache = JSON.parse(rawCache);
+      if (typeof mapaCache === 'object') {
+        Object.entries(mapaCache).forEach(([k, cnpj]) => {
+          adicionarCliente(k, cnpj);
+        });
       }
     }
   } catch (err) {}
 
-  // 5. Consultar no Supabase se conectado
+  // 3. Clientes cadastrados explicitamente pelo usuário
+  const clientesCadastrados = carregarClientesLocais();
+  clientesCadastrados.forEach(c => adicionarCliente(c.nome, c.cnpj, c));
+
+  // 4. Ler de todos os agendamentos locais (vermont_agendamentos_local e variantes)
+  const chavesAgendamentos = ['vermont_agendamentos_local', 'vermont_agendamentos_locais', 'vermont_agendamentos'];
+  chavesAgendamentos.forEach(chaveStorage => {
+    try {
+      const raw = localStorage.getItem(chaveStorage);
+      if (raw) {
+        const lista = JSON.parse(raw);
+        if (Array.isArray(lista)) {
+          lista.forEach(ag => {
+            if (!ag) return;
+            const cnpjAg = ag.cliente_cnpj || resolverCnpjCliente(ag) || ag.destinatario_cnpj || ag.cnpj_cliente;
+            adicionarCliente(ag.cliente, cnpjAg);
+            
+            // Ponto 2 e Ponto 3 de cargas combinadas
+            if (ag.ponto2 && ag.ponto2.cliente) {
+              adicionarCliente(ag.ponto2.cliente, ag.ponto2.cliente_cnpj);
+            }
+            if (ag.ponto3 && ag.ponto3.cliente) {
+              adicionarCliente(ag.ponto3.cliente, ag.ponto3.cliente_cnpj);
+            }
+          });
+        }
+      }
+    } catch (e) {}
+  });
+
+  // 5. Ler dos Envelopamentos locais
+  const envLocais = carregarEnvelopamentosLocais();
+  envLocais.forEach(e => adicionarCliente(e.cliente_nome, e.cliente_cnpj));
+
+  // 6. Consultar no Supabase se conectado
   if (isSupabaseConfigurado()) {
     try {
-      const { data: cliSupabase } = await supabase.from('clientes').select('*').limit(1000);
+      const { data: cliSupabase } = await supabase.from('clientes').select('*').limit(2000);
       if (Array.isArray(cliSupabase)) {
         cliSupabase.forEach(c => adicionarCliente(c.nome, c.cnpj, c));
       }
     } catch (err) {}
 
     try {
-      const { data: agsSupabase } = await supabase.from('agendamentos').select('cliente, cliente_cnpj').limit(2000);
+      const { data: agsSupabase } = await supabase
+        .from('agendamentos')
+        .select('*')
+        .limit(3000);
+
       if (Array.isArray(agsSupabase)) {
-        agsSupabase.forEach(a => adicionarCliente(a.cliente, a.cliente_cnpj));
+        agsSupabase.forEach(ag => {
+          if (!ag) return;
+          const cnpjAg = ag.cliente_cnpj || ag.destinatario_cnpj || ag.cnpj_cliente || resolverCnpjCliente(ag);
+          adicionarCliente(ag.cliente, cnpjAg);
+          if (ag.ponto2?.cliente) adicionarCliente(ag.ponto2.cliente, ag.ponto2.cliente_cnpj);
+          if (ag.ponto3?.cliente) adicionarCliente(ag.ponto3.cliente, ag.ponto3.cliente_cnpj);
+        });
       }
     } catch (err) {}
 
     try {
-      const { data: envSupabase } = await supabase.from('envelopamentos').select('cliente_nome, cliente_cnpj').limit(2000);
+      const { data: envSupabase } = await supabase.from('envelopamentos').select('cliente_nome, cliente_cnpj').limit(3000);
       if (Array.isArray(envSupabase)) {
         envSupabase.forEach(e => adicionarCliente(e.cliente_nome, e.cliente_cnpj));
       }

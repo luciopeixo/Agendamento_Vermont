@@ -2207,7 +2207,7 @@ export function normalizarNomeEmpresaChave(nome = '') {
 /**
  * Base oficial de CNPJs de empresas parceiras frequentes e da própria Vermont
  */
-const CNPJ_CONHECIDOS_PADRAO = {
+export const CNPJ_CONHECIDOS_PADRAO = {
   // Vermont Mineração Ltda
   'VERMONTMINERACAOLTDA': '07.498.412/0001-30',
   'VERMONTMINERACAO': '07.498.412/0001-30',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Layers, Box, Building2, Search, CheckCircle2, AlertTriangle, UploadCloud, Plus, UserPlus } from 'lucide-react';
+import { X, Layers, Box, Building2, Search, CheckCircle2, AlertTriangle, UploadCloud, Plus, UserPlus, Hash } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
   obterMateriaisPorPedreira, 
@@ -62,6 +62,11 @@ export function ModalCadastrarBlocoEnvelopamento({
   const [mostrarDropdownClientes, setMostrarDropdownClientes] = useState(false);
   const dropdownRef = useRef(null);
 
+  // Dropdown de CNPJs
+  const [sugestoesCNPJ, setSugestoesCNPJ] = useState([]);
+  const [mostrarDropdownCNPJ, setMostrarDropdownCNPJ] = useState(false);
+  const dropdownCnpjRef = useRef(null);
+
   const carregarClientes = async () => {
     try {
       const res = await obterClientesDoBancoDeDados();
@@ -73,11 +78,14 @@ export function ModalCadastrarBlocoEnvelopamento({
     carregarClientes();
   }, []);
 
-  // Fechar dropdown de sugestões ao clicar fora
+  // Fechar dropdowns ao clicar fora
   useEffect(() => {
     const handleClickFora = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setMostrarDropdownClientes(false);
+      }
+      if (dropdownCnpjRef.current && !dropdownCnpjRef.current.contains(e.target)) {
+        setMostrarDropdownCNPJ(false);
       }
     };
     document.addEventListener('mousedown', handleClickFora);
@@ -111,6 +119,7 @@ export function ModalCadastrarBlocoEnvelopamento({
     }
   };
 
+  // Filtrar clientes por Nome ou CNPJ
   const handleFiltrarClientes = (termo) => {
     if (modoAba === 'individual') {
       setFormData(prev => ({ ...prev, cliente_nome: termo }));
@@ -119,34 +128,72 @@ export function ModalCadastrarBlocoEnvelopamento({
     }
 
     if (!termo || termo.trim().length < 1) {
-      setSugestoesClientes(clientesBase.slice(0, 10));
+      setSugestoesClientes(clientesBase.slice(0, 80));
       setMostrarDropdownClientes(true);
       return;
     }
 
     const t = termo.toLowerCase().trim();
-    const filtrados = clientesBase.filter(c => 
-      c.nome.toLowerCase().includes(t) || (c.cnpj && c.cnpj.includes(t))
-    );
-    setSugestoesClientes(filtrados.slice(0, 10));
+    const digitos = t.replace(/\D/g, '');
+
+    const filtrados = clientesBase.filter(c => {
+      const nomeMatch = (c.nome || '').toLowerCase().includes(t);
+      const cnpjMatch = (c.cnpj || '').toLowerCase().includes(t);
+      const cnpjDigitosMatch = digitos.length >= 2 && String(c.cnpj || '').replace(/\D/g, '').includes(digitos);
+      return nomeMatch || cnpjMatch || cnpjDigitosMatch;
+    });
+
+    setSugestoesClientes(filtrados.slice(0, 80));
     setMostrarDropdownClientes(true);
   };
 
+  // Filtrar CNPJ com busca inteligente
+  const handleFiltrarCNPJ = (valor) => {
+    const fmt = formatarCNPJ(valor);
+    if (modoAba === 'individual') {
+      setFormData(prev => ({ ...prev, cliente_cnpj: fmt }));
+    } else {
+      setLoteData(prev => ({ ...prev, cliente_cnpj: fmt }));
+    }
+
+    const limpo = fmt.replace(/\D/g, '');
+    if (limpo.length === 14) {
+      handleBuscarCNPJ(limpo, modoAba);
+    }
+
+    if (!valor || valor.trim().length < 1) {
+      const comCnpj = clientesBase.filter(c => !!c.cnpj);
+      setSugestoesCNPJ(comCnpj.slice(0, 80));
+      setMostrarDropdownCNPJ(true);
+      return;
+    }
+
+    const filtrados = clientesBase.filter(c => {
+      if (!c.cnpj) return false;
+      const cnpjDigitos = c.cnpj.replace(/\D/g, '');
+      return c.cnpj.includes(valor) || (limpo && cnpjDigitos.includes(limpo)) || c.nome.toLowerCase().includes(valor.toLowerCase());
+    });
+    setSugestoesCNPJ(filtrados.slice(0, 80));
+    setMostrarDropdownCNPJ(true);
+  };
+
   const handleSelecionarCliente = (cliente) => {
+    const cnpjFmt = cliente.cnpj ? formatarCNPJ(cliente.cnpj) : '';
     if (modoAba === 'individual') {
       setFormData(prev => ({
         ...prev,
         cliente_nome: cliente.nome,
-        cliente_cnpj: cliente.cnpj ? formatarCNPJ(cliente.cnpj) : prev.cliente_cnpj
+        cliente_cnpj: cnpjFmt || prev.cliente_cnpj
       }));
     } else {
       setLoteData(prev => ({
         ...prev,
         cliente_nome: cliente.nome,
-        cliente_cnpj: cliente.cnpj ? formatarCNPJ(cliente.cnpj) : prev.cliente_cnpj
+        cliente_cnpj: cnpjFmt || prev.cliente_cnpj
       }));
     }
     setMostrarDropdownClientes(false);
+    setMostrarDropdownCNPJ(false);
   };
 
   const handleBuscarCNPJ = async (cnpjLimpo, tipo) => {
@@ -410,7 +457,7 @@ export function ModalCadastrarBlocoEnvelopamento({
             <div className="form-group" style={{ marginTop: 14, position: 'relative' }} ref={dropdownRef}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <label className="form-label" style={{ fontSize: '0.82rem', margin: 0 }}>
-                  Cliente / Comprador:
+                  Cliente / Comprador ({clientesBase.length} cadastrados):
                 </label>
                 <button
                   type="button"
@@ -437,7 +484,7 @@ export function ModalCadastrarBlocoEnvelopamento({
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Pesquisar cliente ou digitar..."
+                  placeholder="Pesquisar por nome ou CNPJ no banco de dados..."
                   value={formData.cliente_nome}
                   onChange={(e) => handleFiltrarClientes(e.target.value)}
                   onFocus={() => handleFiltrarClientes(formData.cliente_nome)}
@@ -454,39 +501,55 @@ export function ModalCadastrarBlocoEnvelopamento({
                   left: 0,
                   right: 0,
                   background: 'var(--slate-800)',
-                  border: '1px solid rgba(0, 168, 62, 0.4)',
+                  border: '1px solid rgba(0, 168, 62, 0.5)',
                   borderRadius: 8,
                   marginTop: 4,
-                  maxHeight: 180,
+                  maxHeight: 250,
                   overflowY: 'auto',
                   zIndex: 100,
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.8)'
                 }}>
                   {sugestoesClientes.map((cli, idx) => (
                     <div
                       key={idx}
                       onClick={() => handleSelecionarCliente(cli)}
                       style={{
-                        padding: '9px 14px',
+                        padding: '10px 14px',
                         cursor: 'pointer',
-                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        borderBottom: '1px solid rgba(255,255,255,0.06)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
+                        gap: 12,
                         fontSize: '0.84rem',
                         color: '#fff',
                         transition: 'background 0.15s'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0, 168, 62, 0.2)'}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0, 168, 62, 0.22)'}
                       onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Building2 size={14} color="#4ade80" />
-                        <strong>{cli.nome}</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                        <Building2 size={15} color="#4ade80" style={{ flexShrink: 0 }} />
+                        <strong style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                          {cli.nome}
+                        </strong>
                       </div>
-                      {cli.cnpj && (
-                        <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>
-                          CNPJ: {cli.cnpj}
+                      {cli.cnpj ? (
+                        <span style={{
+                          fontSize: '0.72rem',
+                          background: 'rgba(74, 222, 128, 0.12)',
+                          color: '#4ade80',
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          border: '1px solid rgba(74, 222, 128, 0.3)',
+                          fontFamily: 'monospace',
+                          flexShrink: 0
+                        }}>
+                          {cli.cnpj}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.70rem', color: 'var(--slate-500)', flexShrink: 0 }}>
+                          (Sem CNPJ)
                         </span>
                       )}
                     </div>
@@ -495,28 +558,69 @@ export function ModalCadastrarBlocoEnvelopamento({
               )}
             </div>
 
-            {/* CNPJ do Cliente (Opcional) */}
-            <div className="form-group" style={{ marginTop: 14 }}>
-              <label className="form-label" style={{ fontSize: '0.82rem' }}>CNPJ do Cliente (Opcional):</label>
+            {/* CNPJ do Cliente (Opcional com Autocomplete e Busca Integrada) */}
+            <div className="form-group" style={{ marginTop: 14, position: 'relative' }} ref={dropdownCnpjRef}>
+              <label className="form-label" style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between' }}>
+                <span>CNPJ do Cliente (Opcional):</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Preenche automaticamente ao selecionar o cliente acima</span>
+              </label>
               <div style={{ position: 'relative' }}>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="00.000.000/0000-00"
+                  placeholder="00.000.000/0000-00 (ou pesquise por CNPJ)"
                   value={formData.cliente_cnpj}
-                  onChange={(e) => {
-                    const fmt = formatarCNPJ(e.target.value);
-                    setFormData(prev => ({ ...prev, cliente_cnpj: fmt }));
-                    const limpo = fmt.replace(/\D/g, '');
-                    if (limpo.length === 14) {
-                      handleBuscarCNPJ(limpo, 'individual');
-                    }
-                  }}
+                  onChange={(e) => handleFiltrarCNPJ(e.target.value)}
+                  onFocus={() => handleFiltrarCNPJ(formData.cliente_cnpj)}
                 />
                 {buscandoCNPJ && (
                   <span className="spinner" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14 }} />
                 )}
               </div>
+
+              {/* Dropdown de CNPJs Cadastrados */}
+              {mostrarDropdownCNPJ && sugestoesCNPJ.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  background: 'var(--slate-800)',
+                  border: '1px solid rgba(0, 168, 62, 0.5)',
+                  borderRadius: 8,
+                  marginTop: 4,
+                  maxHeight: 220,
+                  overflowY: 'auto',
+                  zIndex: 100,
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.8)'
+                }}>
+                  {sugestoesCNPJ.map((cli, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handleSelecionarCliente(cli)}
+                      style={{
+                        padding: '9px 14px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        fontSize: '0.82rem',
+                        color: '#fff'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0, 168, 62, 0.22)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span style={{ fontFamily: 'monospace', color: '#4ade80', fontWeight: 700 }}>
+                        {cli.cnpj}
+                      </span>
+                      <span style={{ fontSize: '0.74rem', color: 'var(--slate-300)', marginLeft: 10 }}>
+                        {cli.nome}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Observações / Detalhes de Pátio */}
@@ -591,7 +695,7 @@ export function ModalCadastrarBlocoEnvelopamento({
             {/* Barra de Pesquisa de Cliente no Lote */}
             <div className="form-group" style={{ marginTop: 14, position: 'relative' }} ref={dropdownRef}>
               <label className="form-label" style={{ fontSize: '0.82rem' }}>
-                Cliente / Destinatário Comum:
+                Cliente / Destinatário Comum ({clientesBase.length} disponíveis):
               </label>
               
               <div style={{ position: 'relative' }}>
@@ -599,7 +703,7 @@ export function ModalCadastrarBlocoEnvelopamento({
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Pesquisar cliente ou digitar..."
+                  placeholder="Pesquisar cliente ou CNPJ..."
                   value={loteData.cliente_nome}
                   onChange={(e) => handleFiltrarClientes(e.target.value)}
                   onFocus={() => handleFiltrarClientes(loteData.cliente_nome)}
@@ -615,10 +719,10 @@ export function ModalCadastrarBlocoEnvelopamento({
                   left: 0,
                   right: 0,
                   background: 'var(--slate-800)',
-                  border: '1px solid rgba(0, 168, 62, 0.4)',
+                  border: '1px solid rgba(0, 168, 62, 0.5)',
                   borderRadius: 8,
                   marginTop: 4,
-                  maxHeight: 180,
+                  maxHeight: 220,
                   overflowY: 'auto',
                   zIndex: 100,
                   boxShadow: '0 8px 24px rgba(0,0,0,0.6)'
@@ -645,7 +749,7 @@ export function ModalCadastrarBlocoEnvelopamento({
                         <strong>{cli.nome}</strong>
                       </div>
                       {cli.cnpj && (
-                        <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#4ade80', fontFamily: 'monospace' }}>
                           CNPJ: {cli.cnpj}
                         </span>
                       )}
