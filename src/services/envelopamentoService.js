@@ -184,17 +184,47 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
 
   let pedId = row.pedreira_id;
   let pedNome = row.pedreira_nome;
-  const matKey = String(row.material || '').toLowerCase().trim();
-  const pedPadrao = MAPA_MATERIAL_PADRAO_PEDREIRA[matKey];
-  if (pedPadrao) {
-    if (!pedId || pedId === 'uruoca' || pedId !== pedPadrao.id) {
-      pedId = pedPadrao.id;
-      pedNome = pedPadrao.nome;
+  let matFinal = row.material || '';
+  const matUpper = String(row.material || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+  if (matUpper.includes('CRISTALLO')) {
+    matFinal = 'Cristallo Absolut';
+    pedId = 'uruacu';
+    pedNome = 'Uruaçu - GO';
+  } else if (matUpper.includes('NAURIKA')) {
+    matFinal = 'Naurika';
+    pedId = 'beberibe';
+    pedNome = 'Beberibe - CE';
+  } else if (matUpper.includes('BLUE DEEP')) {
+    matFinal = 'Blue Deep';
+    pedId = 'serrote';
+    pedNome = 'São Gonçalo do Amarante - CE (Serrote)';
+  } else if (matUpper.includes('NEGRESCO')) {
+    matFinal = 'Negresco';
+    pedId = 'massape_negresco';
+    pedNome = 'Massapê - CE (Negresco)';
+  } else if (matUpper.includes('DEL MARE') || matUpper.includes('DELMARE')) {
+    matFinal = 'Del Mare';
+    pedId = 'massape_delmare';
+    pedNome = 'Massapê - CE (Del Mare)';
+  } else if (matUpper.includes('TAJ MAHAL') || matUpper.includes('TAJMAHAL')) {
+    matFinal = 'Taj Mahal';
+    pedId = 'uruoca';
+    pedNome = 'Uruoca - CE (Taj Mahal)';
+  } else {
+    const matKey = String(row.material || '').toLowerCase().trim();
+    const pedPadrao = MAPA_MATERIAL_PADRAO_PEDREIRA[matKey];
+    if (pedPadrao) {
+      if (!pedId || pedId === 'uruoca' || pedId !== pedPadrao.id) {
+        pedId = pedPadrao.id;
+        pedNome = pedPadrao.nome;
+      }
     }
   }
 
   return {
     ...row,
+    material: matFinal,
     pedreira_id: pedId,
     pedreira_nome: pedNome,
     numero_romaneio: rom,
