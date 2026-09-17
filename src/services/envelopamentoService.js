@@ -188,10 +188,12 @@ export const normalizarPedreira = (pedId = '', pedNome = '') => {
   const texto = `${pedId || ''} ${pedNome || ''}`.toLowerCase();
   if (texto.includes('uruoca')) return 'uruoca';
   if (texto.includes('massape') || texto.includes('massapê')) return 'massape';
+  if (texto.includes('sobral') || texto.includes('jaibaras')) return 'sobral';
+  if (texto.includes('serrote') || texto.includes('sao goncalo') || texto.includes('são gonçalo')) return 'serrote';
+  if (texto.includes('beberibe')) return 'beberibe';
   if (texto.includes('hidrolandia') || texto.includes('hidrolândia')) return 'hidrolandia';
   if (texto.includes('banabuiu') || texto.includes('banabuiú')) return 'banabuiu';
   if (texto.includes('santa_quiteria') || texto.includes('quiteria') || texto.includes('quitéria')) return 'santa_quiteria';
-  if (texto.includes('sobral')) return 'sobral';
   return String(pedId || pedNome || '').trim().toLowerCase();
 };
 
@@ -759,39 +761,40 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
 };
 
 /**
- * Busca o status de envelopamento de um bloco específico para um cliente
+ * Busca o status de envelopamento de um bloco específico validando cliente, CNPJ, material e pedreira
  */
-export const buscarStatusEnvelopamentoPorBloco = async (numeroBloco, clienteNome = '') => {
+export const buscarStatusEnvelopamentoPorBloco = async (
+  numeroBloco, 
+  clienteNome = '', 
+  clienteCnpj = '', 
+  material = '', 
+  pedreira = ''
+) => {
   if (!numeroBloco) return null;
 
-  const blocoFormatado = String(numeroBloco).trim().toUpperCase();
   const todos = await listarEnvelopamentos();
+  const info = verificarStatusEnvelopamentoAgendamento({
+    numero_bloco: numeroBloco,
+    cliente: clienteNome,
+    cliente_cnpj: clienteCnpj,
+    material: material,
+    pedreira: pedreira
+  }, todos);
 
-  const encontrado = todos.find(item => {
-    const mesmoBloco = String(item.numero_bloco || '').trim().toUpperCase() === blocoFormatado;
-    if (!mesmoBloco) return false;
-    if (clienteNome) {
-      const cli1 = String(item.cliente_nome || '').toLowerCase().trim();
-      const cli2 = String(clienteNome || '').toLowerCase().trim();
-      return cli1.includes(cli2) || cli2.includes(cli1);
-    }
-    return true;
-  });
-
-  return encontrado || null;
+  return info.encontrado ? info.registro : null;
 };
 
 /**
  * Verifica e sincroniza o status de envelopamento de um bloco de agendamento.
- * Realiza a correspondência por:
- * 1. numero_bloco (chave primária)
- * 2. cliente (opcional / reforço de correspondência)
- * 3. material (opcional)
- * 4. pedreira (opcional)
+ * Valida estritamente a correspondência entre:
+ * 1. numero_bloco (com/sem barra e zeros normalizados)
+ * 2. cliente e CNPJ (se CNPJs informados forem diferentes, descarta)
+ * 3. pedreira (unidade extratora)
+ * 4. material (tipo de rocha)
  * 
  * Regra visual Vermont:
  * - 🟢 Verde: Envelopado OU Sem envelopamento (liberado)
- * - 🔴 Vermelho: Pendente de Envelopamento, Em andamento, Aguardando corte e reparo, ou Não Envelopado/Não Cadastrado
+ * - 🔴 Vermelho: Pendente de Envelopamento, Em andamento, Aguardando corte e reparo, ou Não Registrado
  */
 export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelopamentos = []) => {
   if (!agendamento || !agendamento.numero_bloco) {
@@ -810,34 +813,111 @@ export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelo
 
   const numBlocoAg = normalizarNumeroBloco(agendamento.numero_bloco);
   const numBlocoAgSemBarra = numBlocoAg.replace(/\//g, '');
-  const clienteAg = String(agendamento.cliente || '').trim().toLowerCase();
-  const materialAg = String(agendamento.material || '').trim().toLowerCase();
-  const pedreiraAg = String(agendamento.pedreira || '').trim().toLowerCase();
+  
+  const clienteNomeAg = String(agendamento.cliente || agendamento.cliente_nome || '').trim();
+  const clienteCnpjAg = String(agendamento.cliente_cnpj || '').replace(/\D/g, '');
+  const materialAg = normalizarMaterial(agendamento.material);
+  const pedreiraAg = normalizarPedreira(agendamento.pedreira || agendamento.pedreira_id || agendamento.pedreira_nome);
 
-  // Filtrar todos os que batem com o número do bloco (com ou sem barra e com zeros à esquerda)
-  const candidatos = (Array.isArray(listaEnvelopamentos) ? listaEnvelopamentos : []).filter(env => {
+  // 1. Filtrar todos os que batem com o número do bloco
+  const candidatosPorNumero = (Array.isArray(listaEnvelopamentos) ? listaEnvelopamentos : []).filter(env => {
     const numEnv = normalizarNumeroBloco(env.numero_bloco);
     const numEnvSemBarra = numEnv.replace(/\//g, '');
     return numEnv === numBlocoAg || numEnvSemBarra === numBlocoAgSemBarra;
   });
 
+  if (candidatosPorNumero.length === 0) {
+    return {
+      encontrado: false,
+      isEnvelopadoOuLiberado: false,
+      status: 'nao_registrado',
+      label: 'Não Registrado',
+      cor: '#94a3b8',
+      bg: 'rgba(148, 163, 184, 0.12)',
+      border: 'rgba(148, 163, 184, 0.35)',
+      descricao: 'Bloco não cadastrado no módulo de envelopamento',
+      registro: null
+    };
+  }
+
+  // 2. Validação estrita de Cliente (CNPJ / Razão Social)
+  const matchCliente = (env) => {
+    const cnpjEnv = String(env.cliente_cnpj || '').replace(/\D/g, '');
+    const nomeEnv = String(env.cliente_nome || '').trim();
+
+    // Se ambos tiverem CNPJs com 14 dígitos, a igualdade do CNPJ é definitiva
+    if (clienteCnpjAg.length === 14 && cnpjEnv.length === 14) {
+      return clienteCnpjAg === cnpjEnv;
+    }
+
+    // Se um tem CNPJ e o outro tem CNPJ diferente válido, não bate
+    if (clienteCnpjAg.length === 14 && cnpjEnv.length === 14 && clienteCnpjAg !== cnpjEnv) {
+      return false;
+    }
+
+    // Comparação por nomes
+    if (clienteNomeAg && nomeEnv) {
+      const c1 = normalizarCliente(clienteNomeAg, clienteCnpjAg);
+      const c2 = normalizarCliente(nomeEnv, cnpjEnv);
+      if (c1 === c2) return true;
+
+      const n1 = clienteNomeAg.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      const n2 = nomeEnv.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      if (n1.length >= 3 && n2.length >= 3 && (n1.includes(n2) || n2.includes(n1))) {
+        return true;
+      }
+    }
+
+    // Se nenhum dos dois tem cliente informado
+    if (!clienteNomeAg && !clienteCnpjAg && !nomeEnv && !cnpjEnv) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // 3. Validação de Pedreira
+  const matchPedreira = (env) => {
+    const pedEnv = normalizarPedreira(env.pedreira_id, env.pedreira_nome);
+    if (!pedreiraAg || !pedEnv) return true;
+    if (pedreiraAg === pedEnv) return true;
+    if (pedreiraAg.startsWith('massape') && pedEnv.startsWith('massape')) return true;
+    return false;
+  };
+
+  // 4. Validação de Material
+  const matchMaterial = (env) => {
+    const matEnv = normalizarMaterial(env.material);
+    if (!materialAg || !matEnv) return true;
+    return materialAg === matEnv || materialAg.includes(matEnv) || matEnv.includes(materialAg);
+  };
+
+  // Filtrar candidatos estritamente válidos
+  const candidatosValidos = candidatosPorNumero.filter(env => {
+    const cliOk = matchCliente(env);
+    if (!cliOk) return false;
+
+    const pedOk = matchPedreira(env);
+    if (!pedOk) return false;
+
+    const matOk = matchMaterial(env);
+    if (!matOk) return false;
+
+    return true;
+  });
+
   let correspondente = null;
 
-  if (candidatos.length === 1) {
-    correspondente = candidatos[0];
-  } else if (candidatos.length > 1) {
-    // Tenta encontrar o melhor match com cliente, material ou pedreira
-    correspondente = candidatos.find(env => {
-      const cliEnv = String(env.cliente_nome || '').trim().toLowerCase();
-      const matEnv = String(env.material || '').trim().toLowerCase();
-      const pedEnv = String(env.pedreira_nome || '').trim().toLowerCase();
-
-      const bateCliente = clienteAg && cliEnv && (cliEnv.includes(clienteAg) || clienteAg.includes(cliEnv));
-      const bateMaterial = materialAg && matEnv && (matEnv.includes(materialAg) || materialAg.includes(matEnv));
-      const batePedreira = pedreiraAg && pedEnv && (pedEnv.includes(pedreiraAg) || pedreiraAg.includes(pedEnv));
-
-      return (bateCliente && bateMaterial) || (bateCliente && batePedreira) || bateCliente;
-    }) || candidatos[0];
+  if (candidatosValidos.length === 1) {
+    correspondente = candidatosValidos[0];
+  } else if (candidatosValidos.length > 1) {
+    // Escolhe o melhor candidato dando prioridade para CNPJ idêntico e registro mais recente
+    correspondente = candidatosValidos.slice().sort((a, b) => {
+      const aCnpjMatch = (clienteCnpjAg && String(a.cliente_cnpj || '').replace(/\D/g, '') === clienteCnpjAg) ? 1 : 0;
+      const bCnpjMatch = (clienteCnpjAg && String(b.cliente_cnpj || '').replace(/\D/g, '') === clienteCnpjAg) ? 1 : 0;
+      if (aCnpjMatch !== bCnpjMatch) return bCnpjMatch - aCnpjMatch;
+      return (new Date(b.created_at || b.updated_at || 0)) - (new Date(a.created_at || a.updated_at || 0));
+    })[0];
   }
 
   if (!correspondente) {
@@ -849,7 +929,7 @@ export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelo
       cor: '#94a3b8',
       bg: 'rgba(148, 163, 184, 0.12)',
       border: 'rgba(148, 163, 184, 0.35)',
-      descricao: 'Bloco não cadastrado no módulo de envelopamento',
+      descricao: 'Bloco não cadastrado no envelopamento para este cliente/pedreira/material',
       registro: null
     };
   }

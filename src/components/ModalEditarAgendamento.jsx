@@ -130,7 +130,7 @@ export function ModalEditarAgendamento({
       setInfoEnvelopamento(null);
     }
     return () => { ativo = false; };
-  }, [formData.numero_bloco, formData.cliente, formData.material, formData.pedreira]);
+  }, [formData.numero_bloco, formData.cliente, formData.cliente_cnpj, formData.material, formData.pedreira]);
 
   const handleChange = (campo, valor) => {
     setFormData(prev => {

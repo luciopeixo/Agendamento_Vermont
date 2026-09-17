@@ -226,14 +226,20 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   useEffect(() => {
     let ativo = true;
     if (formData.numero_bloco && formData.numero_bloco.length >= 2) {
-      buscarStatusEnvelopamentoPorBloco(formData.numero_bloco, formData.cliente).then(res => {
+      buscarStatusEnvelopamentoPorBloco(
+        formData.numero_bloco, 
+        formData.cliente, 
+        formData.cliente_cnpj, 
+        formData.material, 
+        formData.pedreira
+      ).then(res => {
         if (ativo) setStatusEnvelopamento1(res);
       }).catch(() => {});
     } else {
       setStatusEnvelopamento1(null);
     }
     return () => { ativo = false; };
-  }, [formData.numero_bloco, formData.cliente]);
+  }, [formData.numero_bloco, formData.cliente, formData.cliente_cnpj, formData.material, formData.pedreira]);
 
   // Validação em tempo real de formato de bloco para Taj Mahal (Thor/Argos exige "/", outros proíbe "/")
   const alertaTajMahal1 = useMemo(() => {
