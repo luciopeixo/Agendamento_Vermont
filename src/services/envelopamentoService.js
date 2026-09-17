@@ -232,6 +232,7 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
 
   return {
     ...row,
+    numero_bloco: String(row.numero_bloco || '').trim().replace(/[.\s]+$/, ''),
     material: matFinal,
     pedreira_id: pedId,
     pedreira_nome: pedNome,
@@ -249,6 +250,7 @@ export const normalizarNumeroBloco = (bloco = '') => {
   let str = String(bloco || '')
     .trim()
     .toUpperCase()
+    .replace(/[.\s]+$/, '')
     .replace(/\s+/g, '');
 
   if (/^\d{3}$/.test(str)) {
@@ -263,7 +265,7 @@ export const normalizarNumeroBloco = (bloco = '') => {
     str = `0${partes[0]}/${partes[1]}`;
   }
 
-  return str;
+  return str.replace(/[.\s]+$/, '');
 };
 
 /**

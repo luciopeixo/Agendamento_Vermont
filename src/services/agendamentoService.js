@@ -2566,7 +2566,7 @@ export function obterPrimeiroHorarioDisponivel(horariosOcupados = [], dataStr = 
  */
 export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false) {
   if (!texto || typeof texto !== 'string') return '';
-  let str = String(texto).trim().toUpperCase();
+  let str = String(texto).trim().toUpperCase().replace(/[.\s]+$/, '').replace(/^[.\s]+/, '');
   
   // 1. Remove prefixos comuns de bloco simples ou combinados como "BLOCO:", "BL.", "BL. Nº", "Nº", "NUMERO:"
   str = str.replace(/^(?:(?:BLOCO|BL|N[º°]|N[O0]|NUMERO|NUM)\s*[:.-]?\s*)+/i, '');
@@ -2607,7 +2607,7 @@ export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false) {
     return `0${partes[0]}/${partes[1]}`;
   }
   
-  return str.trim();
+  return str.replace(/[.\s]+$/, '').trim();
 }
 
 /**

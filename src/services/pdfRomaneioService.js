@@ -302,7 +302,7 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
  */
 export const extrairChavesComparacaoBloco = (numeroBloco) => {
   if (!numeroBloco) return [];
-  const limpo = String(numeroBloco).trim().toUpperCase();
+  const limpo = String(numeroBloco).trim().toUpperCase().replace(/[.\s]+$/, '');
   const apenasAlfaNum = limpo.replace(/[^0-9A-Z]/g, '');
   const chaves = new Set([limpo, apenasAlfaNum]);
 
@@ -410,12 +410,12 @@ export const extrairObservacoesEEnvelopamento = (textoCompleto) => {
   }
 
   // Buscar linhas de envelopamento por bloco:
-  // Ex: "36/26- R$ 3.507,84" ou "37/26: R$ 3.399,42" ou "74726 - R$ 2.042,88" ou "1826- R$ 3.617,60" ou "126 - R$ 1.500,00"
-  const regexLinhaBlocoValor = /(?:^|[\s\n\r])(?:(?:BLOCO|BL\.?|N[º°]?)\s*)?([0-9]{1,6}(?:\/[0-9]{2,4})?|[0-9]{3,7})\s*[-:]?\s*(?:\([^\)]*\)\s*)?R?\$?\s*([\d.]+,\d{2})/gmi;
+  // Ex: "36/26- R$ 3.507,84" ou "63/26.- R$ 273,56" ou "74726 - R$ 2.042,88" ou "1826- R$ 3.617,60" ou "126 - R$ 1.500,00"
+  const regexLinhaBlocoValor = /(?:^|[\s\n\r])(?:(?:BLOCO|BL\.?|N[º°]?)\s*)?([0-9]{1,6}(?:\/[0-9]{2,4})?\.?|[0-9]{3,7}\.?)\s*[-:]?\s*(?:\([^\)]*\)\s*)?R?\$?\s*([\d.]+,\d{2})/gmi;
   let matchItem;
 
   while ((matchItem = regexLinhaBlocoValor.exec(textoObsFinal)) !== null) {
-    const blocoBruto = matchItem[1].trim().toUpperCase();
+    const blocoBruto = matchItem[1].trim().toUpperCase().replace(/[.\s]+$/, '');
     const valorStr = matchItem[2].trim();
     const valorFloat = converterValorMonetarioParaFloat(valorStr);
 
@@ -567,12 +567,12 @@ export const processarRomaneioPdfTexto = async (textoCompleto) => {
     }
 
     // Padrão de linha de bloco Vermont:
-    // Começa com número do bloco (ex: 36/26 ou 839/26 ou 747/26 ou 1826 ou 0126 ou 126 ou 1/26), seguido do nome do material e dimensões
-    const matchLinhaBloco = linha.match(/^([0-9]{1,6}(?:\/[0-9]{2,4})?|[0-9A-Z/-]+)\s+([A-ZÀ-Ú\s]+?)\s+(\d+[,.]\d{2,3}\s*x\s*.*)$/i);
+    // Começa com número do bloco (ex: 36/26 ou 63/26. ou 839/26 ou 747/26 ou 1826 ou 0126 ou 126 ou 1/26), seguido do nome do material e dimensões
+    const matchLinhaBloco = linha.match(/^([0-9]{1,6}(?:\/[0-9]{2,4})?\.?|[0-9A-Z/.-]+)\s+([A-ZÀ-Ú\s]+?)\s+(\d+[,.]\d{2,3}\s*x\s*.*)$/i);
     
     if (matchLinhaBloco) {
       const isThorOuArgos = clienteNome.includes('THOR') || clienteNome.includes('ARGOS');
-      const numeroBlocoBruto = matchLinhaBloco[1].trim().toUpperCase();
+      const numeroBlocoBruto = matchLinhaBloco[1].trim().toUpperCase().replace(/[.\s]+$/, '');
       const numeroBloco = sanitizarNumeroBloco(numeroBlocoBruto, isThorOuArgos);
       const materialBruto = matchLinhaBloco[2].trim();
       const restanteLinha = matchLinhaBloco[3].trim();
