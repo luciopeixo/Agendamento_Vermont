@@ -194,12 +194,14 @@ const consultarEnvelopamentosNuvem = async () => {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (!error && Array.isArray(data) && data.length > 0) {
+    if (!error && Array.isArray(data)) {
       return data.map(parseItemDeSupabaseEnvelopamentos);
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[Envelopamento] Falha ao consultar tabela envelopamentos:', e);
+  }
 
-  // 2. Fallback na nuvem via espelho de sincronização em 'base_motoristas'
+  // 2. Fallback na nuvem via espelho de sincronização em 'base_motoristas' caso a tabela oficial falhe
   try {
     const { data, error } = await supabase
       .from('base_motoristas')
@@ -209,7 +211,7 @@ const consultarEnvelopamentosNuvem = async () => {
 
     if (!error && data?.observacoes) {
       const parsed = JSON.parse(data.observacoes);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
@@ -219,7 +221,7 @@ const consultarEnvelopamentosNuvem = async () => {
 };
 
 /**
- * Lista todos os envelopamentos (Supabase com fallback para LocalStorage e mesclagem bidirecional)
+ * Lista todos os envelopamentos (Supabase é a fonte da verdade; LocalStorage atua como cache/fallback offline)
  */
 export const listarEnvelopamentos = async (filtros = {}) => {
   let dados = [];
@@ -227,44 +229,15 @@ export const listarEnvelopamentos = async (filtros = {}) => {
 
   if (isSupabaseConfigurado()) {
     const dadosNuvem = await consultarEnvelopamentosNuvem();
-    if (Array.isArray(dadosNuvem) && dadosNuvem.length > 0) {
-      // Mesclar nuvem com local (priorizando os registros mais recentes pelo updated_at)
-      const mapa = new Map();
-      dadosLocais.forEach(item => { if (item?.id) mapa.set(item.id, item); });
-      dadosNuvem.forEach(item => {
-        if (!item?.id) return;
-        const local = mapa.get(item.id);
-        if (!local || new Date(item.updated_at || item.created_at || 0) >= new Date(local.updated_at || local.created_at || 0)) {
-          mapa.set(item.id, item);
-        }
-      });
-      dados = Array.from(mapa.values());
+    if (dadosNuvem !== null && Array.isArray(dadosNuvem)) {
+      dados = dadosNuvem;
+      // Atualiza o cache do LocalStorage para manter paridade exata com o banco de dados
       salvarEnvelopamentosLocais(dados);
-
-      // Se havia itens locais ainda não submetidos para a nuvem, sincroniza
-      if (dados.length > dadosNuvem.length) {
-        sincronizarEnvelopamentosNuvem(dados);
-        try {
-          const rowsDB = dados.map(formatarItemParaSupabaseEnvelopamentos);
-          await supabase.from('envelopamentos').upsert(rowsDB, { onConflict: 'id' });
-        } catch (e) {}
-      }
     } else {
+      // Fallback para cache local apenas se a consulta ao Supabase falhar completamente (offline)
       dados = dadosLocais;
-      if (dadosLocais.length > 0) {
-        // Envia os dados locais existentes para a nuvem para que outros usuários recebam imediatamente
-        sincronizarEnvelopamentosNuvem(dadosLocais);
-        try {
-          const rowsDB = dadosLocais.map(formatarItemParaSupabaseEnvelopamentos);
-          await supabase.from('envelopamentos').upsert(rowsDB, { onConflict: 'id' });
-        } catch (e) {}
-      }
     }
   } else {
-    dados = dadosLocais;
-  }
-
-  if (dados.length === 0) {
     dados = dadosLocais;
   }
 
