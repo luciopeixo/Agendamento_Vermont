@@ -867,32 +867,45 @@ export const salvarClientesLocais = (lista) => {
 };
 
 /**
- * Cadastra ou atualiza um cliente
+ * Cadastra ou atualiza um cliente com ID determinístico, evitando duplicações
  */
 export const salvarClienteCadastrado = async (dadosCliente) => {
   if (!dadosCliente || !dadosCliente.nome) return null;
 
   const nomeLimpo = String(dadosCliente.nome).trim().toUpperCase();
   const cnpjLimpo = String(dadosCliente.cnpj || '').trim();
-  const id = dadosCliente.id || `cli_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  const cnpjNumeros = cnpjLimpo.replace(/\D/g, '');
+
+  const locais = carregarClientesLocais();
+
+  // Localiza se o cliente já existe por ID, por CNPJ ou por Nome
+  const clienteExistente = locais.find(c => {
+    if (dadosCliente.id && c.id === dadosCliente.id) return true;
+    const cCnpjNum = (c.cnpj || '').replace(/\D/g, '');
+    if (cnpjNumeros && cCnpjNum && cCnpjNum === cnpjNumeros) return true;
+    if (c.nome && c.nome.trim().toUpperCase() === nomeLimpo) return true;
+    return false;
+  });
+
+  // Garante ID estável/determinístico: se tiver CNPJ, usa cli_CNPJNUMEROS; caso contrário, mantém ID estável
+  const id = dadosCliente.id || clienteExistente?.id || (cnpjNumeros ? `cli_${cnpjNumeros}` : `cli_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`);
   const agora = new Date().toISOString();
 
   const clienteObj = {
     id,
     nome: nomeLimpo,
-    cnpj: cnpjLimpo,
-    telefone: dadosCliente.telefone || '',
-    email: dadosCliente.email || '',
-    cidade: dadosCliente.cidade || '',
-    uf: dadosCliente.uf || '',
-    observacoes: dadosCliente.observacoes || '',
-    created_at: dadosCliente.created_at || agora,
+    cnpj: cnpjLimpo || clienteExistente?.cnpj || '',
+    telefone: dadosCliente.telefone || clienteExistente?.telefone || '',
+    email: dadosCliente.email || clienteExistente?.email || '',
+    cidade: dadosCliente.cidade || clienteExistente?.cidade || '',
+    uf: dadosCliente.uf || clienteExistente?.uf || '',
+    observacoes: dadosCliente.observacoes || clienteExistente?.observacoes || '',
+    created_at: clienteExistente?.created_at || dadosCliente.created_at || agora,
     updated_at: agora
   };
 
-  // Salvar no LocalStorage
-  const locais = carregarClientesLocais();
-  const index = locais.findIndex(c => c.nome === nomeLimpo || (c.id && c.id === id));
+  // Salvar no LocalStorage substituindo duplicatas
+  const index = locais.findIndex(c => c.id === id || (cnpjNumeros && (c.cnpj || '').replace(/\D/g, '') === cnpjNumeros) || c.nome === nomeLimpo);
   if (index >= 0) {
     locais[index] = { ...locais[index], ...clienteObj };
   } else {
@@ -900,11 +913,13 @@ export const salvarClienteCadastrado = async (dadosCliente) => {
   }
   salvarClientesLocais(locais);
 
-  // Sincronizar no Supabase
+  // Sincronizar no Supabase (com onConflict em 'id')
   if (isSupabaseConfigurado()) {
     try {
-      await supabase.from('clientes').upsert(clienteObj);
-    } catch (e) {}
+      await supabase.from('clientes').upsert(clienteObj, { onConflict: 'id' });
+    } catch (e) {
+      console.warn('Erro ao salvar cliente no Supabase:', e);
+    }
     sincronizarClientesNuvem(locais);
   }
 
