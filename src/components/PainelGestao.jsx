@@ -107,7 +107,9 @@ export function PainelGestao({
   onVisualizarComprovante,
   usuario = null,
   isAdmin = false,
-  pedreiraOperador = null
+  pedreiraOperador = null,
+  abaExterna = null,
+  onTrocarAba = null
 }) {
   const { dataHoje } = obterDataHoraAtualBrasil();
   const hojeStr = dataHoje || new Date().toISOString().split('T')[0];
@@ -202,7 +204,16 @@ export function PainelGestao({
   };
 
   const [filtroData, setFiltroData] = useState(() => hojeStr);
-  const [abaAtiva, setAbaAtiva] = useState('tabela'); // 'tabela' ou 'graficos'
+  const [abaAtiva, setAbaAtiva] = useState(() => (abaExterna === 'envelopamento' ? 'envelopamento' : 'tabela'));
+
+  useEffect(() => {
+    if (abaExterna === 'envelopamento') {
+      setAbaAtiva('envelopamento');
+    } else if (abaExterna === 'painel') {
+      setAbaAtiva('tabela');
+    }
+  }, [abaExterna]);
+
   const [notificandoEmailId, setNotificandoEmailId] = useState(null);
   const [excluindoId, setExcluindoId] = useState(null);
   const [mensagemAviso, setMensagemAviso] = useState('');
@@ -1380,7 +1391,10 @@ export function PainelGestao({
       }}>
         <button
           type="button"
-          onClick={() => setAbaAtiva('tabela')}
+          onClick={() => {
+            setAbaAtiva('tabela');
+            if (onTrocarAba) onTrocarAba('painel');
+          }}
           className="btn"
           style={{
             padding: '9px 18px',
@@ -1401,7 +1415,10 @@ export function PainelGestao({
 
         <button
           type="button"
-          onClick={() => setAbaAtiva('envelopamento')}
+          onClick={() => {
+            setAbaAtiva('envelopamento');
+            if (onTrocarAba) onTrocarAba('envelopamento');
+          }}
           className="btn"
           style={{
             padding: '9px 18px',

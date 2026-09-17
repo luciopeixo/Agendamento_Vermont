@@ -201,6 +201,8 @@ export function App() {
               usuario={usuarioAuth}
               isAdmin={isAdmin}
               pedreiraOperador={pedreiraOperador}
+              abaExterna={abaAtiva}
+              onTrocarAba={setAbaAtiva}
             />
           ) : (
             <AdminLogin 

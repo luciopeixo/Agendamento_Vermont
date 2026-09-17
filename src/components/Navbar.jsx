@@ -118,6 +118,19 @@ export function Navbar({
             <span>Painel de Carregamento</span>
           </button>
 
+          {/* Controle de Envelopamento - Exclusivo Usuários Internos (Logados / Admin / Pedreiras) */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setAbaAtiva('envelopamento')}
+              className={`btn navbar-btn ${abaAtiva === 'envelopamento' ? 'btn-vermont' : 'btn-secondary'}`}
+              title="Acessar o Controle de Envelopamento de Blocos"
+            >
+              <Layers size={17} />
+              <span>Controle de Envelopamento</span>
+            </button>
+          )}
+
           {isAdmin && (
             <button
               type="button"
