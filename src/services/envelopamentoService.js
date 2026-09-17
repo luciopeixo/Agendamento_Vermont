@@ -158,13 +158,27 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
 };
 
 /**
- * Normaliza o número do bloco para comparação
+ * Normaliza o número do bloco para comparação e padronização (ex: 126 -> 0126, 1/26 -> 01/26)
  */
 export const normalizarNumeroBloco = (bloco = '') => {
-  return String(bloco || '')
+  let str = String(bloco || '')
     .trim()
     .toUpperCase()
     .replace(/\s+/g, '');
+
+  if (/^\d{3}$/.test(str)) {
+    const seq = str.slice(0, 1);
+    const ano = str.slice(1);
+    const anoNum = parseInt(ano, 10);
+    if (anoNum >= 20 && anoNum <= 35) {
+      str = `0${seq}${ano}`;
+    }
+  } else if (/^\d\/\d{2}$/.test(str)) {
+    const partes = str.split('/');
+    str = `0${partes[0]}/${partes[1]}`;
+  }
+
+  return str;
 };
 
 /**
@@ -792,15 +806,17 @@ export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelo
     };
   }
 
-  const numBlocoAg = String(agendamento.numero_bloco).trim().toUpperCase();
+  const numBlocoAg = normalizarNumeroBloco(agendamento.numero_bloco);
+  const numBlocoAgSemBarra = numBlocoAg.replace(/\//g, '');
   const clienteAg = String(agendamento.cliente || '').trim().toLowerCase();
   const materialAg = String(agendamento.material || '').trim().toLowerCase();
   const pedreiraAg = String(agendamento.pedreira || '').trim().toLowerCase();
 
-  // Filtrar todos os que batem com o número do bloco
+  // Filtrar todos os que batem com o número do bloco (com ou sem barra e com zeros à esquerda)
   const candidatos = (Array.isArray(listaEnvelopamentos) ? listaEnvelopamentos : []).filter(env => {
-    const numEnv = String(env.numero_bloco || '').trim().toUpperCase();
-    return numEnv === numBlocoAg;
+    const numEnv = normalizarNumeroBloco(env.numero_bloco);
+    const numEnvSemBarra = numEnv.replace(/\//g, '');
+    return numEnv === numBlocoAg || numEnvSemBarra === numBlocoAgSemBarra;
   });
 
   let correspondente = null;

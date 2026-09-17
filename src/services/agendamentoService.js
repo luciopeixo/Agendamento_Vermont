@@ -2550,7 +2550,7 @@ export function obterPrimeiroHorarioDisponivel(horariosOcupados = [], dataStr = 
  * Sanitiza a numeração do bloco para remover textos extras (ex: 'BLOCO:', 'Bloco', 'Nº', 'Quartzito', 'Taj Mahal')
  * deixando apenas a numeração/código oficial do bloco a ser imputado no campo.
  */
-export function sanitizarNumeroBloco(texto = '') {
+export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false) {
   if (!texto || typeof texto !== 'string') return '';
   let str = String(texto).trim().toUpperCase();
   
@@ -2573,7 +2573,25 @@ export function sanitizarNumeroBloco(texto = '') {
   str = str.replace(/\s+(?:TAJ\s+MAHAL|QUARTZITO|GRANITO|MARMORE|CARGA\s*\d*|MATERIAL).*$/i, '');
 
   // 5. Remove pontuações desnecessárias no início ou fim (preserva letras, dígitos e '/')
-  str = str.replace(/^[^\w/]+|[^\w/]+$/g, '');
+  str = str.replace(/^[^\w/]+|[^\w/]+$/g, '').trim();
+
+  // 6. Regra especial de padronização de blocos Vermont:
+  // Se for 3 dígitos numéricos terminando com ano válido (ex: 126 -> 0126 / 01/26)
+  if (/^\d{3}$/.test(str)) {
+    const seq = str.slice(0, 1);
+    const ano = str.slice(1);
+    const anoNum = parseInt(ano, 10);
+    if (anoNum >= 20 && anoNum <= 35) {
+      if (isThorOuArgos) {
+        return `0${seq}/${ano}`;
+      }
+      return `0${seq}${ano}`; // "0126"
+    }
+  } else if (/^\d\/\d{2}$/.test(str)) {
+    // Se for formato 1/26 -> padroniza para 01/26
+    const partes = str.split('/');
+    return `0${partes[0]}/${partes[1]}`;
+  }
   
   return str.trim();
 }
