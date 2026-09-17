@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { AgendamentoForm } from './components/AgendamentoForm';
 import { PainelGestao } from './components/PainelGestao';
+import { PainelEnvelopamento } from './components/PainelEnvelopamento';
 import { AdminLogin } from './components/AdminLogin';
 import { ComprovanteModal } from './components/ComprovanteModal';
 import { RegrasModal } from './components/RegrasModal';
@@ -195,19 +196,23 @@ export function App() {
         <ErrorBoundary onReset={() => setAbaAtiva('agendar')}>
           {abaAtiva === 'agendar' ? (
             <AgendamentoForm onAgendamentoSucesso={handleAgendamentoSucesso} />
-          ) : isAutenticado ? (
+          ) : !isAutenticado ? (
+            <AdminLogin 
+              onLoginSucesso={handleLoginSucesso}
+              onVoltar={() => setAbaAtiva('agendar')}
+            />
+          ) : abaAtiva === 'envelopamento' ? (
+            <PainelEnvelopamento 
+              usuario={usuarioAuth}
+              isAdmin={isAdmin}
+              pedreiraOperador={pedreiraOperador}
+            />
+          ) : (
             <PainelGestao 
               onVisualizarComprovante={handleVisualizarComprovante} 
               usuario={usuarioAuth}
               isAdmin={isAdmin}
               pedreiraOperador={pedreiraOperador}
-              abaExterna={abaAtiva}
-              onTrocarAba={setAbaAtiva}
-            />
-          ) : (
-            <AdminLogin 
-              onLoginSucesso={handleLoginSucesso}
-              onVoltar={() => setAbaAtiva('agendar')}
             />
           )}
         </ErrorBoundary>

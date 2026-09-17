@@ -48,7 +48,6 @@ import { GraficosBlocosAdmin } from './GraficosBlocosAdmin';
 import { AutorizacaoCarregamentoModal } from './AutorizacaoCarregamentoModal';
 import { ModalGestaoMotoristasFrota } from './ModalGestaoMotoristasFrota';
 import { ModalConformidadeMotorista } from './ModalConformidadeMotorista';
-import { PainelEnvelopamento } from './PainelEnvelopamento';
 
 /**
  * Emite som harmônico suave usando a Web Audio API (sem arquivos externos)
@@ -204,15 +203,7 @@ export function PainelGestao({
   };
 
   const [filtroData, setFiltroData] = useState(() => hojeStr);
-  const [abaAtiva, setAbaAtiva] = useState(() => (abaExterna === 'envelopamento' ? 'envelopamento' : 'tabela'));
-
-  useEffect(() => {
-    if (abaExterna === 'envelopamento') {
-      setAbaAtiva('envelopamento');
-    } else if (abaExterna === 'painel') {
-      setAbaAtiva('tabela');
-    }
-  }, [abaExterna]);
+  const [abaAtiva, setAbaAtiva] = useState('tabela');
 
   const [notificandoEmailId, setNotificandoEmailId] = useState(null);
   const [excluindoId, setExcluindoId] = useState(null);
@@ -1377,67 +1368,40 @@ export function PainelGestao({
         )}
       </div>
 
-      {/* Navegação entre Módulos Internos do Painel (Carregamento, Envelopamento e Gráficos) */}
-      <div className="no-print" style={{
-        display: 'flex',
-        gap: 10,
-        marginBottom: 20,
-        background: 'rgba(0, 0, 0, 0.45)',
-        padding: '6px',
-        borderRadius: 12,
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        width: 'fit-content',
-        flexWrap: 'wrap'
-      }}>
-        <button
-          type="button"
-          onClick={() => {
-            setAbaAtiva('tabela');
-            if (onTrocarAba) onTrocarAba('painel');
-          }}
-          className="btn"
-          style={{
-            padding: '9px 18px',
-            fontSize: '0.86rem',
-            fontWeight: 700,
-            gap: 8,
-            borderRadius: 8,
-            background: abaAtiva === 'tabela' ? 'var(--vermont-green-subtle)' : 'transparent',
-            border: abaAtiva === 'tabela' ? '1px solid var(--vermont-green-border)' : '1px solid transparent',
-            color: abaAtiva === 'tabela' ? '#4ade80' : 'var(--slate-400)',
-            boxShadow: abaAtiva === 'tabela' ? '0 0 15px rgba(0, 118, 44, 0.35)' : 'none',
-            transition: 'all 0.2s'
-          }}
-        >
-          <FileText size={16} />
-          Controle de Carregamento
-        </button>
+      {/* Navegação entre Módulos Internos do Painel (Carregamento e Gráficos Admin) */}
+      {isAdmin && (
+        <div className="no-print" style={{
+          display: 'flex',
+          gap: 10,
+          marginBottom: 20,
+          background: 'rgba(0, 0, 0, 0.45)',
+          padding: '6px',
+          borderRadius: 12,
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          width: 'fit-content',
+          flexWrap: 'wrap'
+        }}>
+          <button
+            type="button"
+            onClick={() => setAbaAtiva('tabela')}
+            className="btn"
+            style={{
+              padding: '9px 18px',
+              fontSize: '0.86rem',
+              fontWeight: 700,
+              gap: 8,
+              borderRadius: 8,
+              background: abaAtiva === 'tabela' ? 'var(--vermont-green-subtle)' : 'transparent',
+              border: abaAtiva === 'tabela' ? '1px solid var(--vermont-green-border)' : '1px solid transparent',
+              color: abaAtiva === 'tabela' ? '#4ade80' : 'var(--slate-400)',
+              boxShadow: abaAtiva === 'tabela' ? '0 0 15px rgba(0, 118, 44, 0.35)' : 'none',
+              transition: 'all 0.2s'
+            }}
+          >
+            <FileText size={16} />
+            Controle de Carregamento
+          </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            setAbaAtiva('envelopamento');
-            if (onTrocarAba) onTrocarAba('envelopamento');
-          }}
-          className="btn"
-          style={{
-            padding: '9px 18px',
-            fontSize: '0.86rem',
-            fontWeight: 700,
-            gap: 8,
-            borderRadius: 8,
-            background: abaAtiva === 'envelopamento' ? 'rgba(0, 168, 62, 0.2)' : 'transparent',
-            border: abaAtiva === 'envelopamento' ? '1px solid #00a83e' : '1px solid transparent',
-            color: abaAtiva === 'envelopamento' ? '#4ade80' : 'var(--slate-400)',
-            boxShadow: abaAtiva === 'envelopamento' ? '0 0 15px rgba(0, 168, 62, 0.35)' : 'none',
-            transition: 'all 0.2s'
-          }}
-        >
-          <Layers size={16} />
-          Controle de Envelopamento
-        </button>
-
-        {isAdmin && (
           <button
             type="button"
             onClick={() => setAbaAtiva('graficos')}
@@ -1458,21 +1422,14 @@ export function PainelGestao({
             <BarChart3 size={16} />
             Gráficos & Análise de Blocos (Admin)
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* VISÃO 1: CONTROLE DE ENVELOPAMENTO */}
-      {abaAtiva === 'envelopamento' ? (
-        <PainelEnvelopamento 
-          usuario={usuario} 
-          isAdmin={isAdmin} 
-          pedreiraOperador={pedreiraOperador} 
-        />
-      ) : isAdmin && abaAtiva === 'graficos' ? (
-        /* VISÃO 2: GRÁFICOS & ANÁLISE DE BLOCOS (EXCLUSIVO ADMIN) */
+      {/* VISÃO 1: GRÁFICOS & ANÁLISE DE BLOCOS (EXCLUSIVO ADMIN) */}
+      {isAdmin && abaAtiva === 'graficos' ? (
         <GraficosBlocosAdmin agendamentos={todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos} />
       ) : (
-        /* VISÃO 3: TABELA OPERACIONAL & ROMANEIO DE CARREGAMENTOS */
+        /* VISÃO 2: TABELA OPERACIONAL & ROMANEIO DE CARREGAMENTOS */
         <>
           {/* Métricas Rápidas (Oculto na impressão) */}
           <div className="no-print stats-grid-container">
