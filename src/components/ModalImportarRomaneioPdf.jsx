@@ -24,7 +24,9 @@ import {
   STATUS_ENVELOPAMENTO, 
   importarBlocosEmLote,
   obterClientesDoBancoDeDados,
-  salvarClienteCadastrado
+  salvarClienteCadastrado,
+  listarEnvelopamentos,
+  identificarDuplicidadesEmLista
 } from '../services/envelopamentoService';
 import { 
   PEDREIRAS_CEARA, 
@@ -45,6 +47,7 @@ export function ModalImportarRomaneioPdf({
   const [dadosProcessados, setDadosProcessados] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
+  const [envelopamentosExistentes, setEnvelopamentosExistentes] = useState([]);
 
   // Clientes do banco para autocomplete
   const [clientesBase, setClientesBase] = useState([]);
@@ -52,6 +55,18 @@ export function ModalImportarRomaneioPdf({
   const [mostrarDropdownClientes, setMostrarDropdownClientes] = useState(false);
   const dropdownRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Recalcula duplicidades para todos os blocos com base nos dados do cabeçalho e base salva
+  const recalcularDuplicidades = (blocosRaw, clienteNome, clienteCnpj, pedId, pedNome, baseExistente) => {
+    const blocosComCabecalho = (blocosRaw || []).map(b => ({
+      ...b,
+      cliente_nome: clienteNome,
+      cliente_cnpj: clienteCnpj,
+      pedreira_id: pedId,
+      pedreira_nome: pedNome
+    }));
+    return identificarDuplicidadesEmLista(blocosComCabecalho, baseExistente || envelopamentosExistentes);
+  };
 
   const handleConsultarCnpjReceita = async (cnpjParaBuscar) => {
     const limpo = (cnpjParaBuscar || dadosProcessados?.cliente?.cnpj || '').replace(/\D/g, '');
@@ -62,18 +77,26 @@ export function ModalImportarRomaneioPdf({
       const res = await consultarCNPJReceita(limpo);
       if (res?.valido && res?.empresa?.razao_social) {
         const razao = res.empresa.razao_social.toUpperCase().trim();
-        setDadosProcessados(prev => ({
-          ...prev,
-          cliente: {
-            ...prev.cliente,
-            nome: razao,
-            fonte: res.fonte || 'Receita Federal (Oficial)'
-          },
-          blocos: prev.blocos.map(b => ({
-            ...b,
-            cliente_nome: razao
-          }))
-        }));
+        setDadosProcessados(prev => {
+          if (!prev) return prev;
+          const blocosAtualizados = recalcularDuplicidades(
+            prev.blocos,
+            razao,
+            prev.cliente.cnpj,
+            prev.pedreira.id,
+            prev.pedreira.nome,
+            envelopamentosExistentes
+          );
+          return {
+            ...prev,
+            cliente: {
+              ...prev.cliente,
+              nome: razao,
+              fonte: res.fonte || 'Receita Federal (Oficial)'
+            },
+            blocos: blocosAtualizados
+          };
+        });
       }
     } catch (e) {
       console.warn('Erro ao consultar CNPJ:', e);
@@ -84,6 +107,7 @@ export function ModalImportarRomaneioPdf({
 
   useEffect(() => {
     obterClientesDoBancoDeDados().then(res => setClientesBase(res || [])).catch(() => {});
+    listarEnvelopamentos().then(res => setEnvelopamentosExistentes(res || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -114,7 +138,36 @@ export function ModalImportarRomaneioPdf({
         throw new Error('Nenhum bloco foi identificado no documento. Verifique se o PDF é um Romaneio padrão da Vermont.');
       }
 
-      setDadosProcessados(resultado);
+      // Carregar lista atualizada de envelopamentos para garantir detecção em tempo real
+      let baseExistente = envelopamentosExistentes;
+      try {
+        const maisRecentes = await listarEnvelopamentos();
+        if (Array.isArray(maisRecentes)) {
+          baseExistente = maisRecentes;
+          setEnvelopamentosExistentes(maisRecentes);
+        }
+      } catch (e) {}
+
+      // Avaliar duplicidades de cada bloco
+      const blocosAvaliados = recalcularDuplicidades(
+        resultado.blocos,
+        resultado.cliente?.nome || '',
+        resultado.cliente?.cnpj || '',
+        resultado.pedreira?.id || '',
+        resultado.pedreira?.nome || '',
+        baseExistente
+      );
+
+      // Desmarcar blocos duplicados por padrão para proteger o usuário contra inserções repetidas
+      const blocosComSelecao = blocosAvaliados.map(b => ({
+        ...b,
+        selecionado: !b.ehDuplicado
+      }));
+
+      setDadosProcessados({
+        ...resultado,
+        blocos: blocosComSelecao
+      });
       setEtapa('revisao');
     } catch (err) {
       console.error('Erro ao processar PDF do romaneio:', err);
@@ -149,6 +202,15 @@ export function ModalImportarRomaneioPdf({
     }));
   };
 
+  // Marcar apenas novos (desmarcando todos os duplicados)
+  const handleMarcarApenasNovos = () => {
+    if (!dadosProcessados) return;
+    setDadosProcessados(prev => ({
+      ...prev,
+      blocos: prev.blocos.map(b => ({ ...b, selecionado: !b.ehDuplicado }))
+    }));
+  };
+
   // Alterar seleção individual
   const handleToggleBloco = (id) => {
     if (!dadosProcessados) return;
@@ -179,10 +241,22 @@ export function ModalImportarRomaneioPdf({
   // Atualizar cliente do cabeçalho
   const handleFiltrarClientes = (termo) => {
     if (!dadosProcessados) return;
-    setDadosProcessados(prev => ({
-      ...prev,
-      cliente: { ...prev.cliente, nome: termo }
-    }));
+    
+    setDadosProcessados(prev => {
+      const blocosAtualizados = recalcularDuplicidades(
+        prev.blocos,
+        termo,
+        prev.cliente.cnpj,
+        prev.pedreira.id,
+        prev.pedreira.nome,
+        envelopamentosExistentes
+      );
+      return {
+        ...prev,
+        cliente: { ...prev.cliente, nome: termo },
+        blocos: blocosAtualizados
+      };
+    });
 
     if (!termo || termo.trim().length < 1) {
       setSugestoesClientes(clientesBase.slice(0, 50));
@@ -203,18 +277,25 @@ export function ModalImportarRomaneioPdf({
   const handleSelecionarCliente = (cli) => {
     if (!dadosProcessados) return;
     const cnpjFmt = cli.cnpj ? formatarCNPJ(cli.cnpj) : dadosProcessados.cliente.cnpj;
-    setDadosProcessados(prev => ({
-      ...prev,
-      cliente: {
-        nome: cli.nome,
-        cnpj: cnpjFmt
-      },
-      blocos: prev.blocos.map(b => ({
-        ...b,
-        cliente_nome: cli.nome,
-        cliente_cnpj: cnpjFmt
-      }))
-    }));
+    
+    setDadosProcessados(prev => {
+      const blocosAtualizados = recalcularDuplicidades(
+        prev.blocos,
+        cli.nome,
+        cnpjFmt,
+        prev.pedreira.id,
+        prev.pedreira.nome,
+        envelopamentosExistentes
+      );
+      return {
+        ...prev,
+        cliente: {
+          nome: cli.nome,
+          cnpj: cnpjFmt
+        },
+        blocos: blocosAtualizados
+      };
+    });
     setMostrarDropdownClientes(false);
   };
 
@@ -223,15 +304,22 @@ export function ModalImportarRomaneioPdf({
     if (!dadosProcessados) return;
     const pedObj = PEDREIRAS_CEARA.find(p => p.id === pedId);
     const nome = pedObj ? pedObj.nome : pedId;
-    setDadosProcessados(prev => ({
-      ...prev,
-      pedreira: { id: pedId, nome },
-      blocos: prev.blocos.map(b => ({
-        ...b,
-        pedreira_id: pedId,
-        pedreira_nome: nome
-      }))
-    }));
+    
+    setDadosProcessados(prev => {
+      const blocosAtualizados = recalcularDuplicidades(
+        prev.blocos,
+        prev.cliente.nome,
+        prev.cliente.cnpj,
+        pedId,
+        nome,
+        envelopamentosExistentes
+      );
+      return {
+        ...prev,
+        pedreira: { id: pedId, nome },
+        blocos: blocosAtualizados
+      };
+    });
   };
 
   // Confirmar e Salvar Importação
@@ -583,11 +671,21 @@ export function ModalImportarRomaneioPdf({
                     onChange={(e) => {
                       const fmt = formatarCNPJ(e.target.value);
                       const limpo = fmt.replace(/\D/g, '');
-                      setDadosProcessados(prev => ({
-                        ...prev,
-                        cliente: { ...prev.cliente, cnpj: fmt },
-                        blocos: prev.blocos.map(b => ({ ...b, cliente_cnpj: fmt }))
-                      }));
+                      setDadosProcessados(prev => {
+                        const blocosAtualizados = recalcularDuplicidades(
+                          prev.blocos,
+                          prev.cliente.nome,
+                          fmt,
+                          prev.pedreira.id,
+                          prev.pedreira.nome,
+                          envelopamentosExistentes
+                        );
+                        return {
+                          ...prev,
+                          cliente: { ...prev.cliente, cnpj: fmt },
+                          blocos: blocosAtualizados
+                        };
+                      });
                       if (limpo.length === 14) {
                         handleConsultarCnpjReceita(limpo);
                       }
@@ -611,9 +709,49 @@ export function ModalImportarRomaneioPdf({
               </div>
             </div>
 
+            {/* Aviso de Blocos Duplicados */}
+            {blocos.some(b => b.ehDuplicado) && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: 10,
+                padding: '10px 14px',
+                marginBottom: 14,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 10
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fca5a5', fontSize: '0.82rem' }}>
+                  <AlertTriangle size={18} color="#ef4444" style={{ flexShrink: 0 }} />
+                  <span>
+                    <strong>{blocos.filter(b => b.ehDuplicado).length} bloco(s) em duplicidade</strong> detectado(s) para este cliente, material e pedreira. Desmarcados automaticamente.
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={handleMarcarApenasNovos}
+                    className="btn btn-secondary"
+                    style={{
+                      padding: '4px 10px',
+                      fontSize: '0.74rem',
+                      background: 'rgba(0, 168, 62, 0.2)',
+                      borderColor: '#00a83e',
+                      color: '#4ade80',
+                      fontWeight: 600
+                    }}
+                  >
+                    Manter Apenas Novos ({blocos.filter(b => !b.ehDuplicado).length})
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Barra de Seleção e Estatísticas */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '0.84rem', color: '#fff', fontWeight: 600 }}>
                   Blocos Identificados ({blocos.length})
                 </span>
@@ -634,16 +772,31 @@ export function ModalImportarRomaneioPdf({
                   >
                     Desmarcar Todos
                   </button>
+                  {blocos.some(b => b.ehDuplicado) && (
+                    <button
+                      type="button"
+                      onClick={handleMarcarApenasNovos}
+                      className="btn btn-secondary"
+                      style={{ padding: '3px 8px', fontSize: '0.72rem', color: '#4ade80' }}
+                    >
+                      Apenas Novos
+                    </button>
+                  )}
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: 12, fontSize: '0.76rem' }}>
+              <div style={{ display: 'flex', gap: 12, fontSize: '0.76rem', flexWrap: 'wrap' }}>
                 <span style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Clock size={13} /> {qtdPendentes} Pendentes de Envelopamento
                 </span>
                 <span style={{ color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Ban size={13} /> {qtdSemEnv} Sem Envelopamento
                 </span>
+                {blocos.some(b => b.ehDuplicado) && (
+                  <span style={{ color: '#f87171', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700 }}>
+                    <AlertTriangle size={13} /> {blocos.filter(b => b.ehDuplicado).length} Duplicados
+                  </span>
+                )}
               </div>
             </div>
 
@@ -682,7 +835,9 @@ export function ModalImportarRomaneioPdf({
                         style={{ 
                           borderBottom: '1px solid rgba(255,255,255,0.04)',
                           opacity: b.selecionado ? 1 : 0.45,
-                          background: b.status === 'pendente_envelopamento' ? 'rgba(245, 158, 11, 0.03)' : undefined
+                          background: b.ehDuplicado 
+                            ? 'rgba(239, 68, 68, 0.05)' 
+                            : (b.status === 'pendente_envelopamento' ? 'rgba(245, 158, 11, 0.03)' : undefined)
                         }}
                       >
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
@@ -695,17 +850,44 @@ export function ModalImportarRomaneioPdf({
 
                         {/* Bloco */}
                         <td style={{ padding: '10px 12px' }}>
-                          <span style={{
-                            background: 'rgba(255, 255, 255, 0.08)',
-                            color: '#fff',
-                            fontWeight: 800,
-                            padding: '3px 7px',
-                            borderRadius: 6,
-                            fontSize: '0.84rem',
-                            fontFamily: 'monospace'
-                          }}>
-                            {b.numero_bloco}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{
+                              background: b.ehDuplicado ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                              color: b.ehDuplicado ? '#fca5a5' : '#fff',
+                              fontWeight: 800,
+                              padding: '3px 7px',
+                              borderRadius: 6,
+                              fontSize: '0.84rem',
+                              fontFamily: 'monospace',
+                              border: b.ehDuplicado ? '1px solid rgba(239, 68, 68, 0.4)' : undefined
+                            }}>
+                              {b.numero_bloco}
+                            </span>
+                            {b.ehDuplicado && (
+                              <span 
+                                title={b.motivoDuplicidade}
+                                style={{
+                                  fontSize: '0.68rem',
+                                  background: 'rgba(239, 68, 68, 0.2)',
+                                  color: '#f87171',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  fontWeight: 700,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 3,
+                                  cursor: 'help'
+                                }}
+                              >
+                                <AlertTriangle size={11} /> Já Cadastrado
+                              </span>
+                            )}
+                          </div>
+                          {b.ehDuplicado && b.motivoDuplicidade && (
+                            <div style={{ fontSize: '0.68rem', color: '#fca5a5', marginTop: 3 }}>
+                              {b.motivoDuplicidade}
+                            </div>
+                          )}
                         </td>
 
                         {/* Material */}

@@ -161,6 +161,169 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
 };
 
 /**
+ * Normaliza o número do bloco para comparação
+ */
+export const normalizarNumeroBloco = (bloco = '') => {
+  return String(bloco || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+};
+
+/**
+ * Normaliza a pedreira para identificação consistente
+ */
+export const normalizarPedreira = (pedId = '', pedNome = '') => {
+  const texto = `${pedId || ''} ${pedNome || ''}`.toLowerCase();
+  if (texto.includes('uruoca')) return 'uruoca';
+  if (texto.includes('massape') || texto.includes('massapê')) return 'massape';
+  if (texto.includes('hidrolandia') || texto.includes('hidrolândia')) return 'hidrolandia';
+  if (texto.includes('banabuiu') || texto.includes('banabuiú')) return 'banabuiu';
+  if (texto.includes('santa_quiteria') || texto.includes('quiteria') || texto.includes('quitéria')) return 'santa_quiteria';
+  if (texto.includes('sobral')) return 'sobral';
+  return String(pedId || pedNome || '').trim().toLowerCase();
+};
+
+/**
+ * Normaliza o cliente (preferência por dígitos do CNPJ, ou raiz textual do nome)
+ */
+export const normalizarCliente = (nome = '', cnpj = '') => {
+  const cnpjDigitos = String(cnpj || '').replace(/\D/g, '');
+  if (cnpjDigitos.length === 14) {
+    return `CNPJ_${cnpjDigitos}`;
+  }
+  const nomeLimpo = String(nome || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\b(LTDA|ME|EPP|EIRELI|S\/A|SA|SOCIEDADE|ANONIMA|LIMITADA|DO BRASIL|BRASIL|COMERCIO|EXPORTACAO|IMPORTACAO|ROCHAS|MINERACAO|MARMORES|GRANITOS)\b/g, '')
+    .replace(/[^A-Z0-9]/g, '')
+    .trim();
+  return `NOME_${nomeLimpo.slice(0, 15)}`;
+};
+
+/**
+ * Normaliza o material
+ */
+export const normalizarMaterial = (material = '') => {
+  return String(material || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+};
+
+/**
+ * Gera uma chave unificada de duplicidade para Bloco + Cliente + Material + Pedreira
+ */
+export const gerarChaveDuplicidade = ({ numero_bloco, cliente_nome, cliente_cnpj, material, pedreira_id, pedreira_nome }) => {
+  const b = normalizarNumeroBloco(numero_bloco);
+  const c = normalizarCliente(cliente_nome, cliente_cnpj);
+  const m = normalizarMaterial(material);
+  const p = normalizarPedreira(pedreira_id, pedreira_nome);
+  if (!b) return '';
+  return `${b}___${c}___${m}___${p}`;
+};
+
+/**
+ * Verifica se um bloco já existe cadastrado com o mesmo cliente, material e pedreira
+ */
+export const verificarDuplicidadeBloco = ({
+  numero_bloco,
+  cliente_nome,
+  cliente_cnpj,
+  material,
+  pedreira_id,
+  pedreira_nome,
+  idAtual = null,
+  listaExistente = []
+}) => {
+  if (!numero_bloco) return { ehDuplicado: false, existente: null };
+  const chaveAlvo = gerarChaveDuplicidade({ numero_bloco, cliente_nome, cliente_cnpj, material, pedreira_id, pedreira_nome });
+  if (!chaveAlvo) return { ehDuplicado: false, existente: null };
+
+  const existente = listaExistente.find(item => {
+    if (idAtual && item.id === idAtual) return false;
+    const chaveItem = gerarChaveDuplicidade({
+      numero_bloco: item.numero_bloco,
+      cliente_nome: item.cliente_nome,
+      cliente_cnpj: item.cliente_cnpj,
+      material: item.material,
+      pedreira_id: item.pedreira_id,
+      pedreira_nome: item.pedreira_nome
+    });
+    return chaveItem === chaveAlvo;
+  });
+
+  return {
+    ehDuplicado: !!existente,
+    existente: existente || null
+  };
+};
+
+/**
+ * Analisa uma lista de blocos (ex: importação PDF ou lote) identificando duplicidades
+ * tanto em relação aos registros já salvos no sistema quanto entre si mesmos.
+ */
+export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = []) => {
+  const mapaExistentes = new Map();
+  listaExistente.forEach(item => {
+    const chave = gerarChaveDuplicidade({
+      numero_bloco: item.numero_bloco,
+      cliente_nome: item.cliente_nome,
+      cliente_cnpj: item.cliente_cnpj,
+      material: item.material,
+      pedreira_id: item.pedreira_id,
+      pedreira_nome: item.pedreira_nome
+    });
+    if (chave && !mapaExistentes.has(chave)) {
+      mapaExistentes.set(chave, item);
+    }
+  });
+
+  const chavesNoLote = new Map();
+
+  return listaNova.map((item, idx) => {
+    const chave = gerarChaveDuplicidade({
+      numero_bloco: item.numero_bloco,
+      cliente_nome: item.cliente_nome,
+      cliente_cnpj: item.cliente_cnpj,
+      material: item.material,
+      pedreira_id: item.pedreira_id,
+      pedreira_nome: item.pedreira_nome
+    });
+
+    if (!chave) {
+      return { ...item, ehDuplicado: false, motivoDuplicidade: null, itemOriginal: null };
+    }
+
+    if (mapaExistentes.has(chave)) {
+      const original = mapaExistentes.get(chave);
+      const romOrig = original.numero_romaneio || 'S/N';
+      return {
+        ...item,
+        ehDuplicado: true,
+        motivoDuplicidade: `Já cadastrado no sistema (Romaneio: ${romOrig}, Status: ${original.status})`,
+        itemOriginal: original
+      };
+    }
+
+    if (chavesNoLote.has(chave)) {
+      return {
+        ...item,
+        ehDuplicado: true,
+        motivoDuplicidade: `Repetido neste mesmo romaneio/lote (Bloco duplicado)`,
+        itemOriginal: null
+      };
+    }
+
+    chavesNoLote.set(chave, idx);
+    return { ...item, ehDuplicado: false, motivoDuplicidade: null, itemOriginal: null };
+  });
+};
+
+/**
  * Persiste a lista completa de envelopamentos na nuvem (Supabase) garantindo sincronização instantânea
  * em tempo real para todos os usuários através da tabela base_motoristas e da tabela dedicada.
  */

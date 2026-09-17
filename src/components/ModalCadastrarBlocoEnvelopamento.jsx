@@ -13,7 +13,10 @@ import {
   STATUS_ENVELOPAMENTO, 
   salvarEnvelopamento, 
   importarBlocosEmLote,
-  obterClientesDoBancoDeDados
+  obterClientesDoBancoDeDados,
+  listarEnvelopamentos,
+  verificarDuplicidadeBloco,
+  identificarDuplicidadesEmLista
 } from '../services/envelopamentoService';
 import { ModalGestaoClientes } from './ModalGestaoClientes';
 import { ModalImportarRomaneioPdf } from './ModalImportarRomaneioPdf';
@@ -27,6 +30,7 @@ export function ModalCadastrarBlocoEnvelopamento({
   const [modoAba, setModoAba] = useState('individual'); // 'individual' | 'lote' | 'pdf'
   const [modalGestaoClientesAberto, setModalGestaoClientesAberto] = useState(false);
   const [modalPdfAberto, setModalPdfAberto] = useState(false);
+  const [envelopamentosExistentes, setEnvelopamentosExistentes] = useState([]);
   
   // Estado Individual
   const [formData, setFormData] = useState({
@@ -81,7 +85,54 @@ export function ModalCadastrarBlocoEnvelopamento({
 
   useEffect(() => {
     carregarClientes();
+    listarEnvelopamentos().then(res => setEnvelopamentosExistentes(res || [])).catch(() => {});
   }, []);
+
+  // Verificação de duplicidade individual em tempo real
+  const duplicidadeIndividual = React.useMemo(() => {
+    if (!formData.numero_bloco || !formData.cliente_nome) return { ehDuplicado: false, existente: null };
+    return verificarDuplicidadeBloco({
+      numero_bloco: formData.numero_bloco,
+      cliente_nome: formData.cliente_nome,
+      cliente_cnpj: formData.cliente_cnpj,
+      material: formData.material,
+      pedreira_id: formData.pedreira_id,
+      pedreira_nome: formData.pedreira_nome,
+      idAtual: formData.id,
+      listaExistente: envelopamentosExistentes
+    });
+  }, [formData.numero_bloco, formData.cliente_nome, formData.cliente_cnpj, formData.material, formData.pedreira_id, formData.pedreira_nome, formData.id, envelopamentosExistentes]);
+
+  // Verificação de duplicidade em lote
+  const blocosLoteAvaliados = React.useMemo(() => {
+    if (!loteData.textoBlocos.trim() || !loteData.cliente_nome.trim()) return [];
+    const linhas = loteData.textoBlocos
+      .split(/[\n,;]+/)
+      .map(b => sanitizarNumeroBloco(b, isClienteThorOuArgos(loteData.cliente_nome)))
+      .filter(b => b.length > 0);
+
+    const itens = linhas.map(bloco => ({
+      numero_bloco: bloco,
+      pedreira_id: loteData.pedreira_id,
+      pedreira_nome: loteData.pedreira_nome,
+      material: loteData.material,
+      cliente_nome: loteData.cliente_nome,
+      cliente_cnpj: loteData.cliente_cnpj
+    }));
+    return identificarDuplicidadesEmLista(itens, envelopamentosExistentes);
+  }, [loteData.textoBlocos, loteData.cliente_nome, loteData.cliente_cnpj, loteData.pedreira_id, loteData.pedreira_nome, loteData.material, envelopamentosExistentes]);
+
+  const duplicadosLote = React.useMemo(() => {
+    return blocosLoteAvaliados.filter(b => b.ehDuplicado);
+  }, [blocosLoteAvaliados]);
+
+  const handleRemoverDuplicadosLote = () => {
+    const unicos = blocosLoteAvaliados.filter(b => !b.ehDuplicado).map(b => b.numero_bloco);
+    setLoteData(prev => ({
+      ...prev,
+      textoBlocos: unicos.join('\n')
+    }));
+  };
 
   // Fechar dropdowns ao clicar fora
   useEffect(() => {
@@ -696,6 +747,33 @@ export function ModalCadastrarBlocoEnvelopamento({
               />
             </div>
 
+            {/* Alerta de Duplicidade Individual */}
+            {duplicidadeIndividual.ehDuplicado && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.14)',
+                border: '1px solid rgba(239, 68, 68, 0.45)',
+                borderRadius: 10,
+                padding: '11px 15px',
+                marginTop: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10
+              }}>
+                <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: '0.82rem', color: '#fca5a5' }}>
+                  <strong style={{ display: 'block', color: '#fff', marginBottom: 2 }}>
+                    Atenção: Bloco em Duplicidade Detectado!
+                  </strong>
+                  O bloco <strong>{formData.numero_bloco}</strong> já se encontra cadastrado para <strong>{formData.cliente_nome}</strong> ({formData.material} - {formData.pedreira_nome}).
+                  {duplicidadeIndividual.existente?.numero_romaneio && (
+                    <span style={{ display: 'block', marginTop: 2, color: '#fecaca', fontSize: '0.76rem' }}>
+                      Romaneio Original: <strong>{duplicidadeIndividual.existente.numero_romaneio}</strong> | Status: <strong>{duplicidadeIndividual.existente.status}</strong>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Botões de Ação */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
               <button type="button" onClick={onFechar} className="btn btn-secondary">
@@ -832,9 +910,16 @@ export function ModalCadastrarBlocoEnvelopamento({
             </div>
 
             <div className="form-group" style={{ marginTop: 14 }}>
-              <label className="form-label" style={{ fontSize: '0.82rem' }}>
-                Lista de Números dos Blocos (Cole um por linha ou separados por vírgula):
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <label className="form-label" style={{ fontSize: '0.82rem', margin: 0 }}>
+                  Lista de Números dos Blocos:
+                </label>
+                {blocosLoteAvaliados.length > 0 && (
+                  <span style={{ fontSize: '0.74rem', color: duplicadosLote.length > 0 ? '#f87171' : '#4ade80', fontWeight: 600 }}>
+                    {blocosLoteAvaliados.length} bloco(s) {duplicadosLote.length > 0 ? `(${duplicadosLote.length} duplicado${duplicadosLote.length > 1 ? 's' : ''})` : 'válidos'}
+                  </span>
+                )}
+              </div>
               <textarea
                 className="form-input"
                 rows={4}
@@ -845,6 +930,49 @@ export function ModalCadastrarBlocoEnvelopamento({
                 style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}
               />
             </div>
+
+            {/* Aviso de Duplicidade no Lote */}
+            {duplicadosLote.length > 0 && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.14)',
+                border: '1px solid rgba(239, 68, 68, 0.45)',
+                borderRadius: 10,
+                padding: '11px 15px',
+                marginTop: 12,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 10
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0 }} />
+                  <div style={{ fontSize: '0.82rem', color: '#fca5a5' }}>
+                    <strong style={{ display: 'block', color: '#fff', marginBottom: 2 }}>
+                      {duplicadosLote.length} bloco(s) em duplicidade detectado(s):
+                    </strong>
+                    <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#fecaca' }}>
+                      {duplicadosLote.map(d => d.numero_bloco).join(', ')}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoverDuplicadosLote}
+                  className="btn btn-secondary"
+                  style={{
+                    padding: '5px 12px',
+                    fontSize: '0.74rem',
+                    background: 'rgba(0, 168, 62, 0.2)',
+                    borderColor: '#00a83e',
+                    color: '#4ade80',
+                    fontWeight: 600
+                  }}
+                >
+                  Remover Duplicados do Texto ({duplicadosLote.length})
+                </button>
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
               <button type="button" onClick={onFechar} className="btn btn-secondary">

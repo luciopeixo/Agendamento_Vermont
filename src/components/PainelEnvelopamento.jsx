@@ -36,7 +36,8 @@ import {
   excluirEnvelopamentosEmLote,
   calcularMetricasEnvelopamento, 
   STATUS_ENVELOPAMENTO,
-  inscreverEnvelopamentosRealtime
+  inscreverEnvelopamentosRealtime,
+  gerarChaveDuplicidade
 } from '../services/envelopamentoService';
 import { PEDREIRAS_CEARA, formatarDataHoraBR } from '../services/agendamentoService';
 import { ModalCadastrarBlocoEnvelopamento } from './ModalCadastrarBlocoEnvelopamento';
@@ -95,6 +96,41 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   }, [filtroPedreira, filtroStatus, buscaTexto]);
 
   const metricas = calcularMetricasEnvelopamento(envelopamentos);
+
+  // Mapa de duplicidades em tempo real (mesmo Bloco + Cliente + Material + Pedreira)
+  const mapaContagemDuplicados = useMemo(() => {
+    const mapa = new Map();
+    envelopamentos.forEach(item => {
+      const chave = gerarChaveDuplicidade({
+        numero_bloco: item.numero_bloco,
+        cliente_nome: item.cliente_nome,
+        cliente_cnpj: item.cliente_cnpj,
+        material: item.material,
+        pedreira_id: item.pedreira_id,
+        pedreira_nome: item.pedreira_nome
+      });
+      if (chave) {
+        mapa.set(chave, (mapa.get(chave) || 0) + 1);
+      }
+    });
+    return mapa;
+  }, [envelopamentos]);
+
+  const isBlocoDuplicado = (item) => {
+    const chave = gerarChaveDuplicidade({
+      numero_bloco: item.numero_bloco,
+      cliente_nome: item.cliente_nome,
+      cliente_cnpj: item.cliente_cnpj,
+      material: item.material,
+      pedreira_id: item.pedreira_id,
+      pedreira_nome: item.pedreira_nome
+    });
+    return (mapaContagemDuplicados.get(chave) || 0) > 1;
+  };
+
+  const totalDuplicadosDetectados = useMemo(() => {
+    return envelopamentos.filter(b => isBlocoDuplicado(b)).length;
+  }, [envelopamentos, mapaContagemDuplicados]);
 
   // Agrupamento Hierárquico em Matriz: Cliente -> Romaneios -> Blocos
   const gruposPorCliente = useMemo(() => {
@@ -791,6 +827,23 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
               Lista Plana (Todos os Blocos)
             </button>
           </div>
+
+          {totalDuplicadosDetectados > 0 && (
+            <span style={{
+              fontSize: '0.74rem',
+              background: 'rgba(239, 68, 68, 0.15)',
+              color: '#ef4444',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              padding: '4px 10px',
+              borderRadius: 8,
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5
+            }}>
+              <AlertTriangle size={13} /> {totalDuplicadosDetectados} Bloco{totalDuplicadosDetectados > 1 ? 's' : ''} em Duplicidade
+            </span>
+          )}
         </div>
 
         {modoVisualizacao === 'matriz' && gruposPorCliente.length > 0 && (
@@ -1371,6 +1424,25 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                             }}>
                                               {b.numero_bloco}
                                             </span>
+                                            {isBlocoDuplicado(b) && (
+                                              <span 
+                                                title="Atenção: Existe mais de um registro com este mesmo Bloco, Cliente, Material e Pedreira"
+                                                style={{
+                                                  fontSize: '0.66rem',
+                                                  background: 'rgba(239, 68, 68, 0.18)',
+                                                  color: '#ef4444',
+                                                  padding: '2px 6px',
+                                                  borderRadius: 4,
+                                                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                                                  fontWeight: 700,
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: 3
+                                                }}
+                                              >
+                                                <AlertTriangle size={10} /> Duplicado
+                                              </span>
+                                            )}
                                             {b.peso_kg && (
                                               <span style={{
                                                 fontSize: '0.72rem',
@@ -1644,14 +1716,35 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                             background: 'rgba(255, 255, 255, 0.08)',
                             color: 'inherit',
                             fontWeight: 800,
-                            padding: '4px 8px',
+                            padding: '3px 7px',
                             borderRadius: 6,
-                            fontSize: '0.86rem',
+                            fontSize: '0.84rem',
                             fontFamily: 'monospace',
-                            border: '1px solid rgba(255,255,255,0.15)'
+                            letterSpacing: '0.05em',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            display: 'inline-block'
                           }}>
                             {b.numero_bloco}
                           </span>
+                          {isBlocoDuplicado(b) && (
+                            <span 
+                              title="Atenção: Existe mais de um registro com este mesmo Bloco, Cliente, Material e Pedreira"
+                              style={{
+                                fontSize: '0.66rem',
+                                background: 'rgba(239, 68, 68, 0.18)',
+                                color: '#ef4444',
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                                border: '1px solid rgba(239, 68, 68, 0.4)',
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3
+                              }}
+                            >
+                              <AlertTriangle size={10} /> Duplicado
+                            </span>
+                          )}
                           {b.peso_kg && (
                             <span style={{
                               fontSize: '0.72rem',
