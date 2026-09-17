@@ -3742,25 +3742,25 @@ export function normalizarNomeMaterial(material, pedreira = '') {
   const clean = String(material).trim();
   const up = clean.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  // Taj Mahal e variações (incluindo quando cadastrado como Quartzito ou quando a pedreira for Uruoca)
+  // 1. Verificar correspondência com materiais oficiais cadastrados primeiro
+  for (const lista of Object.values(MATERIAIS_POR_PEDREIRA)) {
+    for (const matOficial of lista) {
+      const upOficial = matOficial.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (up === upOficial || up.replace(/\s+/g, '') === upOficial.replace(/\s+/g, '') || up.includes(upOficial)) {
+        return matOficial;
+      }
+    }
+  }
+
+  // 2. Taj Mahal e variações (apenas se contiver Taj Mahal ou for explicitamente "Quartzito" genérico)
   if (
     up.includes('TAJ MAHAL') || 
     up.includes('TAJMAHAL') || 
     up === 'QUARTZITO' || 
-    up.includes('QUARTZITO') ||
-    (pedreira && normalizarChavePedreira(pedreira) === 'URUOCA')
+    up === 'QUARTZITO BRANCO' ||
+    (up === 'QUARTZITO' && pedreira && normalizarChavePedreira(pedreira) === 'URUOCA')
   ) {
     return 'Taj Mahal';
-  }
-
-  // Verificar correspondência com materiais oficiais cadastrados
-  for (const lista of Object.values(MATERIAIS_POR_PEDREIRA)) {
-    for (const matOficial of lista) {
-      const upOficial = matOficial.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      if (up === upOficial || up.replace(/\s+/g, '') === upOficial.replace(/\s+/g, '')) {
-        return matOficial;
-      }
-    }
   }
 
   // Se não encontrar na lista oficial, formata em Title Case mantendo legibilidade
