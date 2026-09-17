@@ -1320,53 +1320,7 @@ export function PainelGestao({
         </div>
       )}
 
-      {/* Alerta de Status de Envio de E-mail */}
-      <div className="glass-panel no-print" style={{
-        padding: 16,
-        marginBottom: 20,
-        background: 'rgba(0, 118, 44, 0.08)',
-        border: '1px solid var(--vermont-green-border)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: 12
-      }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, maxWidth: 800 }}>
-          <Mail size={22} color="#4ade80" style={{ flexShrink: 0, marginTop: 2 }} />
-          <div style={{ fontSize: '0.86rem' }}>
-            <strong style={{ color: '#fff' }}>Notificações por E-mail</strong>
-            <p style={{ margin: '3px 0 0 0', color: 'var(--slate-300)', fontSize: '0.8rem' }}>
-              Cada agendamento e atualização é registrado com cópia imediata para a coordenação de logística.
-            </p>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={handleTestarEnvioDireto}
-          disabled={testandoEmail}
-          className="btn btn-vermont"
-          style={{ padding: '8px 16px', fontSize: '0.84rem' }}
-        >
-          {testandoEmail ? 'Testando envio...' : 'Testar Envio de E-mail'}
-        </button>
-
-        {statusEmailTeste && (
-          <div style={{
-            width: '100%',
-            marginTop: 8,
-            padding: '10px 14px',
-            borderRadius: 8,
-            fontSize: '0.82rem',
-            background: statusEmailTeste.tipo === 'sucesso' ? 'var(--success-bg)' : statusEmailTeste.tipo === 'ativacao' ? 'var(--warning-bg)' : 'var(--danger-bg)',
-            border: statusEmailTeste.tipo === 'sucesso' ? '1px solid var(--success-border)' : statusEmailTeste.tipo === 'ativacao' ? '1px solid var(--warning-border)' : '1px solid var(--danger-border)',
-            color: statusEmailTeste.tipo === 'sucesso' ? '#6ee7b7' : statusEmailTeste.tipo === 'ativacao' ? '#fef3c7' : '#fca5a5'
-          }}>
-            {statusEmailTeste.mensagem}
-          </div>
-        )}
-      </div>
 
       {/* Navegação entre Módulos Internos do Painel (Carregamento e Gráficos Admin) */}
       {isAdmin && (
