@@ -176,6 +176,14 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
   const matchData = obs.match(/\[DATA_ROM:\s*([^\]]+)\]/i);
   if (matchData) dataRom = matchData[1].trim();
 
+  // Fallback: extrair data do texto "Romaneio Nº ... (DD/MM/YYYY)" caso não haja a tag explícita
+  if (!dataRom) {
+    const matchDataTexto = obs.match(/(?:Romaneio\s+N[º°o]?\s*[0-9A-Za-z/]+\s*\(([0-9]{2}\/[0-9]{2}\/[0-9]{4})\)|([0-9]{2}\/[0-9]{2}\/[0-9]{4}))/i);
+    if (matchDataTexto) {
+      dataRom = matchDataTexto[1] || matchDataTexto[2];
+    }
+  }
+
   const obsLimpa = obs
     .replace(/\[ROM:[^\]]*\]/gi, '')
     .replace(/\[PESO:[^\]]*\]/gi, '')

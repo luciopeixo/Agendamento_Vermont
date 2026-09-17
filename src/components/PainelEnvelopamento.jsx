@@ -161,7 +161,11 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       }
       if (!numRom) numRom = 'S/N (CADASTRO DIRETO)';
 
-      const dataRom = item.data_romaneio || '';
+      let dataRom = item.data_romaneio || '';
+      if (!dataRom && item.observacoes) {
+        const matchData = item.observacoes.match(/(?:Romaneio\s+N[º°o]?\s*[0-9A-Za-z/]+\s*\(([0-9]{2}\/[0-9]{2}\/[0-9]{4})\)|([0-9]{2}\/[0-9]{2}\/[0-9]{4}))/i);
+        if (matchData) dataRom = matchData[1] || matchData[2];
+      }
 
       if (!mapaClientes.has(cliNome)) {
         mapaClientes.set(cliNome, {
