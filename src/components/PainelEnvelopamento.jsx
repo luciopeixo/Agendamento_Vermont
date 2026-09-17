@@ -55,6 +55,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [modalPdfAberto, setModalPdfAberto] = useState(false);
   const [modalClientesAberto, setModalClientesAberto] = useState(false);
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
+  const [historicoFiltroBloco, setHistoricoFiltroBloco] = useState('');
   const [modalDuplicidadesAberto, setModalDuplicidadesAberto] = useState(false);
   const [confirmacaoModal, setConfirmacaoModal] = useState({
     aberto: false,
@@ -69,6 +70,11 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [filtroStatus, setFiltroStatus] = useState('');
   const [buscaTexto, setBuscaTexto] = useState('');
   const [executandoAcaoId, setExecutandoAcaoId] = useState(null);
+
+  const abrirHistoricoBloco = (numeroBloco = '') => {
+    setHistoricoFiltroBloco(numeroBloco || '');
+    setModalHistoricoAberto(true);
+  };
 
   // Modo de visualização: 'matriz' (agrupado por cliente -> romaneio -> blocos) ou 'tabela' (lista plana)
   const [modoVisualizacao, setModoVisualizacao] = useState('matriz');
@@ -580,7 +586,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
           <button
             type="button"
-            onClick={() => setModalHistoricoAberto(true)}
+            onClick={() => abrirHistoricoBloco('')}
             className="btn btn-secondary"
             title="Histórico de alterações e auditoria em tempo real"
             style={{ padding: '9px 14px', gap: 6, fontSize: '0.84rem' }}
@@ -1632,6 +1638,27 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                               "{b.observacoes}"
                                             </div>
                                           )}
+
+                                          <button
+                                            type="button"
+                                            onClick={() => abrirHistoricoBloco(b.numero_bloco)}
+                                            style={{
+                                              background: 'none',
+                                              border: 'none',
+                                              color: '#38bdf8',
+                                              fontSize: '0.70rem',
+                                              cursor: 'pointer',
+                                              padding: '3px 0 0 0',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: 4,
+                                              fontWeight: 600,
+                                              textDecoration: 'underline'
+                                            }}
+                                            title={`Ver histórico completo e auditoria do bloco ${b.numero_bloco}`}
+                                          >
+                                            <History size={11} /> Ver histórico do bloco
+                                          </button>
                                         </td>
 
                                         {/* Ações de Pátio */}
@@ -1712,6 +1739,16 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                                 Reverter
                                               </button>
                                             )}
+
+                                            <button
+                                              type="button"
+                                              onClick={() => abrirHistoricoBloco(b.numero_bloco)}
+                                              className="btn btn-secondary"
+                                              style={{ padding: '4px 6px', color: '#38bdf8' }}
+                                              title={`Ver histórico e auditoria do bloco ${b.numero_bloco}`}
+                                            >
+                                              <History size={12} />
+                                            </button>
 
                                             <button
                                               type="button"
@@ -1958,6 +1995,27 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                             "{b.observacoes}"
                           </div>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => abrirHistoricoBloco(b.numero_bloco)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#38bdf8',
+                            fontSize: '0.70rem',
+                            cursor: 'pointer',
+                            padding: '3px 0 0 0',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            fontWeight: 600,
+                            textDecoration: 'underline'
+                          }}
+                          title={`Ver histórico completo e auditoria do bloco ${b.numero_bloco}`}
+                        >
+                          <History size={11} /> Ver histórico do bloco
+                        </button>
                       </td>
 
                       <td style={{ padding: '12px 14px', textAlign: 'center' }}>
@@ -2037,6 +2095,16 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                               Reverter
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => abrirHistoricoBloco(b.numero_bloco)}
+                            className="btn btn-secondary"
+                            style={{ padding: '5px 7px', color: '#38bdf8' }}
+                            title={`Ver histórico e auditoria do bloco ${b.numero_bloco}`}
+                          >
+                            <History size={13} />
+                          </button>
 
                           <button
                             type="button"
@@ -2328,6 +2396,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       {modalHistoricoAberto && (
         <ModalHistoricoEnvelopamentos
           onFechar={() => setModalHistoricoAberto(false)}
+          filtroBlocoInicial={historicoFiltroBloco}
         />
       )}
 

@@ -21,11 +21,17 @@ import {
 } from '../services/envelopamentoService';
 import { formatarDataHoraBR } from '../services/agendamentoService';
 
-export function ModalHistoricoEnvelopamentos({ onFechar }) {
+export function ModalHistoricoEnvelopamentos({ onFechar, filtroBlocoInicial = '' }) {
   const [historico, setHistorico] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [busca, setBusca] = useState('');
+  const [busca, setBusca] = useState(filtroBlocoInicial || '');
   const [filtroAcao, setFiltroAcao] = useState('todos');
+
+  useEffect(() => {
+    if (filtroBlocoInicial) {
+      setBusca(filtroBlocoInicial);
+    }
+  }, [filtroBlocoInicial]);
 
   const carregar = async () => {
     setCarregando(true);
@@ -229,6 +235,31 @@ export function ModalHistoricoEnvelopamentos({ onFechar }) {
             </select>
           </div>
         </div>
+
+        {/* Indicador de Filtro Ativo por Bloco */}
+        {busca && (
+          <div style={{
+            padding: '8px 24px',
+            background: 'rgba(56, 189, 248, 0.10)',
+            borderBottom: '1px solid rgba(56, 189, 248, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.78rem'
+          }}>
+            <span style={{ color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+              <Box size={14} /> Histórico filtrado para o termo: <strong style={{ color: '#fff', background: 'rgba(56,189,248,0.2)', padding: '2px 8px', borderRadius: 4, fontFamily: 'monospace' }}>{busca}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => setBusca('')}
+              className="btn btn-secondary"
+              style={{ padding: '3px 8px', fontSize: '0.72rem', gap: 4 }}
+            >
+              <X size={12} /> Ver Histórico Completo
+            </button>
+          </div>
+        )}
 
         {/* Lista de Registros da Linha do Tempo */}
         <div style={{
