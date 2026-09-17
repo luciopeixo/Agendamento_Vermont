@@ -140,7 +140,7 @@ const MAPA_MATERIAL_PADRAO_PEDREIRA = {
   'breccia imperiale': { id: 'sobral_jaibaras', nome: 'Sobral - CE (Jaibaras)' },
   'zitan': { id: 'sobral_jaibaras', nome: 'Sobral - CE (Jaibaras)' },
   'scenario': { id: 'sobral_jaibaras', nome: 'Sobral - CE (Jaibaras)' },
-  'naurika': { id: 'sobral_jaibaras', nome: 'Sobral - CE (Jaibaras)' },
+  'naurika': { id: 'beberibe', nome: 'Beberibe - CE' },
   'blue deep': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
   'panettone': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
   'roma imperiale': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },

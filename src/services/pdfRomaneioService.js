@@ -217,7 +217,7 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
   }
 
   // 2. Buscar por menções a materiais específicos no documento (ordem de especificidade)
-  if (matUpper.includes('NAURIKA') || t.includes('NAURIKA') || matUpper.includes('ZITAN') || t.includes('ZITAN') || matUpper.includes('SCENARIO') || t.includes('SCENARIO') || matUpper.includes('BRECCIA IMPERIALE') || t.includes('BRECCIA IMPERIALE') || t.includes('JAIBARAS') || (t.includes('SOBRAL') && !t.includes('MASSAPE'))) {
+  if (matUpper.includes('ZITAN') || t.includes('ZITAN') || matUpper.includes('SCENARIO') || t.includes('SCENARIO') || matUpper.includes('BRECCIA IMPERIALE') || t.includes('BRECCIA IMPERIALE') || t.includes('JAIBARAS') || (t.includes('SOBRAL') && !t.includes('MASSAPE'))) {
     const p = PEDREIRAS_CEARA.find(item => item.id === 'sobral_jaibaras');
     return {
       id: 'sobral_jaibaras',
@@ -249,7 +249,7 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
     };
   }
 
-  if (matUpper.includes('RAFFINATO') || t.includes('RAFFINATO') || matUpper.includes('GUINESS') || t.includes('GUINESS') || matUpper.includes('NOUVEAU') || t.includes('NOUVEAU') || t.includes('BEBERIBE')) {
+  if (matUpper.includes('NAURIKA') || t.includes('NAURIKA') || matUpper.includes('RAFFINATO') || t.includes('RAFFINATO') || matUpper.includes('GUINESS') || t.includes('GUINESS') || matUpper.includes('NOUVEAU') || t.includes('NOUVEAU') || t.includes('BEBERIBE')) {
     const p = PEDREIRAS_CEARA.find(item => item.id === 'beberibe');
     return {
       id: 'beberibe',
