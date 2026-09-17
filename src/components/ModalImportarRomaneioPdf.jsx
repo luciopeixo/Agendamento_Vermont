@@ -362,12 +362,16 @@ export function ModalImportarRomaneioPdf({
       // Salvar em lote
       await importarBlocosEmLote(itensProntos, usuarioNome);
 
-      // Salvar cliente na base
+      // Salvar cliente na base (não-bloqueante)
       if (dadosProcessados.cliente.nome) {
-        await salvarClienteCadastrado({
-          nome: dadosProcessados.cliente.nome,
-          cnpj: dadosProcessados.cliente.cnpj
-        });
+        try {
+          await salvarClienteCadastrado({
+            nome: dadosProcessados.cliente.nome,
+            cnpj: dadosProcessados.cliente.cnpj
+          });
+        } catch (e) {
+          console.warn('Aviso ao salvar cliente cadastrado:', e);
+        }
       }
 
       if (onSucesso) {
