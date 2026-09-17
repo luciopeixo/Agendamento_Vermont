@@ -297,6 +297,87 @@ body.fundo-tajmahal .badge-info {
   border-color: #7dd3fc !important;
 }
 
+/* =========================================================================
+   REFINAMENTO EXECUTIVO DO TEMA CLARO (TAJ MAHAL) - ENVELOPAMENTO & MODAIS
+   ========================================================================= */
+body.fundo-tajmahal {
+  --panel-bg: #ffffff;
+}
+
+body.fundo-tajmahal .glass-panel {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+  color: #1e293b !important;
+}
+
+body.fundo-tajmahal .glass-panel:hover {
+  border-color: #cbd5e1 !important;
+}
+
+body.fundo-tajmahal div[style*="background: 'var(--panel-bg, #0f172a)'"],
+body.fundo-tajmahal div[style*="background: var(--panel-bg, #0f172a)"],
+body.fundo-tajmahal div[style*="background: #0f172a"],
+body.fundo-tajmahal div[style*="background: rgb(15, 23, 42)"] {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+body.fundo-tajmahal .glass-panel h1,
+body.fundo-tajmahal .glass-panel h2,
+body.fundo-tajmahal .glass-panel h3,
+body.fundo-tajmahal .glass-panel h4,
+body.fundo-tajmahal .glass-panel h5 {
+  color: #0f172a !important;
+}
+
+body.fundo-tajmahal input,
+body.fundo-tajmahal select,
+body.fundo-tajmahal textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+body.fundo-tajmahal input::placeholder,
+body.fundo-tajmahal textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+body.fundo-tajmahal table thead tr {
+  background: #f1f5f9 !important;
+}
+
+body.fundo-tajmahal table thead th {
+  color: #334155 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+body.fundo-tajmahal table tbody td {
+  color: #1e293b !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+body.fundo-tajmahal table tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+body.fundo-tajmahal span[style*="color: #38bdf8"],
+body.fundo-tajmahal span[style*="color: rgb(56, 189, 248)"] {
+  color: #0284c7 !important;
+}
+
+body.fundo-tajmahal span[style*="color: #4ade80"],
+body.fundo-tajmahal span[style*="color: rgb(74, 222, 128)"] {
+  color: #16a34a !important;
+}
+
+body.fundo-tajmahal span[style*="color: #fbbf24"],
+body.fundo-tajmahal span[style*="color: rgb(251, 191, 36)"] {
+  color: #d97706 !important;
+}
+
 /* Opção 3: Estúdio Minimalista - Grafite Mineral Acetinado sem Textura Fotográfica */
 body.fundo-grafite {
   background-color: #080c0f;

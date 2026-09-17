@@ -26,7 +26,9 @@ import {
   LayoutGrid,
   List,
   Filter,
-  X
+  X,
+  History,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   listarEnvelopamentos, 
@@ -43,6 +45,8 @@ import { PEDREIRAS_CEARA, formatarDataHoraBR } from '../services/agendamentoServ
 import { ModalCadastrarBlocoEnvelopamento } from './ModalCadastrarBlocoEnvelopamento';
 import { ModalGestaoClientes } from './ModalGestaoClientes';
 import { ModalImportarRomaneioPdf } from './ModalImportarRomaneioPdf';
+import { ModalHistoricoEnvelopamentos } from './ModalHistoricoEnvelopamentos';
+import { ModalVisualizarDuplicidades } from './ModalVisualizarDuplicidades';
 
 export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [envelopamentos, setEnvelopamentos] = useState([]);
@@ -50,6 +54,16 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
   const [modalPdfAberto, setModalPdfAberto] = useState(false);
   const [modalClientesAberto, setModalClientesAberto] = useState(false);
+  const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
+  const [modalDuplicidadesAberto, setModalDuplicidadesAberto] = useState(false);
+  const [confirmacaoModal, setConfirmacaoModal] = useState({
+    aberto: false,
+    titulo: '',
+    mensagem: '',
+    detalhes: '',
+    textoBotao: '',
+    onConfirmar: null
+  });
   const [blocoEmEdicao, setBlocoEmEdicao] = useState(null);
   const [filtroPedreira, setFiltroPedreira] = useState(pedreiraOperador || '');
   const [filtroStatus, setFiltroStatus] = useState('');
@@ -212,12 +226,33 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       else if (item.status === 'aguardando_corte_reparo') grupoRom.metricas.aguardando_corte_reparo++;
     });
 
+    const parseDataRomaneio = (dataStr) => {
+      if (!dataStr) return 0;
+      const partes = String(dataStr).trim().split(/[/.-]/);
+      if (partes.length === 3) {
+        if (partes[2].length === 4) {
+          return new Date(parseInt(partes[2], 10), parseInt(partes[1], 10) - 1, parseInt(partes[0], 10)).getTime();
+        }
+        if (partes[0].length === 4) {
+          return new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, parseInt(partes[2], 10)).getTime();
+        }
+      }
+      const t = Date.parse(dataStr);
+      return isNaN(t) ? 0 : t;
+    };
+
     const lista = Array.from(mapaClientes.values()).map(cli => ({
       ...cli,
-      romaneios: Array.from(cli.romaneiosMap.values()).sort((a, b) => b.blocos.length - a.blocos.length)
+      romaneios: Array.from(cli.romaneiosMap.values()).sort((a, b) => {
+        const timeA = parseDataRomaneio(a.dataRomaneio);
+        const timeB = parseDataRomaneio(b.dataRomaneio);
+        if (timeB !== timeA) return timeB - timeA; // Mais recente primeiro
+        return (b.numeroRomaneio || '').localeCompare(a.numeroRomaneio || '', 'pt-BR');
+      })
     }));
 
-    return lista.sort((a, b) => b.metricas.total - a.metricas.total);
+    // 1ª REGRA: Ordenar clientes em ordem alfabética (A-Z)
+    return lista.sort((a, b) => (a.clienteNome || '').localeCompare(b.clienteNome || '', 'pt-BR'));
   }, [envelopamentos]);
 
   const toggleCliente = (cliNome) => {
@@ -270,15 +305,33 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
     }
   };
 
-  const handleExcluir = async (id, numeroBloco) => {
-    if (window.confirm(`Tem certeza que deseja remover o bloco ${numeroBloco} do controle de envelopamento?`)) {
-      try {
-        await excluirEnvelopamento(id);
-        await carregarDados();
-      } catch (err) {
-        console.error('Erro ao excluir:', err);
+  // Helper para solicitar confirmação segura antes de qualquer exclusão (3ª REGRA)
+  const solicitarConfirmacao = ({ titulo, mensagem, detalhes, textoBotao, onConfirmar }) => {
+    setConfirmacaoModal({
+      aberto: true,
+      titulo: titulo || 'Confirmar Exclusão',
+      mensagem: mensagem || 'Tem certeza que deseja realizar esta operação?',
+      detalhes: detalhes || '',
+      textoBotao: textoBotao || 'Sim, Confirmar Exclusão',
+      onConfirmar
+    });
+  };
+
+  const handleExcluir = (id, numeroBloco) => {
+    solicitarConfirmacao({
+      titulo: 'Excluir Bloco do Envelopamento',
+      mensagem: `Tem certeza que deseja remover o bloco ${numeroBloco} do controle de envelopamento?`,
+      detalhes: 'Esta ação removerá o bloco e seu registro do painel de envelopamento.',
+      textoBotao: 'Sim, Excluir Bloco',
+      onConfirmar: async () => {
+        try {
+          await excluirEnvelopamento(id);
+          await carregarDados();
+        } catch (err) {
+          console.error('Erro ao excluir:', err);
+        }
       }
-    }
+    });
   };
 
   // Funções de Seleção Múltipla de Blocos para Ações em Lote
@@ -314,44 +367,56 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
     const statusObj = STATUS_ENVELOPAMENTO[novoStatus?.toUpperCase()] || { label: novoStatus };
     const count = blocosSelecionados.size;
 
-    if (window.confirm(`Deseja alterar o status de ${count} bloco(s) selecionado(s) para "${statusObj.label}"?`)) {
-      setExecutandoLote(true);
-      try {
-        const ids = Array.from(blocosSelecionados);
-        await atualizarStatusEnvelopamentosEmLote(ids, novoStatus, usuarioNome);
-        setBlocosSelecionados(new Set());
-        await carregarDados();
-      } catch (err) {
-        console.error('Erro ao atualizar status em lote:', err);
-        alert('Erro ao atualizar status em lote.');
-      } finally {
-        setExecutandoLote(false);
+    solicitarConfirmacao({
+      titulo: `Alterar Status de ${count} Bloco(s)`,
+      mensagem: `Deseja realmente alterar o status de ${count} bloco(s) selecionado(s) para "${statusObj.label}"?`,
+      detalhes: 'Todos os blocos marcados terão seu status atualizado em lote.',
+      textoBotao: `Sim, Alterar para ${statusObj.label}`,
+      onConfirmar: async () => {
+        setExecutandoLote(true);
+        try {
+          const ids = Array.from(blocosSelecionados);
+          await atualizarStatusEnvelopamentosEmLote(ids, novoStatus, usuarioNome);
+          setBlocosSelecionados(new Set());
+          await carregarDados();
+        } catch (err) {
+          console.error('Erro ao atualizar status em lote:', err);
+          alert('Erro ao atualizar status em lote.');
+        } finally {
+          setExecutandoLote(false);
+        }
       }
-    }
+    });
   };
 
-  const handleExcluirLoteSelecionados = async () => {
+  const handleExcluirLoteSelecionados = () => {
     if (blocosSelecionados.size === 0) return;
     const count = blocosSelecionados.size;
 
-    if (window.confirm(`⚠️ ATENÇÃO: Deseja realmente EXCLUIR os ${count} bloco(s) selecionado(s)?`)) {
-      setExecutandoLote(true);
-      try {
-        const ids = Array.from(blocosSelecionados);
-        await excluirEnvelopamentosEmLote(ids);
-        setBlocosSelecionados(new Set());
-        await carregarDados();
-      } catch (err) {
-        console.error('Erro ao excluir em lote:', err);
-        alert('Erro ao excluir blocos selecionados.');
-      } finally {
-        setExecutandoLote(false);
+    solicitarConfirmacao({
+      titulo: `Excluir ${count} Bloco(s) Selecionado(s)`,
+      mensagem: `⚠️ ATENÇÃO: Deseja realmente EXCLUIR os ${count} bloco(s) selecionado(s)?`,
+      detalhes: 'Esta ação não poderá ser desfeita. Todos os blocos marcados serão removidos do sistema.',
+      textoBotao: `Sim, Excluir ${count} Blocos`,
+      onConfirmar: async () => {
+        setExecutandoLote(true);
+        try {
+          const ids = Array.from(blocosSelecionados);
+          await excluirEnvelopamentosEmLote(ids);
+          setBlocosSelecionados(new Set());
+          await carregarDados();
+        } catch (err) {
+          console.error('Erro ao excluir em lote:', err);
+          alert('Erro ao excluir blocos selecionados.');
+        } finally {
+          setExecutandoLote(false);
+        }
       }
-    }
+    });
   };
 
   // Excluir apenas os blocos com status ENVELOPADO de um Romaneio específico
-  const handleExcluirEnvelopadosRomaneio = async (rom) => {
+  const handleExcluirEnvelopadosRomaneio = (rom) => {
     const blocosEnvelopados = (rom.blocos || []).filter(b => b.status === 'envelopado');
     if (blocosEnvelopados.length === 0) {
       alert('Não há blocos com status "Envelopado" neste romaneio.');
@@ -359,54 +424,68 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
     }
 
     const nomeRom = rom.numeroRomaneio.startsWith('S/N') ? rom.numeroRomaneio : `Romaneio Nº ${rom.numeroRomaneio}`;
-    const msg = `Tem certeza que deseja EXCLUIR todos os ${blocosEnvelopados.length} bloco(s) ENVELOPADO(S) do ${nomeRom}?`;
     
-    if (window.confirm(msg)) {
-      try {
-        const ids = blocosEnvelopados.map(b => b.id);
-        await excluirEnvelopamentosEmLote(ids);
-        await carregarDados();
-      } catch (err) {
-        console.error('Erro ao excluir blocos envelopados:', err);
-        alert('Erro ao excluir blocos envelopados.');
+    solicitarConfirmacao({
+      titulo: 'Limpar Blocos Envelopados',
+      mensagem: `Tem certeza que deseja EXCLUIR todos os ${blocosEnvelopados.length} bloco(s) ENVELOPADO(S) do ${nomeRom}?`,
+      detalhes: 'Os blocos com status pendente ou em andamento deste romaneio serão mantidos.',
+      textoBotao: 'Sim, Excluir Envelopados',
+      onConfirmar: async () => {
+        try {
+          const ids = blocosEnvelopados.map(b => b.id);
+          await excluirEnvelopamentosEmLote(ids);
+          await carregarDados();
+        } catch (err) {
+          console.error('Erro ao excluir blocos envelopados:', err);
+          alert('Erro ao excluir blocos envelopados.');
+        }
       }
-    }
+    });
   };
 
   // Excluir todos os blocos de um Romaneio
-  const handleExcluirRomaneioCompleto = async (rom) => {
+  const handleExcluirRomaneioCompleto = (rom) => {
     const nomeRom = rom.numeroRomaneio.startsWith('S/N') ? rom.numeroRomaneio : `Romaneio Nº ${rom.numeroRomaneio}`;
-    const msg = `⚠️ ATENÇÃO: Deseja realmente remover TODOS os ${rom.blocos.length} bloco(s) do ${nomeRom}?`;
     
-    if (window.confirm(msg)) {
-      try {
-        const ids = rom.blocos.map(b => b.id);
-        await excluirEnvelopamentosEmLote(ids);
-        await carregarDados();
-      } catch (err) {
-        console.error('Erro ao excluir romaneio:', err);
-        alert('Erro ao excluir romaneio.');
+    solicitarConfirmacao({
+      titulo: `Excluir Romaneio Completo (${nomeRom})`,
+      mensagem: `⚠️ ATENÇÃO: Deseja realmente remover TODOS os ${rom.blocos.length} bloco(s) do ${nomeRom}?`,
+      detalhes: 'Todos os blocos vinculados a este romaneio serão excluídos permanentemente.',
+      textoBotao: 'Sim, Excluir Todos os Blocos',
+      onConfirmar: async () => {
+        try {
+          const ids = rom.blocos.map(b => b.id);
+          await excluirEnvelopamentosEmLote(ids);
+          await carregarDados();
+        } catch (err) {
+          console.error('Erro ao excluir romaneio:', err);
+          alert('Erro ao excluir romaneio.');
+        }
       }
-    }
+    });
   };
 
   // Excluir todos os blocos envelopados de um Cliente
-  const handleExcluirEnvelopadosCliente = async (grupo) => {
+  const handleExcluirEnvelopadosCliente = (grupo) => {
     const blocosEnvelopados = (grupo.blocos || []).filter(b => b.status === 'envelopado');
     if (blocosEnvelopados.length === 0) return;
 
-    const msg = `Deseja realmente EXCLUIR todos os ${blocosEnvelopados.length} bloco(s) ENVELOPADO(S) do cliente ${grupo.clienteNome}?`;
-    
-    if (window.confirm(msg)) {
-      try {
-        const ids = blocosEnvelopados.map(b => b.id);
-        await excluirEnvelopamentosEmLote(ids);
-        await carregarDados();
-      } catch (err) {
-        console.error('Erro ao excluir envelopados do cliente:', err);
-        alert('Erro ao excluir blocos.');
+    solicitarConfirmacao({
+      titulo: `Limpar Envelopados de ${grupo.clienteNome}`,
+      mensagem: `Deseja realmente EXCLUIR todos os ${blocosEnvelopados.length} bloco(s) ENVELOPADO(S) do cliente ${grupo.clienteNome}?`,
+      detalhes: 'Os demais blocos não finalizados deste comprador serão preservados.',
+      textoBotao: 'Sim, Excluir Envelopados',
+      onConfirmar: async () => {
+        try {
+          const ids = blocosEnvelopados.map(b => b.id);
+          await excluirEnvelopamentosEmLote(ids);
+          await carregarDados();
+        } catch (err) {
+          console.error('Erro ao excluir envelopados do cliente:', err);
+          alert('Erro ao excluir blocos.');
+        }
       }
-    }
+    });
   };
 
   const handleExportarCSV = () => {
@@ -493,6 +572,17 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           >
             <Users size={16} color="#16a34a" />
             Clientes
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setModalHistoricoAberto(true)}
+            className="btn btn-secondary"
+            title="Histórico de alterações e auditoria em tempo real"
+            style={{ padding: '9px 14px', gap: 6, fontSize: '0.84rem' }}
+          >
+            <History size={16} color="#3b82f6" />
+            Histórico
           </button>
           
           <button
@@ -829,20 +919,31 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           </div>
 
           {totalDuplicadosDetectados > 0 && (
-            <span style={{
-              fontSize: '0.74rem',
-              background: 'rgba(239, 68, 68, 0.15)',
-              color: '#ef4444',
-              border: '1px solid rgba(239, 68, 68, 0.35)',
-              padding: '4px 10px',
-              borderRadius: 8,
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 5
-            }}>
-              <AlertTriangle size={13} /> {totalDuplicadosDetectados} Bloco{totalDuplicadosDetectados > 1 ? 's' : ''} em Duplicidade
-            </span>
+            <button
+              type="button"
+              onClick={() => setModalDuplicidadesAberto(true)}
+              style={{
+                fontSize: '0.74rem',
+                background: 'rgba(239, 68, 68, 0.15)',
+                color: '#ef4444',
+                border: '1px solid rgba(239, 68, 68, 0.35)',
+                padding: '5px 12px',
+                borderRadius: 8,
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              title="Clique para visualizar e gerenciar blocos duplicados"
+            >
+              <AlertTriangle size={14} color="#ef4444" />
+              <span>{totalDuplicadosDetectados} Bloco{totalDuplicadosDetectados > 1 ? 's' : ''} em Duplicidade</span>
+              <span style={{ fontSize: '0.70rem', background: '#ef4444', color: '#fff', padding: '1px 6px', borderRadius: 4, marginLeft: 2 }}>
+                Ver Detalhes
+              </span>
+            </button>
           )}
         </div>
 
@@ -2217,6 +2318,134 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             alert(`${qtd} bloco${qtd > 1 ? 's' : ''} do romaneio importado${qtd > 1 ? 's' : ''} com sucesso no envelopamento!`);
           }}
         />
+      )}
+
+      {/* Modal de Histórico de Alterações / Auditoria em Tempo Real (4ª Regra) */}
+      {modalHistoricoAberto && (
+        <ModalHistoricoEnvelopamentos
+          onFechar={() => setModalHistoricoAberto(false)}
+        />
+      )}
+
+      {/* Modal de Visualização e Gestão de Blocos Duplicados (5ª Regra) */}
+      {modalDuplicidadesAberto && (
+        <ModalVisualizarDuplicidades
+          envelopamentos={envelopamentos}
+          usuarioNome={usuarioNome}
+          onFechar={() => setModalDuplicidadesAberto(false)}
+          onAtualizado={async () => {
+            await carregarDados();
+          }}
+        />
+      )}
+
+      {/* Modal de Confirmação Segura para Exclusão de Informações (3ª Regra) */}
+      {confirmacaoModal.aberto && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999999,
+          padding: 16
+        }}>
+          <div className="glass-panel" style={{
+            maxWidth: 480,
+            width: '100%',
+            padding: '24px',
+            borderRadius: 16,
+            border: '1px solid rgba(239, 68, 68, 0.4)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+            background: 'var(--panel-bg, #0f172a)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+              <div style={{
+                width: 46,
+                height: 46,
+                borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444',
+                flexShrink: 0
+              }}>
+                <ShieldAlert size={26} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#ef4444', fontWeight: 700 }}>
+                  {confirmacaoModal.titulo || 'Confirmação de Exclusão'}
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--slate-400)' }}>
+                  Ação destrutiva - requer confirmação explícita
+                </p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.94rem', lineHeight: 1.5, marginBottom: confirmacaoModal.detalhes ? 10 : 20, color: 'var(--slate-200)' }}>
+              {confirmacaoModal.mensagem}
+            </p>
+
+            {confirmacaoModal.detalhes && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                borderRadius: 8,
+                padding: '10px 14px',
+                fontSize: '0.82rem',
+                color: 'var(--slate-300)',
+                marginBottom: 20
+              }}>
+                {confirmacaoModal.detalhes}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setConfirmacaoModal({ ...confirmacaoModal, aberto: false })}
+                style={{ padding: '9px 18px', fontSize: '0.86rem' }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={async () => {
+                  const acao = confirmacaoModal.onConfirmar;
+                  setConfirmacaoModal({ ...confirmacaoModal, aberto: false });
+                  if (typeof acao === 'function') {
+                    await acao();
+                  }
+                }}
+                style={{
+                  background: '#dc2626',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '9px 18px',
+                  borderRadius: 8,
+                  fontSize: '0.86rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6
+                }}
+              >
+                <Trash2 size={16} />
+                {confirmacaoModal.textoBotao || 'Sim, Tenho Certeza'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

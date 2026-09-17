@@ -492,7 +492,10 @@ export const listarEnvelopamentos = async (filtros = {}) => {
       const cli = String(item.cliente_nome || '').toLowerCase();
       const mat = String(item.material || '').toLowerCase();
       const ped = String(item.pedreira_nome || '').toLowerCase();
-      if (!bloco.includes(termo) && !cli.includes(termo) && !mat.includes(termo) && !ped.includes(termo)) {
+      const rom = String(item.numero_romaneio || '').toLowerCase();
+      const dataRom = String(item.data_romaneio || '').toLowerCase();
+      const obs = String(item.observacoes || '').toLowerCase();
+      if (!bloco.includes(termo) && !cli.includes(termo) && !mat.includes(termo) && !ped.includes(termo) && !rom.includes(termo) && !dataRom.includes(termo) && !obs.includes(termo)) {
         return false;
       }
     }
@@ -564,6 +567,154 @@ export const inscreverEnvelopamentosRealtime = (callback) => {
   };
 };
 
+const HISTORICO_STORAGE_KEY = 'vermont_envelopamentos_historico_locais';
+
+/**
+ * Lê o histórico de alterações local
+ */
+export const carregarHistoricoLocais = () => {
+  try {
+    const raw = localStorage.getItem(HISTORICO_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+};
+
+/**
+ * Salva o histórico no LocalStorage
+ */
+export const salvarHistoricoLocais = (lista) => {
+  try {
+    localStorage.setItem(HISTORICO_STORAGE_KEY, JSON.stringify(lista.slice(0, 500)));
+  } catch (err) {}
+};
+
+/**
+ * Registra uma entrada de auditoria/histórico de envelopamento
+ */
+export const registrarHistoricoEnvelopamento = async ({
+  tipo_acao, // 'CRIACAO', 'EDICAO', 'STATUS_ALTERADO', 'STATUS_LOTE', 'EXCLUSAO', 'EXCLUSAO_LOTE', 'IMPORTACAO_ROMANEIO'
+  numero_bloco = '',
+  cliente_nome = '',
+  material = '',
+  pedreira_nome = '',
+  numero_romaneio = '',
+  status_anterior = null,
+  status_novo = null,
+  usuario_nome = 'Equipe Vermont',
+  detalhes = ''
+}) => {
+  const agora = new Date().toISOString();
+  const id = `hist_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+
+  const entrada = {
+    id,
+    tipo_acao,
+    numero_bloco: String(numero_bloco || '').trim(),
+    cliente_nome: String(cliente_nome || '').trim(),
+    material: String(material || '').trim(),
+    pedreira_nome: String(pedreira_nome || '').trim(),
+    numero_romaneio: String(numero_romaneio || '').trim(),
+    status_anterior: status_anterior || null,
+    status_novo: status_novo || null,
+    usuario_nome: usuario_nome || 'Equipe Vermont',
+    detalhes: detalhes || '',
+    created_at: agora
+  };
+
+  // 1. Salvar no LocalStorage
+  const locais = carregarHistoricoLocais();
+  locais.unshift(entrada);
+  salvarHistoricoLocais(locais);
+
+  // 2. Disparar Realtime Broadcast e tentar persistir no Supabase se tabela existir
+  if (isSupabaseConfigurado()) {
+    try {
+      await supabase.from('envelopamentos_historico').insert(entrada);
+    } catch (e) {}
+
+    try {
+      const canalBroadcast = supabase.channel('canal_historico_envelopamentos');
+      canalBroadcast.send({
+        type: 'broadcast',
+        event: 'novo_registro_historico',
+        payload: entrada
+      });
+    } catch (e) {}
+  }
+
+  // Notificar evento local
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vermont_historico_envelopamento_changed', { detail: entrada }));
+  }
+
+  return entrada;
+};
+
+/**
+ * Consulta o histórico de alterações (Supabase + LocalStorage)
+ */
+export const listarHistoricoEnvelopamentos = async () => {
+  if (isSupabaseConfigurado()) {
+    try {
+      const { data, error } = await supabase
+        .from('envelopamentos_historico')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(300);
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        salvarHistoricoLocais(data);
+        return data;
+      }
+    } catch (e) {}
+  }
+  return carregarHistoricoLocais();
+};
+
+/**
+ * Inscreve listener para histórico de alterações em tempo real
+ */
+export const inscreverHistoricoRealtime = (callback) => {
+  let supabaseChannel = null;
+
+  if (isSupabaseConfigurado()) {
+    try {
+      supabaseChannel = supabase
+        .channel(`realtime_historico_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`)
+        .on('broadcast', { event: 'novo_registro_historico' }, (payload) => {
+          if (typeof callback === 'function') callback(payload?.payload);
+        })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'envelopamentos_historico' }, (payload) => {
+          if (typeof callback === 'function') callback(payload?.new);
+        })
+        .subscribe();
+    } catch (e) {}
+  }
+
+  const handleLocal = (e) => {
+    if (typeof callback === 'function') callback(e.detail);
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('vermont_historico_envelopamento_changed', handleLocal);
+  }
+
+  return () => {
+    if (supabaseChannel && isSupabaseConfigurado()) {
+      try {
+        supabase.removeChannel(supabaseChannel);
+      } catch (e) {}
+    }
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('vermont_historico_envelopamento_changed', handleLocal);
+    }
+  };
+};
+
 /**
  * Salva ou atualiza um registro de envelopamento
  */
@@ -620,7 +771,10 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
 
   // 1. Atualizar LocalStorage
   const index = locais.findIndex(item => item.id === id);
-  if (index >= 0) {
+  const isEdicao = index >= 0;
+  const itemAnterior = isEdicao ? locais[index] : null;
+
+  if (isEdicao) {
     locais[index] = { ...locais[index], ...registroCompleto };
   } else {
     locais.unshift(registroCompleto);
@@ -636,6 +790,33 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
       console.warn('[Envelopamento] Falha ao upsert na tabela envelopamentos:', e);
     }
   }
+
+  // 3. Registrar Histórico de Auditoria
+  try {
+    const statusMudou = isEdicao && itemAnterior?.status !== registroCompleto.status;
+    const tipoAcao = !isEdicao 
+      ? 'CRIACAO' 
+      : (statusMudou ? 'STATUS_ALTERADO' : 'EDICAO');
+    
+    let det = !isEdicao 
+      ? `Bloco ${registroCompleto.numero_bloco} cadastrado como ${STATUS_ENVELOPAMENTO[registroCompleto.status?.toUpperCase()]?.label || registroCompleto.status}` 
+      : (statusMudou 
+          ? `Status alterado de "${STATUS_ENVELOPAMENTO[itemAnterior?.status?.toUpperCase()]?.label || itemAnterior?.status}" para "${STATUS_ENVELOPAMENTO[registroCompleto.status?.toUpperCase()]?.label || registroCompleto.status}"`
+          : `Dados do bloco ${registroCompleto.numero_bloco} editados`);
+
+    await registrarHistoricoEnvelopamento({
+      tipo_acao: tipoAcao,
+      numero_bloco: registroCompleto.numero_bloco,
+      cliente_nome: registroCompleto.cliente_nome,
+      material: registroCompleto.material,
+      pedreira_nome: registroCompleto.pedreira_nome,
+      numero_romaneio: registroCompleto.numero_romaneio,
+      status_anterior: isEdicao ? itemAnterior?.status : null,
+      status_novo: registroCompleto.status,
+      usuario_nome: usuarioNome,
+      detalhes: det
+    });
+  } catch (errHist) {}
 
   // Notificar ouvintes locais imediatamente
   notificarAlteracaoEnvelopamento();
@@ -724,6 +905,24 @@ export const atualizarStatusEnvelopamentosEmLote = async (ids = [], novoStatus, 
     }
   }
 
+  // Registrar histórico em lote
+  try {
+    const lblStatus = STATUS_ENVELOPAMENTO[novoStatus?.toUpperCase()]?.label || novoStatus;
+    for (const at of itensAtualizados) {
+      await registrarHistoricoEnvelopamento({
+        tipo_acao: 'STATUS_LOTE',
+        numero_bloco: at.numero_bloco,
+        cliente_nome: at.cliente_nome,
+        material: at.material,
+        pedreira_nome: at.pedreira_nome,
+        numero_romaneio: at.numero_romaneio,
+        status_novo: novoStatus,
+        usuario_nome: usuarioNome,
+        detalhes: `Status atualizado em lote para "${lblStatus}"`
+      });
+    }
+  } catch (eH) {}
+
   notificarAlteracaoEnvelopamento();
   return true;
 };
@@ -731,8 +930,9 @@ export const atualizarStatusEnvelopamentosEmLote = async (ids = [], novoStatus, 
 /**
  * Exclui um registro de envelopamento
  */
-export const excluirEnvelopamento = async (id) => {
+export const excluirEnvelopamento = async (id, usuarioNome = 'Equipe Vermont') => {
   const locais = carregarEnvelopamentosLocais();
+  const itemExcluido = locais.find(item => item.id === id);
   const novaLista = locais.filter(item => item.id !== id);
   salvarEnvelopamentosLocais(novaLista);
 
@@ -742,6 +942,22 @@ export const excluirEnvelopamento = async (id) => {
     } catch (err) {}
   }
 
+  // Registrar histórico de exclusão
+  if (itemExcluido) {
+    try {
+      await registrarHistoricoEnvelopamento({
+        tipo_acao: 'EXCLUSAO',
+        numero_bloco: itemExcluido.numero_bloco,
+        cliente_nome: itemExcluido.cliente_nome,
+        material: itemExcluido.material,
+        pedreira_nome: itemExcluido.pedreira_nome,
+        numero_romaneio: itemExcluido.numero_romaneio,
+        usuario_nome: usuarioNome,
+        detalhes: `Bloco ${itemExcluido.numero_bloco} excluído do sistema`
+      });
+    } catch (eH) {}
+  }
+
   notificarAlteracaoEnvelopamento();
   return true;
 };
@@ -749,11 +965,12 @@ export const excluirEnvelopamento = async (id) => {
 /**
  * Exclui múltiplos registros de envelopamento em lote por lista de IDs
  */
-export const excluirEnvelopamentosEmLote = async (ids = []) => {
+export const excluirEnvelopamentosEmLote = async (ids = [], usuarioNome = 'Equipe Vermont', motivo = '') => {
   if (!Array.isArray(ids) || ids.length === 0) return true;
 
   const setIds = new Set(ids);
   const locais = carregarEnvelopamentosLocais();
+  const excluidos = locais.filter(item => setIds.has(item.id));
   const novaLista = locais.filter(item => !setIds.has(item.id));
   salvarEnvelopamentosLocais(novaLista);
 
@@ -764,6 +981,22 @@ export const excluirEnvelopamentosEmLote = async (ids = []) => {
       console.warn('Erro ao excluir lote no Supabase:', err);
     }
   }
+
+  // Registrar histórico
+  try {
+    for (const ex of excluidos) {
+      await registrarHistoricoEnvelopamento({
+        tipo_acao: 'EXCLUSAO_LOTE',
+        numero_bloco: ex.numero_bloco,
+        cliente_nome: ex.cliente_nome,
+        material: ex.material,
+        pedreira_nome: ex.pedreira_nome,
+        numero_romaneio: ex.numero_romaneio,
+        usuario_nome: usuarioNome,
+        detalhes: motivo || `Bloco ${ex.numero_bloco} excluído em operação de lote (${excluidos.length} blocos)`
+      });
+    }
+  } catch (eH) {}
 
   notificarAlteracaoEnvelopamento();
   return true;
@@ -801,7 +1034,7 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
 
     const registroCompleto = {
       id,
-      numero_bloco: String(dados.numero_bloco || '').trim().toUpperCase(),
+      numero_bloco: String(dados.numero_bloco || '').trim().toUpperCase().replace(/[.\s]+$/, ''),
       cliente_nome: String(dados.cliente_nome || '').trim().toUpperCase(),
       cliente_cnpj: String(dados.cliente_cnpj || '').trim(),
       material: String(dados.material || '').trim(),
@@ -841,6 +1074,23 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
       console.warn('[Envelopamento] Falha ao importar em lote na tabela envelopamentos:', e);
     }
   }
+
+  // 3. Registrar no histórico
+  try {
+    for (const reg of registrosCompletos) {
+      await registrarHistoricoEnvelopamento({
+        tipo_acao: 'IMPORTACAO_ROMANEIO',
+        numero_bloco: reg.numero_bloco,
+        cliente_nome: reg.cliente_nome,
+        material: reg.material,
+        pedreira_nome: reg.pedreira_nome,
+        numero_romaneio: reg.numero_romaneio,
+        status_novo: reg.status,
+        usuario_nome: usuarioNome,
+        detalhes: `Importado via Romaneio Nº ${reg.numero_romaneio || 'S/N'}`
+      });
+    }
+  } catch (eH) {}
 
   // Notificar ouvintes
   notificarAlteracaoEnvelopamento();
