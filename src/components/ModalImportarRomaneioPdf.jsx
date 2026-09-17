@@ -193,12 +193,15 @@ export function ModalImportarRomaneioPdf({
     setArrastando(false);
   };
 
-  // Alterar seleção em lote
+  // Alterar seleção em lote (apenas blocos válidos/não duplicados)
   const handleToggleTodos = (selecionar) => {
     if (!dadosProcessados) return;
     setDadosProcessados(prev => ({
       ...prev,
-      blocos: prev.blocos.map(b => ({ ...b, selecionado: selecionar }))
+      blocos: prev.blocos.map(b => ({
+        ...b,
+        selecionado: b.ehDuplicado ? false : selecionar
+      }))
     }));
   };
 
@@ -211,12 +214,16 @@ export function ModalImportarRomaneioPdf({
     }));
   };
 
-  // Alterar seleção individual
+  // Alterar seleção individual (bloqueado para itens duplicados)
   const handleToggleBloco = (id) => {
     if (!dadosProcessados) return;
     setDadosProcessados(prev => ({
       ...prev,
-      blocos: prev.blocos.map(b => b.id === id ? { ...b, selecionado: !b.selecionado } : b)
+      blocos: prev.blocos.map(b => {
+        if (b.id !== id) return b;
+        if (b.ehDuplicado) return { ...b, selecionado: false };
+        return { ...b, selecionado: !b.selecionado };
+      })
     }));
   };
 
@@ -325,10 +332,11 @@ export function ModalImportarRomaneioPdf({
   // Confirmar e Salvar Importação
   const handleConfirmarImportacao = async () => {
     if (!dadosProcessados) return;
-    const selecionados = dadosProcessados.blocos.filter(b => b.selecionado);
+    // Bloqueio estrito: apenas blocos selecionados E que NÃO sejam duplicados
+    const selecionados = dadosProcessados.blocos.filter(b => b.selecionado && !b.ehDuplicado);
     
     if (selecionados.length === 0) {
-      setErro('Selecione pelo menos um bloco para importar.');
+      setErro('Inclusão bloqueada: Nenhum bloco válido/novo selecionado para importação (blocos duplicados estão bloqueados).');
       return;
     }
 
@@ -815,8 +823,10 @@ export function ModalImportarRomaneioPdf({
                     <th style={{ padding: '10px 12px', width: 40, textAlign: 'center' }}>
                       <input
                         type="checkbox"
-                        checked={blocos.length > 0 && blocos.every(b => b.selecionado)}
+                        disabled={blocos.filter(b => !b.ehDuplicado).length === 0}
+                        checked={blocos.filter(b => !b.ehDuplicado).length > 0 && blocos.filter(b => !b.ehDuplicado).every(b => b.selecionado)}
                         onChange={(e) => handleToggleTodos(e.target.checked)}
+                        title={blocos.filter(b => !b.ehDuplicado).length === 0 ? 'Todos os blocos são duplicados' : 'Marcar/desmarcar todos os novos'}
                       />
                     </th>
                     <th style={{ padding: '10px 12px', fontSize: '0.75rem', color: 'var(--slate-400)', textAlign: 'left' }}>BLOCO</th>
@@ -834,7 +844,7 @@ export function ModalImportarRomaneioPdf({
                         key={b.id}
                         style={{ 
                           borderBottom: '1px solid rgba(255,255,255,0.04)',
-                          opacity: b.selecionado ? 1 : 0.45,
+                          opacity: b.ehDuplicado ? 0.45 : (b.selecionado ? 1 : 0.6),
                           background: b.ehDuplicado 
                             ? 'rgba(239, 68, 68, 0.05)' 
                             : (b.status === 'pendente_envelopamento' ? 'rgba(245, 158, 11, 0.03)' : undefined)
@@ -843,8 +853,11 @@ export function ModalImportarRomaneioPdf({
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <input
                             type="checkbox"
-                            checked={b.selecionado}
+                            disabled={b.ehDuplicado}
+                            checked={!b.ehDuplicado && b.selecionado}
                             onChange={() => handleToggleBloco(b.id)}
+                            title={b.ehDuplicado ? 'Inclusão bloqueada: Bloco já cadastrado no sistema' : 'Selecionar bloco'}
+                            style={{ cursor: b.ehDuplicado ? 'not-allowed' : 'pointer' }}
                           />
                         </td>
 
@@ -868,7 +881,7 @@ export function ModalImportarRomaneioPdf({
                                 title={b.motivoDuplicidade}
                                 style={{
                                   fontSize: '0.68rem',
-                                  background: 'rgba(239, 68, 68, 0.2)',
+                                  background: 'rgba(239, 68, 68, 0.25)',
                                   color: '#f87171',
                                   padding: '2px 6px',
                                   borderRadius: 4,
@@ -876,10 +889,11 @@ export function ModalImportarRomaneioPdf({
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: 3,
-                                  cursor: 'help'
+                                  cursor: 'help',
+                                  border: '1px solid rgba(239, 68, 68, 0.35)'
                                 }}
                               >
-                                <AlertTriangle size={11} /> Já Cadastrado
+                                <Ban size={11} /> Bloqueado (Já Cadastrado)
                               </span>
                             )}
                           </div>
@@ -924,6 +938,7 @@ export function ModalImportarRomaneioPdf({
                             <select
                               className="form-select"
                               value={b.status}
+                              disabled={b.ehDuplicado}
                               onChange={(e) => handleAlterarStatusBloco(b.id, e.target.value)}
                               style={{
                                 height: 30,
@@ -933,7 +948,8 @@ export function ModalImportarRomaneioPdf({
                                 color: statusInfo.cor,
                                 borderColor: statusInfo.border,
                                 fontWeight: 700,
-                                width: 'auto'
+                                width: 'auto',
+                                opacity: b.ehDuplicado ? 0.5 : 1
                               }}
                             >
                               {Object.values(STATUS_ENVELOPAMENTO).map(st => (
@@ -954,7 +970,7 @@ export function ModalImportarRomaneioPdf({
                             onClick={() => handleRemoverBloco(b.id)}
                             className="btn btn-secondary"
                             style={{ padding: '4px 6px', color: '#f87171' }}
-                            title="Remover este bloco da importação"
+                            title="Remover este bloco da lista"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -986,17 +1002,27 @@ export function ModalImportarRomaneioPdf({
                 </button>
                 <button
                   type="button"
-                  disabled={salvando || qtdSelecionados === 0}
+                  disabled={salvando || qtdSelecionados === 0 || (blocos.length > 0 && blocos.every(b => b.ehDuplicado))}
                   onClick={handleConfirmarImportacao}
-                  className="btn btn-vermont"
-                  style={{ gap: 8, padding: '9px 20px', fontSize: '0.88rem' }}
+                  className={`btn ${(blocos.length > 0 && blocos.every(b => b.ehDuplicado)) ? 'btn-secondary' : 'btn-vermont'}`}
+                  style={{ 
+                    gap: 8, 
+                    padding: '9px 20px', 
+                    fontSize: '0.88rem',
+                    opacity: (blocos.length > 0 && blocos.every(b => b.ehDuplicado)) ? 0.6 : 1,
+                    cursor: (blocos.length > 0 && blocos.every(b => b.ehDuplicado)) ? 'not-allowed' : 'pointer'
+                  }}
                 >
                   {salvando ? (
                     <span className="spinner" style={{ width: 16, height: 16 }} />
+                  ) : (blocos.length > 0 && blocos.every(b => b.ehDuplicado)) ? (
+                    <Ban size={18} color="#ef4444" />
                   ) : (
                     <CheckCircle2 size={18} />
                   )}
-                  Confirmar e Importar {qtdSelecionados} Bloco{qtdSelecionados > 1 ? 's' : ''}
+                  {(blocos.length > 0 && blocos.every(b => b.ehDuplicado)) 
+                    ? 'Inclusão Bloqueada (Todos Duplicados)'
+                    : `Confirmar e Importar ${qtdSelecionados} Bloco${qtdSelecionados > 1 ? 's' : ''}`}
                 </button>
               </div>
             </div>

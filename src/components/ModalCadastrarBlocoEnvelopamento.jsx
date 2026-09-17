@@ -284,6 +284,12 @@ export function ModalCadastrarBlocoEnvelopamento({
       return;
     }
 
+    // Bloqueio estrito de duplicidade no cadastro individual
+    if (!blocoEdicao && duplicidadeIndividual.ehDuplicado) {
+      setErro(`Inclusão bloqueada: O bloco "${formData.numero_bloco}" já se encontra cadastrado para o cliente "${formData.cliente_nome}" (${formData.material} - ${formData.pedreira_nome}).`);
+      return;
+    }
+
     // Validação de formato da barra para Taj Mahal (Thor/Argos exige "/", outros proíbe "/")
     const validacao = validarFormatoBlocoTajMahal({
       material: formData.material,
@@ -331,25 +337,34 @@ export function ModalCadastrarBlocoEnvelopamento({
       return;
     }
 
+    const itens = linhas.map(bloco => ({
+      numero_bloco: bloco,
+      pedreira_id: loteData.pedreira_id,
+      pedreira_nome: loteData.pedreira_nome,
+      material: loteData.material,
+      cliente_nome: loteData.cliente_nome,
+      cliente_cnpj: loteData.cliente_cnpj,
+      status: loteData.status,
+      observacoes: loteData.observacoes
+    }));
+
+    // Identificar e filtrar blocos não duplicados
+    const avaliados = identificarDuplicidadesEmLista(itens, envelopamentosExistentes);
+    const itensValidos = avaliados.filter(b => !b.ehDuplicado);
+
+    if (itensValidos.length === 0) {
+      setErro('Inclusão bloqueada: Todos os blocos informados já se encontram cadastrados no sistema para este cliente, material e pedreira.');
+      return;
+    }
+
     setSalvando(true);
     try {
-      const itens = linhas.map(bloco => ({
-        numero_bloco: bloco,
-        pedreira_id: loteData.pedreira_id,
-        pedreira_nome: loteData.pedreira_nome,
-        material: loteData.material,
-        cliente_nome: loteData.cliente_nome,
-        cliente_cnpj: loteData.cliente_cnpj,
-        status: loteData.status,
-        observacoes: loteData.observacoes
-      }));
-
-      await importarBlocosEmLote(itens, usuarioNome);
-      if (onSalvo) onSalvo(null, itens.length);
+      await importarBlocosEmLote(itensValidos, usuarioNome);
+      if (onSalvo) onSalvo(null, itensValidos.length);
       onFechar();
     } catch (err) {
       console.error(err);
-      setErro('Erro ao importar lote de blocos.');
+      setErro(err?.message || 'Erro ao importar lote de blocos.');
     } finally {
       setSalvando(false);
     }
@@ -762,9 +777,12 @@ export function ModalCadastrarBlocoEnvelopamento({
                 <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0 }} />
                 <div style={{ fontSize: '0.82rem', color: '#fca5a5' }}>
                   <strong style={{ display: 'block', color: '#fff', marginBottom: 2 }}>
-                    Atenção: Bloco em Duplicidade Detectado!
+                    Bloqueio: Bloco em Duplicidade Detectado!
                   </strong>
                   O bloco <strong>{formData.numero_bloco}</strong> já se encontra cadastrado para <strong>{formData.cliente_nome}</strong> ({formData.material} - {formData.pedreira_nome}).
+                  <span style={{ display: 'block', color: '#f87171', fontWeight: 600, marginTop: 3 }}>
+                    🚫 Inclusão bloqueada para evitar duplicações no sistema.
+                  </span>
                   {duplicidadeIndividual.existente?.numero_romaneio && (
                     <span style={{ display: 'block', marginTop: 2, color: '#fecaca', fontSize: '0.76rem' }}>
                       Romaneio Original: <strong>{duplicidadeIndividual.existente.numero_romaneio}</strong> | Status: <strong>{duplicidadeIndividual.existente.status}</strong>
@@ -779,9 +797,26 @@ export function ModalCadastrarBlocoEnvelopamento({
               <button type="button" onClick={onFechar} className="btn btn-secondary">
                 Cancelar
               </button>
-              <button type="submit" disabled={salvando} className="btn btn-vermont" style={{ gap: 6 }}>
-                {salvando ? <span className="spinner" style={{ width: 16, height: 16 }} /> : <CheckCircle2 size={16} />}
-                {blocoEdicao ? 'Salvar Alterações' : 'Cadastrar Bloco'}
+              <button 
+                type="submit" 
+                disabled={salvando || (!blocoEdicao && duplicidadeIndividual.ehDuplicado)} 
+                className={`btn ${(!blocoEdicao && duplicidadeIndividual.ehDuplicado) ? 'btn-secondary' : 'btn-vermont'}`} 
+                style={{ 
+                  gap: 6,
+                  opacity: (!blocoEdicao && duplicidadeIndividual.ehDuplicado) ? 0.6 : 1,
+                  cursor: (!blocoEdicao && duplicidadeIndividual.ehDuplicado) ? 'not-allowed' : 'pointer',
+                  borderColor: (!blocoEdicao && duplicidadeIndividual.ehDuplicado) ? '#ef4444' : undefined,
+                  color: (!blocoEdicao && duplicidadeIndividual.ehDuplicado) ? '#fca5a5' : undefined
+                }}
+              >
+                {salvando ? (
+                  <span className="spinner" style={{ width: 16, height: 16 }} />
+                ) : (!blocoEdicao && duplicidadeIndividual.ehDuplicado) ? (
+                  <Ban size={16} color="#ef4444" />
+                ) : (
+                  <CheckCircle2 size={16} />
+                )}
+                {blocoEdicao ? 'Salvar Alterações' : (!blocoEdicao && duplicidadeIndividual.ehDuplicado) ? 'Inclusão Bloqueada (Duplicado)' : 'Cadastrar Bloco'}
               </button>
             </div>
           </form>
@@ -916,7 +951,7 @@ export function ModalCadastrarBlocoEnvelopamento({
                 </label>
                 {blocosLoteAvaliados.length > 0 && (
                   <span style={{ fontSize: '0.74rem', color: duplicadosLote.length > 0 ? '#f87171' : '#4ade80', fontWeight: 600 }}>
-                    {blocosLoteAvaliados.length} bloco(s) {duplicadosLote.length > 0 ? `(${duplicadosLote.length} duplicado${duplicadosLote.length > 1 ? 's' : ''})` : 'válidos'}
+                    {blocosLoteAvaliados.length} bloco(s) {duplicadosLote.length > 0 ? `(${duplicadosLote.length} duplicado${duplicadosLote.length > 1 ? 's' : ''} bloqueado${duplicadosLote.length > 1 ? 's' : ''})` : 'válidos'}
                   </span>
                 )}
               </div>
@@ -949,10 +984,15 @@ export function ModalCadastrarBlocoEnvelopamento({
                   <AlertTriangle size={20} color="#ef4444" style={{ flexShrink: 0 }} />
                   <div style={{ fontSize: '0.82rem', color: '#fca5a5' }}>
                     <strong style={{ display: 'block', color: '#fff', marginBottom: 2 }}>
-                      {duplicadosLote.length} bloco(s) em duplicidade detectado(s):
+                      Bloqueio: {duplicadosLote.length} bloco(s) em duplicidade detectado(s):
                     </strong>
                     <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#fecaca' }}>
                       {duplicadosLote.map(d => d.numero_bloco).join(', ')}
+                    </span>
+                    <span style={{ display: 'block', color: '#f87171', fontSize: '0.74rem', marginTop: 2 }}>
+                      {blocosLoteAvaliados.length === duplicadosLote.length 
+                        ? 'Todos os blocos já existem no sistema. Inclusão bloqueada.' 
+                        : 'Apenas os blocos novos e válidos serão importados.'}
                     </span>
                   </div>
                 </div>
@@ -969,7 +1009,7 @@ export function ModalCadastrarBlocoEnvelopamento({
                     fontWeight: 600
                   }}
                 >
-                  Remover Duplicados do Texto ({duplicadosLote.length})
+                  Remover Duplicados ({duplicadosLote.length})
                 </button>
               </div>
             )}
@@ -978,9 +1018,28 @@ export function ModalCadastrarBlocoEnvelopamento({
               <button type="button" onClick={onFechar} className="btn btn-secondary">
                 Cancelar
               </button>
-              <button type="submit" disabled={salvando} className="btn btn-vermont" style={{ gap: 6 }}>
-                {salvando ? <span className="spinner" style={{ width: 16, height: 16 }} /> : <UploadCloud size={16} />}
-                Importar Blocos em Lote
+              <button 
+                type="submit" 
+                disabled={salvando || (blocosLoteAvaliados.length > 0 && duplicadosLote.length === blocosLoteAvaliados.length)} 
+                className={`btn ${(blocosLoteAvaliados.length > 0 && duplicadosLote.length === blocosLoteAvaliados.length) ? 'btn-secondary' : 'btn-vermont'}`}
+                style={{ 
+                  gap: 6,
+                  opacity: (blocosLoteAvaliados.length > 0 && duplicadosLote.length === blocosLoteAvaliados.length) ? 0.6 : 1,
+                  cursor: (blocosLoteAvaliados.length > 0 && duplicadosLote.length === blocosLoteAvaliados.length) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {salvando ? (
+                  <span className="spinner" style={{ width: 16, height: 16 }} />
+                ) : (blocosLoteAvaliados.length > 0 && duplicadosLote.length === blocosLoteAvaliados.length) ? (
+                  <Ban size={16} color="#ef4444" />
+                ) : (
+                  <UploadCloud size={16} />
+                )}
+                {(blocosLoteAvaliados.length > 0 && duplicadosLote.length === blocosLoteAvaliados.length)
+                  ? 'Inclusão Bloqueada (Todos Duplicados)'
+                  : duplicadosLote.length > 0
+                  ? `Importar ${blocosLoteAvaliados.length - duplicadosLote.length} Bloco(s) Válido(s)`
+                  : 'Importar Blocos em Lote'}
               </button>
             </div>
           </form>

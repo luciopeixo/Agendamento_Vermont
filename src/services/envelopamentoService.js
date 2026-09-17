@@ -464,6 +464,25 @@ export const inscreverEnvelopamentosRealtime = (callback) => {
 export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont') => {
   const agora = new Date().toISOString();
   const id = dados.id || `env_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  const locais = carregarEnvelopamentosLocais();
+
+  // Validação e bloqueio estrito contra duplicidades
+  const checagemDuplicidade = verificarDuplicidadeIndividual({
+    numero_bloco: dados.numero_bloco,
+    cliente_nome: dados.cliente_nome,
+    cliente_cnpj: dados.cliente_cnpj,
+    material: dados.material,
+    pedreira_id: dados.pedreira_id,
+    pedreira_nome: dados.pedreira_nome,
+    idAtual: dados.id,
+    listaExistente: locais
+  });
+
+  if (checagemDuplicidade.ehDuplicado) {
+    const orig = checagemDuplicidade.existente;
+    const msgRomaneio = orig?.numero_romaneio ? ` (Romaneio original: ${orig.numero_romaneio})` : '';
+    throw new Error(`Inclusão bloqueada: O bloco "${dados.numero_bloco}" já está cadastrado para o cliente "${dados.cliente_nome}" (${dados.material} - ${dados.pedreira_nome || dados.pedreira_id})${msgRomaneio}.`);
+  }
 
   let statusNormalizado = dados.status || 'pendente_envelopamento';
   if (statusNormalizado === 'pendente') statusNormalizado = 'pendente_envelopamento';
@@ -494,7 +513,6 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
   };
 
   // 1. Atualizar LocalStorage
-  const locais = carregarEnvelopamentosLocais();
   const index = locais.findIndex(item => item.id === id);
   if (index >= 0) {
     locais[index] = { ...locais[index], ...registroCompleto };
@@ -505,15 +523,12 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
 
   // 2. Sincronizar na nuvem (Supabase)
   if (isSupabaseConfigurado()) {
-    // A. Formatar apenas colunas válidas e persistir tags de romaneio/peso nas observações para a tabela 'envelopamentos'
     try {
       const rowDB = formatarItemParaSupabaseEnvelopamentos(registroCompleto);
-      await supabase.from('envelopamentos').upsert(rowDB);
+      await supabase.from('envelopamentos').upsert(rowDB, { onConflict: 'id' });
     } catch (e) {
       console.warn('[Envelopamento] Falha ao upsert na tabela envelopamentos:', e);
     }
-    // B. Sincronizar no espelho em tempo real
-    sincronizarEnvelopamentosNuvem(locais);
   }
 
   // Notificar ouvintes locais imediatamente
@@ -601,7 +616,6 @@ export const atualizarStatusEnvelopamentosEmLote = async (ids = [], novoStatus, 
     } catch (err) {
       console.warn('Erro ao atualizar lote no Supabase envelopamentos:', err);
     }
-    sincronizarEnvelopamentosNuvem(novaLista);
   }
 
   notificarAlteracaoEnvelopamento();
@@ -620,7 +634,6 @@ export const excluirEnvelopamento = async (id) => {
     try {
       await supabase.from('envelopamentos').delete().eq('id', id);
     } catch (err) {}
-    sincronizarEnvelopamentosNuvem(novaLista);
   }
 
   notificarAlteracaoEnvelopamento();
@@ -644,7 +657,6 @@ export const excluirEnvelopamentosEmLote = async (ids = []) => {
     } catch (err) {
       console.warn('Erro ao excluir lote no Supabase:', err);
     }
-    sincronizarEnvelopamentosNuvem(novaLista);
   }
 
   notificarAlteracaoEnvelopamento();
@@ -652,16 +664,27 @@ export const excluirEnvelopamentosEmLote = async (ids = []) => {
 };
 
 /**
- * Importa múltiplos blocos em lote de forma atômica e com sincronização instantânea
+ * Importa múltiplos blocos em lote de forma atômica e com sincronização instantânea,
+ * bloqueando estritamente a inserção de quaisquer blocos duplicados.
  */
 export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont') => {
   if (!Array.isArray(itens) || itens.length === 0) return [];
+
+  const locais = carregarEnvelopamentosLocais();
+
+  // Filtragem estrita contra duplicidades
+  const itensAvaliados = identificarDuplicidadesEmLista(itens, locais);
+  const itensValidos = itensAvaliados.filter(item => !item.ehDuplicado);
+
+  if (itensValidos.length === 0) {
+    throw new Error('Inclusão bloqueada: Todos os blocos informados já se encontram cadastrados no sistema para este cliente, material e pedreira.');
+  }
 
   const agora = new Date().toISOString();
   const registrosCompletos = [];
   const rowsParaDB = [];
 
-  for (const dados of itens) {
+  for (const dados of itensValidos) {
     if (!dados.numero_bloco) continue;
 
     const id = dados.id || `env_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
@@ -698,7 +721,6 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
   }
 
   // 1. Atualizar LocalStorage mesclando
-  const locais = carregarEnvelopamentosLocais();
   const mapa = new Map();
   locais.forEach(item => { if (item?.id) mapa.set(item.id, item); });
   registrosCompletos.forEach(item => mapa.set(item.id, item));
@@ -712,7 +734,6 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
     } catch (e) {
       console.warn('[Envelopamento] Falha ao importar em lote na tabela envelopamentos:', e);
     }
-    sincronizarEnvelopamentosNuvem(novaLista);
   }
 
   // Notificar ouvintes
