@@ -75,9 +75,6 @@ export const salvarEnvelopamentosLocais = (lista) => {
   }
 };
 
-const SYNC_ENV_CPF = '00000000099';
-const SYNC_CLI_CPF = '00000000098';
-
 const COLUNAS_VALIDAS_ENVELOPAMENTOS = new Set([
   'id',
   'numero_bloco',
@@ -324,33 +321,11 @@ export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = 
 };
 
 /**
- * Persiste a lista completa de envelopamentos na nuvem (Supabase) garantindo sincronização instantânea
- * em tempo real para todos os usuários através da tabela base_motoristas e da tabela dedicada.
- */
-const sincronizarEnvelopamentosNuvem = async (lista) => {
-  if (!isSupabaseConfigurado() || !Array.isArray(lista)) return;
-  try {
-    // 1. Espelho na nuvem (base_motoristas com CPF válido de 11 dígitos)
-    await supabase.from('base_motoristas').upsert({
-      cpf: SYNC_ENV_CPF,
-      nome: 'SISTEMA_ENVELOPAMENTO_VERMONT',
-      observacoes: JSON.stringify(lista),
-      status_documental: 'REGULAR',
-      atualizado_por: 'Sistema Envelopamento Vermont',
-      atualizado_em: new Date().toISOString()
-    }, { onConflict: 'cpf' });
-  } catch (err) {
-    console.warn('[Envelopamento] Falha ao sincronizar espelho na nuvem:', err);
-  }
-};
-
-/**
- * Consulta a lista de envelopamentos na nuvem com failover inteligente
+ * Consulta a lista de envelopamentos na nuvem diretamente na tabela oficial
  */
 const consultarEnvelopamentosNuvem = async () => {
   if (!isSupabaseConfigurado()) return null;
 
-  // 1. Tentar primeiro na tabela oficial 'envelopamentos'
   try {
     const { data, error } = await supabase
       .from('envelopamentos')
@@ -363,22 +338,6 @@ const consultarEnvelopamentosNuvem = async () => {
   } catch (e) {
     console.warn('[Envelopamento] Falha ao consultar tabela envelopamentos:', e);
   }
-
-  // 2. Fallback na nuvem via espelho de sincronização em 'base_motoristas' caso a tabela oficial falhe
-  try {
-    const { data, error } = await supabase
-      .from('base_motoristas')
-      .select('observacoes')
-      .eq('cpf', SYNC_ENV_CPF)
-      .maybeSingle();
-
-    if (!error && data?.observacoes) {
-      const parsed = JSON.parse(data.observacoes);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    }
-  } catch (e) {}
 
   return null;
 };
@@ -444,7 +403,7 @@ export const notificarAlteracaoEnvelopamento = () => {
 
 /**
  * Inscreve um callback para ser notificado sempre que houver alterações nos envelopamentos
- * (via Supabase Realtime em 'envelopamentos' e 'base_motoristas', eventos da janela local e Storage entre abas).
+ * (via Supabase Realtime na tabela 'envelopamentos', eventos da janela local e Storage entre abas).
  */
 export const inscreverEnvelopamentosRealtime = (callback) => {
   let supabaseChannel = null;
@@ -459,15 +418,6 @@ export const inscreverEnvelopamentosRealtime = (callback) => {
           { event: '*', schema: 'public', table: 'envelopamentos' },
           (payload) => {
             if (typeof callback === 'function') callback(payload);
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'base_motoristas' },
-          (payload) => {
-            if (payload?.new?.cpf === SYNC_ENV_CPF || payload?.new?.cpf === SYNC_CLI_CPF) {
-              if (typeof callback === 'function') callback(payload);
-            }
           }
         )
         .subscribe();
@@ -932,49 +882,19 @@ export const calcularMetricasEnvelopamento = (lista = []) => {
 };
 
 /**
- * Persiste clientes na nuvem
- */
-const sincronizarClientesNuvem = async (lista) => {
-  if (!isSupabaseConfigurado() || !Array.isArray(lista)) return;
-  try {
-    await supabase.from('base_motoristas').upsert({
-      cpf: SYNC_CLI_CPF,
-      nome: 'SISTEMA_CLIENTES_VERMONT',
-      observacoes: JSON.stringify(lista),
-      status_documental: 'REGULAR',
-      atualizado_por: 'Sistema Envelopamento Vermont',
-      atualizado_em: new Date().toISOString()
-    }, { onConflict: 'cpf' });
-  } catch (err) {}
-};
-
-/**
  * Consulta clientes cadastrados na nuvem
  */
 const consultarClientesCadastradosNuvem = async () => {
   if (!isSupabaseConfigurado()) return [];
 
-  // 1. Tentar tabela 'clientes'
   try {
     const { data, error } = await supabase.from('clientes').select('*').limit(3000);
-    if (!error && Array.isArray(data) && data.length > 0) {
+    if (!error && Array.isArray(data)) {
       return data;
     }
-  } catch (e) {}
-
-  // 2. Fallback via espelho de sincronização em 'base_motoristas'
-  try {
-    const { data, error } = await supabase
-      .from('base_motoristas')
-      .select('observacoes')
-      .eq('cpf', SYNC_CLI_CPF)
-      .maybeSingle();
-
-    if (!error && data?.observacoes) {
-      const parsed = JSON.parse(data.observacoes);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Erro ao consultar clientes no Supabase:', e);
+  }
 
   return [];
 };
@@ -1056,7 +976,6 @@ export const salvarClienteCadastrado = async (dadosCliente) => {
     } catch (e) {
       console.warn('Erro ao salvar cliente no Supabase:', e);
     }
-    sincronizarClientesNuvem(locais);
   }
 
   notificarAlteracaoEnvelopamento();
@@ -1075,7 +994,6 @@ export const excluirClienteCadastrado = async (idOuNome) => {
     try {
       await supabase.from('clientes').delete().or(`id.eq.${idOuNome},nome.eq.${idOuNome}`);
     } catch (err) {}
-    sincronizarClientesNuvem(filtrados);
   }
 
   notificarAlteracaoEnvelopamento();
