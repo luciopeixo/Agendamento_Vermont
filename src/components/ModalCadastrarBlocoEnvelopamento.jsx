@@ -290,17 +290,6 @@ export function ModalCadastrarBlocoEnvelopamento({
       return;
     }
 
-    // Validação de formato da barra para Taj Mahal (Thor/Argos exige "/", outros proíbe "/")
-    const validacao = validarFormatoBlocoTajMahal({
-      material: formData.material,
-      cliente: formData.cliente_nome,
-      numero_bloco: formData.numero_bloco
-    });
-    if (!validacao.valido) {
-      setErro(validacao.mensagem);
-      return;
-    }
-
     setSalvando(true);
     try {
       const registro = await salvarEnvelopamento(formData, usuarioNome);
@@ -531,11 +520,14 @@ export function ModalCadastrarBlocoEnvelopamento({
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Ex: 0326 ou 11/26 (Thor/Argos)"
+                  placeholder="Ex: 0326 ou 18/26TB"
                   value={formData.numero_bloco}
                   onChange={(e) => {
-                    const sanitizado = sanitizarNumeroBloco(e.target.value, isClienteThorOuArgos(formData.cliente_nome));
-                    setFormData(prev => ({ ...prev, numero_bloco: sanitizado }));
+                    setFormData(prev => ({ ...prev, numero_bloco: e.target.value.toUpperCase() }));
+                  }}
+                  onBlur={(e) => {
+                    const limpo = e.target.value.trim().replace(/[.\s]+$/, '');
+                    setFormData(prev => ({ ...prev, numero_bloco: limpo }));
                   }}
                   required
                 />
