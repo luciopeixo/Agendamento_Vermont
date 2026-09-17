@@ -75,16 +75,99 @@ export const salvarEnvelopamentosLocais = (lista) => {
   }
 };
 
-const SYNC_ENV_CPF = 'ENV_STORAGE_VERMONT';
-const SYNC_CLI_CPF = 'CLI_STORAGE_VERMONT';
+const SYNC_ENV_CPF = '00000000099';
+const SYNC_CLI_CPF = '00000000098';
+
+const COLUNAS_VALIDAS_ENVELOPAMENTOS = new Set([
+  'id',
+  'numero_bloco',
+  'cliente_nome',
+  'cliente_cnpj',
+  'material',
+  'pedreira_id',
+  'pedreira_nome',
+  'status',
+  'responsavel_envelopamento',
+  'responsavel_liberacao',
+  'data_cadastro',
+  'data_envelopamento',
+  'data_liberacao',
+  'observacoes',
+  'agendamento_id',
+  'created_at',
+  'updated_at'
+]);
+
+/**
+ * Formata um item de envelopamento garantindo compatibilidade estrita com a tabela do Supabase
+ * e serializando campos adicionais (romaneio, peso) nas observações
+ */
+export const formatarItemParaSupabaseEnvelopamentos = (item) => {
+  let obs = (item.observacoes || '')
+    .replace(/\[ROM:[^\]]*\]/gi, '')
+    .replace(/\[PESO:[^\]]*\]/gi, '')
+    .replace(/\[DATA_ROM:[^\]]*\]/gi, '')
+    .trim();
+
+  const tags = [];
+  if (item.numero_romaneio) tags.push(`[ROM:${item.numero_romaneio}]`);
+  if (item.peso_kg) tags.push(`[PESO:${item.peso_kg}]`);
+  if (item.data_romaneio) tags.push(`[DATA_ROM:${item.data_romaneio}]`);
+
+  const observacoesComTags = tags.length > 0 ? `${tags.join('')} ${obs}`.trim() : obs;
+  const row = {};
+  for (const col of COLUNAS_VALIDAS_ENVELOPAMENTOS) {
+    if (col === 'observacoes') {
+      row.observacoes = observacoesComTags;
+    } else if (item[col] !== undefined) {
+      row[col] = item[col];
+    }
+  }
+  return row;
+};
+
+/**
+ * Reconstrói os campos expandidos a partir das linhas retornadas pelo Supabase
+ */
+export const parseItemDeSupabaseEnvelopamentos = (row) => {
+  if (!row) return row;
+  let obs = row.observacoes || '';
+  let rom = row.numero_romaneio || '';
+  let peso = row.peso_kg || '';
+  let dataRom = row.data_romaneio || '';
+
+  const matchRom = obs.match(/\[ROM:\s*([^\]]+)\]/i);
+  if (matchRom) rom = matchRom[1].trim();
+
+  const matchPeso = obs.match(/\[PESO:\s*([^\]]+)\]/i);
+  if (matchPeso) peso = matchPeso[1].trim();
+
+  const matchData = obs.match(/\[DATA_ROM:\s*([^\]]+)\]/i);
+  if (matchData) dataRom = matchData[1].trim();
+
+  const obsLimpa = obs
+    .replace(/\[ROM:[^\]]*\]/gi, '')
+    .replace(/\[PESO:[^\]]*\]/gi, '')
+    .replace(/\[DATA_ROM:[^\]]*\]/gi, '')
+    .trim();
+
+  return {
+    ...row,
+    numero_romaneio: rom,
+    peso_kg: peso,
+    data_romaneio: dataRom,
+    observacoes: obsLimpa
+  };
+};
 
 /**
  * Persiste a lista completa de envelopamentos na nuvem (Supabase) garantindo sincronização instantânea
- * mesmo caso a tabela dedicada 'envelopamentos' ainda não tenha sido criada via SQL Editor.
+ * em tempo real para todos os usuários através da tabela base_motoristas e da tabela dedicada.
  */
 const sincronizarEnvelopamentosNuvem = async (lista) => {
   if (!isSupabaseConfigurado() || !Array.isArray(lista)) return;
   try {
+    // 1. Espelho na nuvem (base_motoristas com CPF válido de 11 dígitos)
     await supabase.from('base_motoristas').upsert({
       cpf: SYNC_ENV_CPF,
       nome: 'SISTEMA_ENVELOPAMENTO_VERMONT',
@@ -112,7 +195,7 @@ const consultarEnvelopamentosNuvem = async () => {
       .order('created_at', { ascending: false });
 
     if (!error && Array.isArray(data) && data.length > 0) {
-      return data;
+      return data.map(parseItemDeSupabaseEnvelopamentos);
     }
   } catch (e) {}
 
@@ -126,7 +209,7 @@ const consultarEnvelopamentosNuvem = async () => {
 
     if (!error && data?.observacoes) {
       const parsed = JSON.parse(data.observacoes);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
@@ -157,11 +240,24 @@ export const listarEnvelopamentos = async (filtros = {}) => {
       });
       dados = Array.from(mapa.values());
       salvarEnvelopamentosLocais(dados);
+
+      // Se havia itens locais ainda não submetidos para a nuvem, sincroniza
+      if (dados.length > dadosNuvem.length) {
+        sincronizarEnvelopamentosNuvem(dados);
+        try {
+          const rowsDB = dados.map(formatarItemParaSupabaseEnvelopamentos);
+          await supabase.from('envelopamentos').upsert(rowsDB, { onConflict: 'id' });
+        } catch (e) {}
+      }
     } else {
       dados = dadosLocais;
       if (dadosLocais.length > 0) {
-        // Envia os dados locais existentes para a nuvem para que outros usuários recebam
+        // Envia os dados locais existentes para a nuvem para que outros usuários recebam imediatamente
         sincronizarEnvelopamentosNuvem(dadosLocais);
+        try {
+          const rowsDB = dadosLocais.map(formatarItemParaSupabaseEnvelopamentos);
+          await supabase.from('envelopamentos').upsert(rowsDB, { onConflict: 'id' });
+        } catch (e) {}
       }
     }
   } else {
@@ -323,10 +419,13 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
 
   // 2. Sincronizar na nuvem (Supabase)
   if (isSupabaseConfigurado()) {
-    // A. Tentar na tabela 'envelopamentos'
+    // A. Formatar apenas colunas válidas e persistir tags de romaneio/peso nas observações para a tabela 'envelopamentos'
     try {
-      await supabase.from('envelopamentos').upsert(registroCompleto);
-    } catch (e) {}
+      const rowDB = formatarItemParaSupabaseEnvelopamentos(registroCompleto);
+      await supabase.from('envelopamentos').upsert(rowDB);
+    } catch (e) {
+      console.warn('[Envelopamento] Falha ao upsert na tabela envelopamentos:', e);
+    }
     // B. Sincronizar no espelho em tempo real
     sincronizarEnvelopamentosNuvem(locais);
   }
@@ -411,7 +510,8 @@ export const atualizarStatusEnvelopamentosEmLote = async (ids = [], novoStatus, 
 
   if (isSupabaseConfigurado()) {
     try {
-      await supabase.from('envelopamentos').upsert(itensAtualizados, { onConflict: 'id' });
+      const rowsDB = itensAtualizados.map(formatarItemParaSupabaseEnvelopamentos);
+      await supabase.from('envelopamentos').upsert(rowsDB, { onConflict: 'id' });
     } catch (err) {
       console.warn('Erro ao atualizar lote no Supabase envelopamentos:', err);
     }
@@ -466,17 +566,73 @@ export const excluirEnvelopamentosEmLote = async (ids = []) => {
 };
 
 /**
- * Importa múltiplos blocos em lote
+ * Importa múltiplos blocos em lote de forma atômica e com sincronização instantânea
  */
 export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont') => {
-  const resultados = [];
-  for (const item of itens) {
-    if (item.numero_bloco) {
-      const salvo = await salvarEnvelopamento(item, usuarioNome);
-      resultados.push(salvo);
-    }
+  if (!Array.isArray(itens) || itens.length === 0) return [];
+
+  const agora = new Date().toISOString();
+  const registrosCompletos = [];
+  const rowsParaDB = [];
+
+  for (const dados of itens) {
+    if (!dados.numero_bloco) continue;
+
+    const id = dados.id || `env_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    let statusNormalizado = dados.status || 'pendente_envelopamento';
+    if (statusNormalizado === 'pendente') statusNormalizado = 'pendente_envelopamento';
+    if (statusNormalizado === 'em_envelopamento') statusNormalizado = 'em_andamento';
+    if (statusNormalizado === 'liberado' || statusNormalizado === 'conferido') statusNormalizado = 'envelopado';
+
+    const registroCompleto = {
+      id,
+      numero_bloco: String(dados.numero_bloco || '').trim().toUpperCase(),
+      cliente_nome: String(dados.cliente_nome || '').trim().toUpperCase(),
+      cliente_cnpj: String(dados.cliente_cnpj || '').trim(),
+      material: String(dados.material || '').trim(),
+      peso_kg: String(dados.peso_kg || '').trim(),
+      numero_romaneio: String(dados.numero_romaneio || dados.romaneio_numero || '').trim().toUpperCase(),
+      data_romaneio: String(dados.data_romaneio || dados.data_emissao || '').trim(),
+      pedreira_id: dados.pedreira_id || '',
+      pedreira_nome: dados.pedreira_nome || '',
+      status: statusNormalizado,
+      responsavel_envelopamento: dados.responsavel_envelopamento || (statusNormalizado === 'em_andamento' ? usuarioNome : null),
+      responsavel_liberacao: dados.responsavel_liberacao || (statusNormalizado === 'envelopado' || statusNormalizado === 'sem_envelopamento' ? usuarioNome : null),
+      data_cadastro: dados.data_cadastro || agora,
+      data_envelopamento: dados.data_envelopamento || (statusNormalizado === 'em_andamento' ? agora : null),
+      data_liberacao: dados.data_liberacao || (statusNormalizado === 'envelopado' || statusNormalizado === 'sem_envelopamento' ? agora : null),
+      observacoes: dados.observacoes || '',
+      agendamento_id: dados.agendamento_id || null,
+      created_at: dados.created_at || agora,
+      updated_at: agora
+    };
+
+    registrosCompletos.push(registroCompleto);
+    rowsParaDB.push(formatarItemParaSupabaseEnvelopamentos(registroCompleto));
   }
-  return resultados;
+
+  // 1. Atualizar LocalStorage mesclando
+  const locais = carregarEnvelopamentosLocais();
+  const mapa = new Map();
+  locais.forEach(item => { if (item?.id) mapa.set(item.id, item); });
+  registrosCompletos.forEach(item => mapa.set(item.id, item));
+  const novaLista = Array.from(mapa.values());
+  salvarEnvelopamentosLocais(novaLista);
+
+  // 2. Sincronizar na nuvem (Supabase)
+  if (isSupabaseConfigurado()) {
+    try {
+      await supabase.from('envelopamentos').upsert(rowsParaDB, { onConflict: 'id' });
+    } catch (e) {
+      console.warn('[Envelopamento] Falha ao importar em lote na tabela envelopamentos:', e);
+    }
+    sincronizarEnvelopamentosNuvem(novaLista);
+  }
+
+  // Notificar ouvintes
+  notificarAlteracaoEnvelopamento();
+
+  return registrosCompletos;
 };
 
 /**
