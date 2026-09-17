@@ -207,6 +207,14 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
     matFinal = 'Del Mare';
     pedId = 'massape_delmare';
     pedNome = 'Massapê - CE (Del Mare)';
+  } else if (matUpper.includes('TELLUS BLUE')) {
+    matFinal = 'Tellus Blue';
+    pedId = 'serrote';
+    pedNome = 'São Gonçalo do Amarante - CE (Serrote)';
+  } else if (matUpper === 'TELLUS' || matUpper.startsWith('TELLUS ')) {
+    matFinal = 'Tellus';
+    pedId = 'massape_negresco';
+    pedNome = 'Massapê - CE (Negresco)';
   } else if (matUpper.includes('TAJ MAHAL') || matUpper.includes('TAJMAHAL')) {
     matFinal = 'Taj Mahal';
     pedId = 'uruoca';
