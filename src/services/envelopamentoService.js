@@ -273,6 +273,8 @@ export const verificarDuplicidadeBloco = ({
   };
 };
 
+export const verificarDuplicidadeIndividual = verificarDuplicidadeBloco;
+
 /**
  * Analisa uma lista de blocos (ex: importação PDF ou lote) identificando duplicidades
  * tanto em relação aos registros já salvos no sistema quanto entre si mesmos.
@@ -481,7 +483,7 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
   const locais = carregarEnvelopamentosLocais();
 
   // Validação e bloqueio estrito contra duplicidades
-  const checagemDuplicidade = verificarDuplicidadeIndividual({
+  const checagemDuplicidade = verificarDuplicidadeBloco({
     numero_bloco: dados.numero_bloco,
     cliente_nome: dados.cliente_nome,
     cliente_cnpj: dados.cliente_cnpj,
