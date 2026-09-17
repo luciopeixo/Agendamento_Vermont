@@ -1209,32 +1209,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                     }}>
                       📦 {grupo.metricas.total} Bloco{grupo.metricas.total > 1 ? 's' : ''}
                     </span>
-
-                    {/* Botão Excluir Envelopados do Cliente */}
-                    {grupo.metricas.envelopado > 0 && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleExcluirEnvelopadosCliente(grupo);
-                        }}
-                        className="btn btn-secondary"
-                        style={{
-                          padding: '3px 8px',
-                          fontSize: '0.70rem',
-                          color: '#f87171',
-                          borderColor: 'rgba(239, 68, 68, 0.35)',
-                          background: 'rgba(239, 68, 68, 0.08)',
-                          fontWeight: 700,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4
-                        }}
-                        title={`Excluir todos os ${grupo.metricas.envelopado} blocos envelopados deste cliente`}
-                      >
-                        <Trash2 size={11} /> Limpar Envelopados ({grupo.metricas.envelopado})
-                      </button>
-                    )}
                   </div>
                 </div>
 
