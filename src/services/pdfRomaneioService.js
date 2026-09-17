@@ -208,25 +208,16 @@ export const normalizarMaterialVermont = (materialBruto, pedreiraId = '') => {
  */
 export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetectado = '') => {
   const matUpper = String(materialDetectado || '').toUpperCase();
-  
+  const t = (textoCompleto || '').toUpperCase();
+
   // 1. Se o material foi identificado, buscar sua pedreira oficial diretamente
   if (materialDetectado) {
     const pedPorMat = obterPedreiraPorMaterial(materialDetectado);
     if (pedPorMat) return pedPorMat;
   }
 
-  const t = (textoCompleto || '').toUpperCase();
-
-  // 2. Buscar por menções a materiais específicos no documento
-  if (matUpper.includes('NAURIKA') || matUpper.includes('RAFFINATO') || matUpper.includes('GUINESS') || matUpper.includes('NOUVEAU') || t.includes('BEBERIBE')) {
-    const p = PEDREIRAS_CEARA.find(item => item.id === 'beberibe');
-    return {
-      id: 'beberibe',
-      nome: p ? p.nome : 'Beberibe - CE'
-    };
-  }
-
-  if (matUpper.includes('ZITAN') || matUpper.includes('SCENARIO') || matUpper.includes('BRECCIA IMPERIALE') || t.includes('JAIBARAS') || (t.includes('SOBRAL') && !t.includes('MASSAPE'))) {
+  // 2. Buscar por menções a materiais específicos no documento (ordem de especificidade)
+  if (matUpper.includes('NAURIKA') || t.includes('NAURIKA') || matUpper.includes('ZITAN') || t.includes('ZITAN') || matUpper.includes('SCENARIO') || t.includes('SCENARIO') || matUpper.includes('BRECCIA IMPERIALE') || t.includes('BRECCIA IMPERIALE') || t.includes('JAIBARAS') || (t.includes('SOBRAL') && !t.includes('MASSAPE'))) {
     const p = PEDREIRAS_CEARA.find(item => item.id === 'sobral_jaibaras');
     return {
       id: 'sobral_jaibaras',
@@ -234,15 +225,15 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
     };
   }
 
-  if (matUpper.includes('NEGRESCO') || matUpper.includes('INFINITY BROWN') || matUpper.includes('INFINITY BLACK') || matUpper.includes('JJ BROWN') || matUpper.includes('BROWN STRINGS')) {
-    const p = PEDREIRAS_CEARA.find(item => item.id === 'massape_negresco');
+  if (matUpper.includes('BLUE DEEP') || t.includes('BLUE DEEP') || matUpper.includes('ROMA IMPERIALE') || t.includes('ROMA IMPERIALE') || matUpper.includes('PANETTONE') || t.includes('PANETTONE') || matUpper.includes('TELLUS BLUE') || t.includes('TELLUS BLUE') || matUpper.includes('ATLANTIC BLUE') || t.includes('ATLANTIC BLUE') || matUpper.includes('BLUE MARE') || t.includes('BLUE MARE') || matUpper.includes('BLUE ROMA') || t.includes('BLUE ROMA') || matUpper.includes('ILLUSION') || t.includes('ILLUSION') || t.includes('SERROTE') || t.includes('SÃO GONÇALO') || t.includes('SAO GONCALO')) {
+    const p = PEDREIRAS_CEARA.find(item => item.id === 'serrote');
     return {
-      id: 'massape_negresco',
-      nome: p ? p.nome : 'Massapê - CE (Negresco)'
+      id: 'serrote',
+      nome: p ? p.nome : 'São Gonçalo do Amarante - CE (Serrote)'
     };
   }
 
-  if (matUpper.includes('DEL MARE') || matUpper.includes('CHATEAU') || matUpper.includes('BRECCIA VIOLA') || matUpper.includes('EVORA')) {
+  if (matUpper.includes('DEL MARE') || t.includes('DEL MARE') || matUpper.includes('CHATEAU') || t.includes('CHATEAU') || matUpper.includes('BRECCIA VIOLA') || t.includes('BRECCIA VIOLA') || matUpper.includes('EVORA') || t.includes('EVORA')) {
     const p = PEDREIRAS_CEARA.find(item => item.id === 'massape_delmare');
     return {
       id: 'massape_delmare',
@@ -250,11 +241,19 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
     };
   }
 
-  if (matUpper.includes('BLUE DEEP') || matUpper.includes('ROMA IMPERIALE') || matUpper.includes('PANETTONE') || matUpper.includes('TELLUS BLUE') || matUpper.includes('SERROTE') || matUpper.includes('SÃO GONÇALO') || matUpper.includes('SAO GONCALO')) {
-    const p = PEDREIRAS_CEARA.find(item => item.id === 'serrote');
+  if (matUpper.includes('NEGRESCO') || t.includes('NEGRESCO') || matUpper.includes('INFINITY BROWN') || t.includes('INFINITY BROWN') || matUpper.includes('INFINITY BLACK') || t.includes('INFINITY BLACK') || matUpper.includes('JJ BROWN') || t.includes('JJ BROWN') || matUpper.includes('BROWN STRINGS') || t.includes('BROWN STRINGS') || matUpper.includes('BROWNIE') || t.includes('BROWNIE') || matUpper.includes('KOUROS') || t.includes('KOUROS') || matUpper.includes('TELLUS') || t.includes('TELLUS') || t.includes('BOA VISTA') || t.includes('MASSAPE') || t.includes('MASSAPÊ')) {
+    const p = PEDREIRAS_CEARA.find(item => item.id === 'massape_negresco');
     return {
-      id: 'serrote',
-      nome: p ? p.nome : 'São Gonçalo do Amarante - CE (Serrote)'
+      id: 'massape_negresco',
+      nome: p ? p.nome : 'Massapê - CE (Negresco)'
+    };
+  }
+
+  if (matUpper.includes('RAFFINATO') || t.includes('RAFFINATO') || matUpper.includes('GUINESS') || t.includes('GUINESS') || matUpper.includes('NOUVEAU') || t.includes('NOUVEAU') || t.includes('BEBERIBE')) {
+    const p = PEDREIRAS_CEARA.find(item => item.id === 'beberibe');
+    return {
+      id: 'beberibe',
+      nome: p ? p.nome : 'Beberibe - CE'
     };
   }
 
@@ -266,7 +265,7 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
     };
   }
 
-  if (matUpper.includes('TAJ MAHAL') || matUpper.includes('TAJMAHAL')) {
+  if (matUpper.includes('TAJ MAHAL') || t.includes('TAJ MAHAL') || matUpper.includes('TAJMAHAL') || t.includes('TAJMAHAL')) {
     const p = PEDREIRAS_CEARA.find(item => item.id === 'uruoca');
     return {
       id: 'uruoca',

@@ -57,7 +57,7 @@ export const carregarEnvelopamentosLocais = () => {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.map(item => parseItemDeSupabaseEnvelopamentos(item)) : [];
   } catch (err) {
     console.error('Erro ao ler envelopamentos locais:', err);
     return [];
@@ -123,6 +123,37 @@ export const formatarItemParaSupabaseEnvelopamentos = (item) => {
   return row;
 };
 
+const MAPA_MATERIAL_PADRAO_PEDREIRA = {
+  'taj mahal': { id: 'uruoca', nome: 'Uruoca - CE (Taj Mahal)' },
+  'infinity brown': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'infinity black': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'negresco': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'brownie': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'brown strings': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'kouros': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'jj brown': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'tellus': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'del mare': { id: 'massape_delmare', nome: 'Massapê - CE (Del Mare)' },
+  'chateau blanc': { id: 'massape_delmare', nome: 'Massapê - CE (Del Mare)' },
+  'breccia viola': { id: 'massape_delmare', nome: 'Massapê - CE (Del Mare)' },
+  'evora': { id: 'massape_delmare', nome: 'Massapê - CE (Del Mare)' },
+  'breccia imperiale': { id: 'sobral_jaibaras', nome: 'Sobral - CE (Jaibaras)' },
+  'zitan': { id: 'sobral_jaibaras', nome: 'Sobral - CE (Jaibaras)' },
+  'scenario': { id: 'sobral_jaibaras', nome: 'Sobral - CE (Jaibaras)' },
+  'naurika': { id: 'sobral_jaibaras', nome: 'Sobral - CE (Jaibaras)' },
+  'blue deep': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
+  'panettone': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
+  'roma imperiale': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
+  'tellus blue': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
+  'atlantic blue': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
+  'illusion': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
+  'blue mare': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
+  'blue roma': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
+  'raffinato': { id: 'beberibe', nome: 'Beberibe - CE' },
+  'guiness': { id: 'beberibe', nome: 'Beberibe - CE' },
+  'nouveau': { id: 'beberibe', nome: 'Beberibe - CE' }
+};
+
 /**
  * Reconstrói os campos expandidos a partir das linhas retornadas pelo Supabase
  */
@@ -148,8 +179,21 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
     .replace(/\[DATA_ROM:[^\]]*\]/gi, '')
     .trim();
 
+  let pedId = row.pedreira_id;
+  let pedNome = row.pedreira_nome;
+  const matKey = String(row.material || '').toLowerCase().trim();
+  const pedPadrao = MAPA_MATERIAL_PADRAO_PEDREIRA[matKey];
+  if (pedPadrao) {
+    if (!pedId || pedId === 'uruoca' || pedId !== pedPadrao.id) {
+      pedId = pedPadrao.id;
+      pedNome = pedPadrao.nome;
+    }
+  }
+
   return {
     ...row,
+    pedreira_id: pedId,
+    pedreira_nome: pedNome,
     numero_romaneio: rom,
     peso_kg: peso,
     data_romaneio: dataRom,

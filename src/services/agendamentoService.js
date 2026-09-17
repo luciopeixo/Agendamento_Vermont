@@ -60,7 +60,8 @@ export const MATERIAIS_POR_PEDREIRA = {
   sobral_jaibaras: [
     'Breccia Imperiale',
     'Zitan',
-    'Scenario'
+    'Scenario',
+    'Naurika'
   ],
   serrote: [
     'Blue Deep',
@@ -74,7 +75,6 @@ export const MATERIAIS_POR_PEDREIRA = {
   ],
   beberibe: [
     'Raffinato',
-    'Naurika',
     'Guiness',
     'Nouveau'
   ]

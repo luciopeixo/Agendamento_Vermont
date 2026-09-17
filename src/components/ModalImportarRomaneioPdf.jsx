@@ -120,8 +120,8 @@ export function ModalImportarRomaneioPdf({
           todosBlocos.push({
             id: `pdf_${i}_${bIdx}_${b.numero_bloco || Math.random()}`,
             numero_bloco: b.numero_bloco,
-            pedreira_id: res.pedreira?.id || '',
-            pedreira_nome: res.pedreira?.nome || 'Não especificada',
+            pedreira_id: b.pedreira_id || res.pedreira?.id || '',
+            pedreira_nome: b.pedreira_nome || res.pedreira?.nome || 'Não especificada',
             material: b.material || 'Não especificado',
             peso_kg: b.peso_kg || '',
             numero_romaneio: res.numeroRomaneio || '',
