@@ -269,7 +269,7 @@ export function App() {
             }} />
           </div>
 
-          {/* Polo Operacional Ceará e Unidades */}
+          {/* Polos Operacionais Ceará e Goiás e Unidades */}
           <div style={{
             fontSize: '0.84rem',
             lineHeight: 1.6,
@@ -282,7 +282,7 @@ export function App() {
           }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#4ade80', fontWeight: 700, marginRight: 8 }}>
               <MapPin size={14} color="#4ade80" />
-              <span>Polo Operacional Ceará:</span>
+              <span>Polos Operacionais (Ceará & Goiás):</span>
             </div>
             <span>
               Uruoca (Taj Mahal) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
@@ -290,7 +290,8 @@ export function App() {
               Massapê (Del Mare) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
               Sobral (Jaibaras) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
               São Gonçalo do Amarante (Serrote) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
-              Beberibe
+              Beberibe <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
+              Uruaçu (GO)
             </span>
           </div>
 

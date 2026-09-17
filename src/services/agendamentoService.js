@@ -33,13 +33,24 @@ export const PEDREIRAS_CEARA = [
     id: 'beberibe',
     nome: 'Beberibe - CE',
     cidade: 'Beberibe - CE'
+  },
+  {
+    id: 'uruacu',
+    nome: 'Uruaçu - GO',
+    cidade: 'Uruaçu - GO'
   }
 ];
+
+// Alias de exportação para compatibilidade
+export const PEDREIRAS = PEDREIRAS_CEARA;
 
 // Mapeamento oficial de materiais por pedreira da Vermont Mineração
 export const MATERIAIS_POR_PEDREIRA = {
   uruoca: [
     'Taj Mahal'
+  ],
+  uruacu: [
+    'Cristallo Absolut'
   ],
   massape_negresco: [
     'Infinity Brown',
@@ -104,6 +115,9 @@ export function obterMateriaisPorPedreira(pedreiraOuId = '') {
   }
   if (maiusc === 'BEBERIBE' || maiusc.includes('BEBERIBE')) {
     return MATERIAIS_POR_PEDREIRA.beberibe;
+  }
+  if (maiusc === 'URUACU' || maiusc.includes('URUACU') || maiusc.includes('URUAÇU') || maiusc.includes('GOIAS') || maiusc.includes('GOIÁS')) {
+    return MATERIAIS_POR_PEDREIRA.uruacu;
   }
 
   return [];
@@ -3711,6 +3725,7 @@ export function normalizarChavePedreira(nome) {
   if (up.includes('JAIBARAS') || (up.includes('SOBRAL') && !up.includes('MASSAPE'))) return 'SOBRAL_JAIBARAS';
   if (up.includes('SERROTE') || up.includes('SAO GONCALO')) return 'SERROTE';
   if (up.includes('BEBERIBE')) return 'BEBERIBE';
+  if (up.includes('URUACU') || up.includes('URUAÇU') || up.includes('GOIAS') || up.includes('GOIÁS')) return 'URUACU';
   return up.replace(/[^A-Z0-9]/g, '');
 }
 
@@ -4854,7 +4869,7 @@ O transportador deverá sempre confirmar com o cliente, antes de realizar o carr
 
 Atenciosamente,
 Vermont Mineração Ltda.
-Portal de Agendamentos Polo Ceará`;
+Portal de Agendamentos • Polos Ceará & Goiás`;
 
   return `mailto:${encodeURIComponent(emailDestino)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
 }

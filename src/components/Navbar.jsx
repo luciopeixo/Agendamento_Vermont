@@ -58,7 +58,7 @@ export function Navbar({
 
           <div className="navbar-brand-info">
             <span className="badge badge-vermont navbar-badge">
-              POLO CEARÁ
+              POLOS CEARÁ & GOIÁS
             </span>
             <p className="navbar-brand-title">
               Portal de Agendamento • Grupo Vermont

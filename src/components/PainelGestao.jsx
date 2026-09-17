@@ -2134,7 +2134,7 @@ export function PainelGestao({
               </span>
             </div>
             <div style={{ fontSize: '0.8rem', color: 'var(--slate-300)', marginTop: 2 }}>
-              Unidade: <strong>{filtroPedreira === 'todas' ? 'Todas as Pedreiras (Polo Ceará)' : filtroPedreira}</strong> | 
+              Unidade: <strong>{filtroPedreira === 'todas' ? 'Todas as Pedreiras (Ceará & Goiás)' : filtroPedreira}</strong> | 
               Data de Emissão: <strong>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date())}</strong>
               {filtroData && <> | Filtrado para a data: <strong>{formatarDataBR(filtroData)}</strong></>}
               {!isTodosStatus && <> | Status: <strong>{filtroStatus.join(', ')}</strong></>}

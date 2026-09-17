@@ -136,6 +136,7 @@ export const normalizarMaterialVermont = (materialBruto, pedreiraId = '') => {
   const matUpper = matLimpo.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   
   // Regras diretas de materiais conhecidos
+  if (matUpper.includes('CRISTALLO')) return 'Cristallo Absolut';
   if (matUpper.includes('NAURIKA')) return 'Naurika';
   if (matUpper.includes('RAFFINATO')) return 'Raffinato';
   if (matUpper.includes('GUINESS')) return 'Guiness';
@@ -262,6 +263,14 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
     return {
       id: 'santa_quiteria',
       nome: p ? p.nome : 'Santa Quitéria - CE'
+    };
+  }
+
+  if (matUpper.includes('CRISTALLO') || t.includes('CRISTALLO') || matUpper.includes('URUAÇU') || matUpper.includes('URUACU') || t.includes('URUAÇU') || t.includes('URUACU') || t.includes('GOIAS') || t.includes('GOIÁS')) {
+    const p = PEDREIRAS_CEARA.find(item => item.id === 'uruacu');
+    return {
+      id: 'uruacu',
+      nome: p ? p.nome : 'Uruaçu - GO'
     };
   }
 

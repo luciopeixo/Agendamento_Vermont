@@ -68,7 +68,7 @@ export function RegrasModal({ aberto, onFechar }) {
           <div>
             <h2 style={{ fontSize: '1.35rem', margin: 0, color: '#fff' }}>Regras de Agendamento</h2>
             <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--slate-400)' }}>
-              Diretrizes operacionais para carregamento de blocos nas pedreiras (Ceará)
+              Diretrizes operacionais para carregamento de blocos nas pedreiras (Ceará e Goiás)
             </p>
           </div>
         </div>
@@ -155,7 +155,7 @@ export function RegrasModal({ aberto, onFechar }) {
         <div style={{ marginBottom: 20 }}>
           <h3 style={{ fontSize: '1rem', color: '#4ade80', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <MapPin size={18} />
-            Pedreiras Oficiais no Ceará
+            Pedreiras Oficiais (Ceará e Goiás)
           </h3>
           <div style={{
             display: 'grid',

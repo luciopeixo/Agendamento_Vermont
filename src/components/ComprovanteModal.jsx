@@ -294,8 +294,8 @@ _Portal Oficial de Agendamentos • Vermont Mineração_`;
           </h2>
           <p className="comprovante-subtitulo" style={{ margin: 0, fontSize: '0.86rem', color: '#86efac' }}>
             {isCombinado 
-              ? `Autorização Oficial de Entrada & Rota Combinada (${listaPontos.length} Pedreiras / Blocos) • Polo Ceará` 
-              : 'Autorização Oficial de Entrada & Carregamento • Polo Ceará'}
+              ? `Autorização Oficial de Entrada & Rota Combinada (${listaPontos.length} Pedreiras / Blocos) • Polos Ceará & Goiás` 
+              : 'Autorização Oficial de Entrada & Carregamento • Polos Ceará & Goiás'}
           </p>
 
           <div className="comprovante-protocolo-badge" style={{

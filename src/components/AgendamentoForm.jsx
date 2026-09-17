@@ -1317,7 +1317,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               Portal de Agendamento de Carregamento
             </h1>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--slate-400)' }}>
-              Grupo Vermont Mineração • Pedreiras Polo Ceará
+              Grupo Vermont Mineração • Pedreiras Polos Ceará & Goiás
             </p>
           </div>
         </div>

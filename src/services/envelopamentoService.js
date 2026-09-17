@@ -151,7 +151,10 @@ const MAPA_MATERIAL_PADRAO_PEDREIRA = {
   'blue roma': { id: 'serrote', nome: 'São Gonçalo do Amarante - CE (Serrote)' },
   'raffinato': { id: 'beberibe', nome: 'Beberibe - CE' },
   'guiness': { id: 'beberibe', nome: 'Beberibe - CE' },
-  'nouveau': { id: 'beberibe', nome: 'Beberibe - CE' }
+  'nouveau': { id: 'beberibe', nome: 'Beberibe - CE' },
+  'cristallo absolut': { id: 'uruacu', nome: 'Uruaçu - GO' },
+  'cristallo absolute': { id: 'uruacu', nome: 'Uruaçu - GO' },
+  'cristallo': { id: 'uruacu', nome: 'Uruaçu - GO' }
 };
 
 /**
@@ -235,6 +238,7 @@ export const normalizarPedreira = (pedId = '', pedNome = '') => {
   if (texto.includes('sobral') || texto.includes('jaibaras')) return 'sobral';
   if (texto.includes('serrote') || texto.includes('sao goncalo') || texto.includes('são gonçalo')) return 'serrote';
   if (texto.includes('beberibe')) return 'beberibe';
+  if (texto.includes('uruacu') || texto.includes('uruaçu') || texto.includes('goias') || texto.includes('goiás')) return 'uruacu';
   if (texto.includes('hidrolandia') || texto.includes('hidrolândia')) return 'hidrolandia';
   if (texto.includes('banabuiu') || texto.includes('banabuiú')) return 'banabuiu';
   if (texto.includes('santa_quiteria') || texto.includes('quiteria') || texto.includes('quitéria')) return 'santa_quiteria';
