@@ -12,8 +12,8 @@ import {
   Sparkles,
   AlertCircle
 } from 'lucide-react';
-import { obterClientesDoBancoDeDados } from '../services/envelopamentoService';
-import { formatarDataBR, saoMesmaPedreira } from '../services/agendamentoService';
+import { obterClientesDoBancoDeDados, normalizarPeso } from '../services/envelopamentoService';
+import { saoMesmaPedreira } from '../services/agendamentoService';
 
 export function ModalNotificarClienteWhatsApp({ 
   aberto, 
@@ -23,7 +23,7 @@ export function ModalNotificarClienteWhatsApp({
   pedreiraOperador = ''
 }) {
   const [clientesDb, setClientesDb] = useState([]);
-  const [filtroPeriodo, setFiltroPeriodo] = useState('ontem'); // 'ontem', 'hoje', '7_dias', 'mes_atual', 'todos', 'custom'
+  const [filtroPeriodo, setFiltroPeriodo] = useState('7_dias'); // '7_dias', 'hoje', 'ontem', 'mes_atual', 'todos', 'custom'
   const [dataInicioCustom, setDataInicioCustom] = useState('');
   const [dataFimCustom, setDataFimCustom] = useState('');
   const [clienteSelecionado, setClienteSelecionado] = useState(clienteInicial || '');
@@ -41,16 +41,48 @@ export function ModalNotificarClienteWhatsApp({
     }
   }, [aberto]);
 
-  // Função auxiliar para formatar peso em kg sem gerar NaN
+  // Função para formatar o peso em kg sem gerar NaN
   const formatarPesoKg = (peso) => {
     if (peso === undefined || peso === null || peso === '') return '10.000 kg';
-    const limpo = String(peso).replace(/\./g, '').replace(',', '.').trim();
-    const num = parseFloat(limpo);
-    if (isNaN(num)) return `${peso} kg`;
-    return `${num.toLocaleString('pt-BR')} kg`;
+    let str = String(peso).trim();
+    if (str.toLowerCase().includes('nan')) return '10.000 kg';
+    
+    // Tratamento de pontos e vírgulas brasileiros
+    if (str.includes('.') && str.includes(',')) {
+      str = str.replace(/\./g, '').replace(',', '.');
+    } else if (str.includes(',')) {
+      str = str.replace(',', '.');
+    } else if (str.includes('.') && str.split('.')[1]?.length === 3) {
+      str = str.replace(/\./g, '');
+    }
+
+    const num = parseFloat(str.replace(/[^\d.-]/g, ''));
+    if (isNaN(num) || num <= 0) {
+      return String(peso).endsWith('kg') ? String(peso) : `${peso} kg`;
+    }
+    return `${Math.round(num).toLocaleString('pt-BR')} kg`;
   };
 
-  // Função para formatar o nome da pedreira de forma amigável: "Massapê - Del Mare"
+  // Formatação segura de data sem bugs de ISO string
+  const formatarDataSegura = (dataStr) => {
+    if (!dataStr) return '';
+    try {
+      if (dataStr.includes('T')) {
+        const datePart = dataStr.split('T')[0];
+        const [y, m, d] = datePart.split('-');
+        return `${d}/${m}/${y}`;
+      }
+      if (dataStr.includes('-')) {
+        const [y, m, d] = dataStr.slice(0, 10).split('-');
+        return `${d}/${m}/${y}`;
+      }
+      return dataStr;
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Formatar nome da pedreira de forma amigável: "Massapê - Del Mare"
   const formatarNomePedreira = (pedNome = '') => {
     if (!pedNome) return 'Pedreira Vermont';
     let nomeLimpo = String(pedNome).replace(/\s*-\s*CE\s*/i, ' - ').trim();
@@ -58,7 +90,7 @@ export function ModalNotificarClienteWhatsApp({
     return nomeLimpo;
   };
 
-  // Helper de limites de datas
+  // Limites de datas para o período selecionado
   const limitesData = useMemo(() => {
     const hoje = new Date();
     hoje.setHours(23, 59, 59, 999);
@@ -98,22 +130,19 @@ export function ModalNotificarClienteWhatsApp({
     return { dataMin, dataMax };
   }, [filtroPeriodo, dataInicioCustom, dataFimCustom]);
 
-  // Lista dinâmica: APENAS os clientes que tiveram blocos ENVELOPADOS no período selecionado
+  // Lista dinâmica: APENAS clientes que tiveram blocos ENVELOPADOS no período
   const clientesDisponiveisNoPeriodo = useMemo(() => {
     const { dataMin, dataMax } = limitesData;
     const mapa = new Map();
 
     (envelopamentos || []).forEach(item => {
-      // Considera apenas status envelopado
       if (item.status !== 'envelopado') return;
 
-      // Filtro de Pedreira (se houver)
       if (filtroPedreira !== 'todas') {
         const ped = item.pedreira_nome || item.pedreira_id || '';
         if (!saoMesmaPedreira(ped, filtroPedreira)) return;
       }
 
-      // Filtro de Data
       const dataStr = item.data_liberacao || item.data_envelopamento || item.data_cadastro || item.data_romaneio || item.created_at;
       if (dataStr && (dataMin || dataMax)) {
         try {
@@ -151,7 +180,7 @@ export function ModalNotificarClienteWhatsApp({
     return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
   }, [envelopamentos, clientesDb, limitesData, filtroPedreira]);
 
-  // Sincroniza o cliente selecionado quando o período/lista muda
+  // Sincroniza o cliente selecionado quando o período mudar
   useEffect(() => {
     if (clientesDisponiveisNoPeriodo.length > 0) {
       const aindaExiste = clientesDisponiveisNoPeriodo.some(c => c.nome === clienteSelecionado);
@@ -174,7 +203,7 @@ export function ModalNotificarClienteWhatsApp({
     }
   }, [clienteSelecionado, clientesDisponiveisNoPeriodo, clientesDb]);
 
-  // Filtra os blocos envelopados do cliente selecionado no período
+  // Blocos envelopados do cliente selecionado no período
   const blocosFiltrados = useMemo(() => {
     if (!clienteSelecionado) return [];
     const { dataMin, dataMax } = limitesData;
@@ -212,7 +241,7 @@ export function ModalNotificarClienteWhatsApp({
     });
   }, [envelopamentos, clienteSelecionado, limitesData, filtroPedreira]);
 
-  // Inicializa todos os blocos encontrados como marcados por padrão
+  // Inicializa todos os blocos encontrados como selecionados
   useEffect(() => {
     if (blocosFiltrados.length > 0) {
       const novoSet = new Set(blocosFiltrados.map(b => b.id || b.numero_bloco));
@@ -239,12 +268,20 @@ export function ModalNotificarClienteWhatsApp({
     }
   };
 
-  // Blocos selecionados para envio
   const blocosParaEnvio = useMemo(() => {
     return blocosFiltrados.filter(b => blocosSelecionadosIds.has(b.id || b.numero_bloco));
   }, [blocosFiltrados, blocosSelecionadosIds]);
 
-  // Mensagem padronizada oficial exata conforme solicitado
+  const pesoTotalKg = useMemo(() => {
+    return blocosParaEnvio.reduce((acc, item) => {
+      const p = normalizarPeso(item.peso_kg);
+      return acc + (p > 0 ? p : 0);
+    }, 0);
+  }, [blocosParaEnvio]);
+
+  const pesoTotalToneladas = (pesoTotalKg / 1000).toFixed(1);
+
+  // Mensagem padronizada exata conforme solicitado
   const mensagemWhatsApp = useMemo(() => {
     if (!clienteSelecionado || blocosParaEnvio.length === 0) {
       return '';
@@ -255,18 +292,23 @@ export function ModalNotificarClienteWhatsApp({
     texto += `Informamos que os blocos abaixo foram *ENVELOPADOS* e encontram-se *LIBERADOS PARA CARREGAMENTO* :\n`;
 
     blocosParaEnvio.forEach((b, idx) => {
-      const mat = b.material ? `*${b.material}*` : '-';
+      const mat = b.material ? `*${b.material}*` : '';
       const peso = formatarPesoKg(b.peso_kg);
       const ped = formatarNomePedreira(b.pedreira_nome || b.pedreira_id);
       const numRom = b.numero_romaneio ? ` | Rom: *${b.numero_romaneio}*` : '';
-      
-      texto += `${idx + 1}. Bloco nº *${b.numero_bloco}* | ${mat} | ${peso} (${ped})${numRom}\n\n`;
+
+      let linhaBloco = `${idx + 1}. Bloco nº *${b.numero_bloco}*`;
+      if (mat) linhaBloco += ` | ${mat}`;
+      if (peso) linhaBloco += ` | ${peso}`;
+      if (ped) linhaBloco += ` (${ped})`;
+      if (numRom) linhaBloco += `${numRom}`;
+
+      texto += `${linhaBloco}\n\n`;
     });
 
     return texto.trim();
   }, [clienteSelecionado, blocosParaEnvio]);
 
-  // Disparo para WhatsApp
   const handleEnviarWhatsApp = () => {
     if (!mensagemWhatsApp) return;
 
@@ -355,7 +397,7 @@ export function ModalNotificarClienteWhatsApp({
                 Notificar Cliente via WhatsApp
               </h2>
               <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
-                Selecione o período para listar apenas os clientes com blocos envelopados na data
+                Selecione o período abaixo para visualizar apenas os clientes com blocos envelopados
               </span>
             </div>
           </div>
@@ -373,7 +415,7 @@ export function ModalNotificarClienteWhatsApp({
         {/* Corpo com Scroll */}
         <div style={{ padding: '18px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
           
-          {/* Passo 1: Seleção de Período */}
+          {/* PASSO 1: SELEÇÃO DE PERÍODO (ACIMA DO CLIENTE) */}
           <div style={{
             background: 'rgba(255, 255, 255, 0.03)',
             padding: 14,
@@ -381,14 +423,14 @@ export function ModalNotificarClienteWhatsApp({
             border: '1px solid rgba(255, 255, 255, 0.07)'
           }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 8 }}>
-              <Calendar size={14} color="#fbbf24" /> 1. SELECIONE O PERÍODO DOS BLOCOS ENVELOPADOS:
+              <Calendar size={14} color="#fbbf24" /> 1. PERÍODO / DATAS DOS BLOCOS:
             </label>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               {[
-                { id: 'ontem', label: 'Ontem' },
-                { id: 'hoje', label: 'Hoje' },
                 { id: '7_dias', label: 'Últimos 7 Dias' },
+                { id: 'hoje', label: 'Hoje' },
+                { id: 'ontem', label: 'Ontem' },
                 { id: 'mes_atual', label: 'Mês Atual' },
                 { id: 'todos', label: 'Todo o Histórico' },
                 { id: 'custom', label: '📅 Personalizado (De / Até)' }
@@ -444,7 +486,7 @@ export function ModalNotificarClienteWhatsApp({
             )}
           </div>
 
-          {/* Passo 2: Seleção do Cliente (Filtrado pelo Período) & Telefone */}
+          {/* PASSO 2: SELEÇÃO DE CLIENTE & WHATSAPP (ABAIXO DO PERÍODO) */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -457,7 +499,7 @@ export function ModalNotificarClienteWhatsApp({
             {/* Cliente */}
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 6 }}>
-                <Building2 size={14} color="#38bdf8" /> 2. CLIENTE COM BLOCOS NO PERÍODO:
+                <Building2 size={14} color="#38bdf8" /> 2. CLIENTE COMPRADOR:
               </label>
               
               {clientesDisponiveisNoPeriodo.length === 0 ? (
@@ -500,7 +542,7 @@ export function ModalNotificarClienteWhatsApp({
             {/* WhatsApp de Destino */}
             <div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 6 }}>
-                <Phone size={14} color="#4ade80" /> WHATSAPP DO DESTINATÁRIO:
+                <Phone size={14} color="#4ade80" /> WHATSAPP DE DESTINO:
               </label>
               <input
                 type="text"
@@ -521,12 +563,12 @@ export function ModalNotificarClienteWhatsApp({
                 }}
               />
               <span style={{ fontSize: '0.68rem', color: 'var(--slate-400)', display: 'block', marginTop: 3 }}>
-                * Se deixar em branco, o WhatsApp abrirá para selecionar o contato.
+                * Se deixar em branco, o WhatsApp abrirá para você escolher o contato manualmente.
               </span>
             </div>
           </div>
 
-          {/* Passo 3: Lista de Blocos com Checkboxes */}
+          {/* PASSO 3: BLOCOS ENVELOPADOS ENCONTRADOS */}
           {clienteSelecionado && (
             <div style={{
               background: 'rgba(255, 255, 255, 0.03)',
@@ -538,11 +580,11 @@ export function ModalNotificarClienteWhatsApp({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Box size={16} color="#4ade80" />
                   <span style={{ fontSize: '0.84rem', color: '#fff', fontWeight: 700 }}>
-                    Blocos Envelopados ({blocosFiltrados.length})
+                    Blocos Envelopados Encontrados ({blocosFiltrados.length})
                   </span>
                   {blocosParaEnvio.length > 0 && (
                     <span style={{ fontSize: '0.76rem', color: '#4ade80', background: 'rgba(34,197,94,0.15)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
-                      {blocosParaEnvio.length} selecionado{blocosParaEnvio.length > 1 ? 's' : ''}
+                      {blocosParaEnvio.length} selecionado{blocosParaEnvio.length > 1 ? 's' : ''} • {pesoTotalToneladas} t
                     </span>
                   )}
                 </div>
@@ -579,6 +621,7 @@ export function ModalNotificarClienteWhatsApp({
                   const selecionado = blocosSelecionadosIds.has(id);
                   const pedFormatada = formatarNomePedreira(b.pedreira_nome || b.pedreira_id);
                   const pesoFmt = formatarPesoKg(b.peso_kg);
+                  const dtFmt = formatarDataSegura(b.data_liberacao || b.data_romaneio || b.data_cadastro);
 
                   return (
                     <div
@@ -605,24 +648,25 @@ export function ModalNotificarClienteWhatsApp({
                         />
                         <div>
                           <strong style={{ color: '#fff', fontSize: '0.84rem' }}>
-                            Bloco {b.numero_bloco}
+                            Bloco nº {b.numero_bloco}
                           </strong>
-                          {b.numero_romaneio && (
+                          {b.material && (
                             <span style={{ fontSize: '0.74rem', color: '#38bdf8', marginLeft: 8 }}>
-                              Rom. {b.numero_romaneio}
+                              • {b.material}
                             </span>
                           )}
-                          {b.material && (
-                            <span style={{ fontSize: '0.74rem', color: 'var(--slate-300)', marginLeft: 8 }}>
-                              • {b.material}
+                          {b.numero_romaneio && (
+                            <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', marginLeft: 8 }}>
+                              (Rom. {b.numero_romaneio})
                             </span>
                           )}
                         </div>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.76rem', color: 'var(--slate-400)' }}>
-                        <span>({pedFormatada})</span>
+                        <span>{pedFormatada}</span>
                         <strong style={{ color: '#fbbf24' }}>{pesoFmt}</strong>
+                        {dtFmt && <span style={{ color: 'var(--slate-500)' }}>{dtFmt}</span>}
                       </div>
                     </div>
                   );
@@ -631,7 +675,7 @@ export function ModalNotificarClienteWhatsApp({
             </div>
           )}
 
-          {/* Passo 4: Prévia da Mensagem (Formato WhatsApp) */}
+          {/* PASSO 4: PRÉVIA DA MENSAGEM */}
           {mensagemWhatsApp && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
