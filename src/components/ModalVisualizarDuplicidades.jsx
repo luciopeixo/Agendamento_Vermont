@@ -11,11 +11,12 @@ import {
   Layers, 
   CheckCircle2, 
   ArrowRight,
-  ShieldAlert
+  ShieldAlert,
+  Search,
+  Sparkles
 } from 'lucide-react';
 import { 
   STATUS_ENVELOPAMENTO, 
-  gerarChaveDuplicidade,
   saoBlocosCorrespondentes,
   excluirEnvelopamento,
   atualizarStatusEnvelopamento,
@@ -31,7 +32,26 @@ export function ModalVisualizarDuplicidades({
   usuarioNome 
 }) {
   const [excluindoId, setExcluindoId] = useState(null);
+  const [excluindoLote, setExcluindoLote] = useState(false);
   const [mensagemSucesso, setMensagemSucesso] = useState('');
+  const [busca, setBusca] = useState('');
+
+  // Helper seguro para obter cores e labels de status
+  const getStatusInfo = (status) => {
+    if (!status) return STATUS_ENVELOPAMENTO.PENDENTE_ENVELOPAMENTO;
+    const key = String(status).toUpperCase();
+    if (STATUS_ENVELOPAMENTO[key]) return STATUS_ENVELOPAMENTO[key];
+    if (key === 'PENDENTE' || key.includes('PENDENTE')) return STATUS_ENVELOPAMENTO.PENDENTE_ENVELOPAMENTO;
+    if (key === 'ENVELOPADO' || key.includes('ENVELOP')) return STATUS_ENVELOPAMENTO.ENVELOPADO;
+    if (key === 'SEM_ENVELOPAMENTO' || key.includes('SEM_')) return STATUS_ENVELOPAMENTO.SEM_ENVELOPAMENTO;
+    return {
+      id: status,
+      label: status,
+      cor: '#94a3b8',
+      bg: 'rgba(148, 163, 184, 0.15)',
+      border: '#64748b'
+    };
+  };
 
   // Agrupar blocos duplicados pela inteligência de correspondência unificada
   const gruposDuplicados = React.useMemo(() => {
@@ -62,7 +82,35 @@ export function ModalVisualizarDuplicidades({
       .sort((a, b) => compararNumeroBlocoDecrescente(a.numero_bloco, b.numero_bloco));
   }, [envelopamentos]);
 
+  // Grupos filtrados pela busca
+  const gruposFiltrados = React.useMemo(() => {
+    if (!busca.trim()) return gruposDuplicados;
+    const termo = busca.toLowerCase().trim();
+    return gruposDuplicados.filter(g => 
+      (g.numero_bloco || '').toLowerCase().includes(termo) ||
+      (g.cliente_nome || '').toLowerCase().includes(termo) ||
+      (g.material || '').toLowerCase().includes(termo) ||
+      (g.pedreira_nome || '').toLowerCase().includes(termo) ||
+      g.itens.some(it => (it.numero_romaneio || '').toLowerCase().includes(termo))
+    );
+  }, [gruposDuplicados, busca]);
+
   const totalBlocosDuplicados = gruposDuplicados.reduce((acc, g) => acc + g.itens.length, 0);
+
+  // Identifica itens duplicados que estejam com status pendente de envelopamento
+  const itensPendentesDuplicados = React.useMemo(() => {
+    const pendentes = [];
+    gruposDuplicados.forEach(g => {
+      // Se houver mais de um item no grupo, localiza aqueles que são pendentes
+      g.itens.forEach(it => {
+        const st = (it.status || '').toLowerCase();
+        if (st.includes('pendente')) {
+          pendentes.push(it);
+        }
+      });
+    });
+    return pendentes;
+  }, [gruposDuplicados]);
 
   const handleExcluirDuplicata = async (item) => {
     if (!window.confirm(`Deseja realmente excluir a duplicata do bloco "${item.numero_bloco}" (Romaneio: ${item.numero_romaneio || 'S/N'})?`)) {
@@ -78,6 +126,28 @@ export function ModalVisualizarDuplicidades({
       alert('Erro ao excluir duplicata: ' + (err?.message || 'Tente novamente'));
     } finally {
       setExcluindoId(null);
+    }
+  };
+
+  const handleExcluirTodasPendentesDuplicadas = async () => {
+    if (itensPendentesDuplicados.length === 0) return;
+    if (!window.confirm(`Deseja excluir automaticamente as ${itensPendentesDuplicados.length} duplicatas que estão com status "Pendente de Envelopamento"? Registros válidos (Envelopados/Sem Envelopamento) serão preservados.`)) {
+      return;
+    }
+
+    setExcluindoLote(true);
+    try {
+      let excluidos = 0;
+      for (const item of itensPendentesDuplicados) {
+        await excluirEnvelopamento(item.id, usuarioNome);
+        excluidos++;
+      }
+      setMensagemSucesso(`${excluidos} duplicatas com status pendente foram excluídas com sucesso!`);
+      if (typeof onRecarregar === 'function') onRecarregar();
+    } catch (err) {
+      alert('Erro ao excluir duplicatas pendentes: ' + (err?.message || 'Tente novamente'));
+    } finally {
+      setExcluindoLote(false);
     }
   };
 
@@ -107,15 +177,17 @@ export function ModalVisualizarDuplicidades({
     }}>
       <div className="glass-panel modal-duplicidades-container" style={{
         width: '100%',
-        maxWidth: 1000,
-        maxHeight: '92vh',
+        maxWidth: 1050,
+        height: '90vh',
+        maxHeight: '90vh',
         display: 'flex',
         flexDirection: 'column',
         borderRadius: 16,
         padding: 0,
         overflow: 'hidden',
         border: '1px solid rgba(239, 68, 68, 0.4)',
-        boxShadow: '0 25px 60px rgba(0,0,0,0.7)'
+        boxShadow: '0 25px 60px rgba(0,0,0,0.7)',
+        background: '#0f172a'
       }}>
         {/* Cabeçalho */}
         <div style={{
@@ -124,7 +196,8 @@ export function ModalVisualizarDuplicidades({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'rgba(239, 68, 68, 0.08)'
+          background: 'rgba(239, 68, 68, 0.08)',
+          flexShrink: 0
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
@@ -136,12 +209,13 @@ export function ModalVisualizarDuplicidades({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#f87171'
+              color: '#f87171',
+              flexShrink: 0
             }}>
               <ShieldAlert size={24} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <h2 style={{ fontSize: '1.25rem', margin: 0, color: '#fff', fontWeight: 800 }}>
                   Central de Análise de Blocos em Duplicidade
                 </h2>
@@ -173,6 +247,61 @@ export function ModalVisualizarDuplicidades({
           </button>
         </div>
 
+        {/* Barra de Ações Rápidas e Busca */}
+        <div style={{
+          padding: '12px 24px',
+          background: 'rgba(0, 0, 0, 0.25)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12,
+          flexShrink: 0
+        }}>
+          <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: 400 }}>
+            <Search size={15} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--slate-400)' }} />
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Buscar bloco, cliente, romaneio..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              style={{
+                paddingLeft: 34,
+                fontSize: '0.82rem',
+                height: 36,
+                background: 'rgba(255, 255, 255, 0.05)',
+                width: '100%'
+              }}
+            />
+          </div>
+
+          {itensPendentesDuplicados.length > 0 && (
+            <button
+              type="button"
+              onClick={handleExcluirTodasPendentesDuplicadas}
+              disabled={excluindoLote}
+              className="btn btn-danger"
+              style={{
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                padding: '8px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'rgba(239, 68, 68, 0.2)',
+                borderColor: '#ef4444',
+                color: '#fca5a5'
+              }}
+              title="Excluir de uma só vez todas as ocorrências de duplicata que estão com status pendente"
+            >
+              <Trash2 size={14} />
+              {excluindoLote ? 'Excluindo duplicatas...' : `Excluir ${itensPendentesDuplicados.length} Duplicatas Pendentes`}
+            </button>
+          )}
+        </div>
+
         {mensagemSucesso && (
           <div style={{
             background: 'rgba(34, 197, 94, 0.15)',
@@ -182,7 +311,8 @@ export function ModalVisualizarDuplicidades({
             fontSize: '0.82rem',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between'
+            justifyContent: 'space-between',
+            flexShrink: 0
           }}>
             <span>✓ {mensagemSucesso}</span>
             <button
@@ -195,16 +325,17 @@ export function ModalVisualizarDuplicidades({
           </div>
         )}
 
-        {/* Lista de Grupos Conflitantes */}
+        {/* Lista de Grupos Conflitantes com Scroll Seguro */}
         <div style={{
           flex: 1,
+          minHeight: 0,
           overflowY: 'auto',
           padding: '20px 24px',
           display: 'flex',
           flexDirection: 'column',
-          gap: 18
+          gap: 16
         }}>
-          {gruposDuplicados.length === 0 ? (
+          {gruposFiltrados.length === 0 ? (
             <div style={{
               textAlign: 'center',
               padding: '60px 20px',
@@ -215,21 +346,26 @@ export function ModalVisualizarDuplicidades({
             }}>
               <CheckCircle2 size={44} style={{ margin: '0 auto 12px', color: '#4ade80' }} />
               <h3 style={{ margin: '0 0 6px', color: '#fff', fontSize: '1.1rem', fontWeight: 700 }}>
-                Nenhum bloco em duplicidade no sistema!
+                {gruposDuplicados.length === 0 ? 'Nenhum bloco em duplicidade no sistema!' : 'Nenhum resultado para a busca'}
               </h3>
               <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--slate-300)' }}>
-                Todos os blocos cadastrados possuem unicidade estrita por Cliente, Material e Pedreira.
+                {gruposDuplicados.length === 0 
+                  ? 'Todos os blocos cadastrados possuem unicidade estrita por Cliente, Material e Pedreira.'
+                  : 'Tente alterar os termos pesquisados.'}
               </p>
             </div>
           ) : (
-            gruposDuplicados.map((grupo, gIdx) => (
+            gruposFiltrados.map((grupo, gIdx) => (
               <div
                 key={grupo.chave || gIdx}
                 style={{
-                  background: 'rgba(0, 0, 0, 0.35)',
+                  flexShrink: 0,
+                  width: '100%',
+                  background: 'rgba(15, 23, 42, 0.75)',
                   border: '1px solid rgba(239, 68, 68, 0.35)',
                   borderRadius: 12,
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
                 }}
               >
                 {/* Header do Grupo Duplicado */}
@@ -279,7 +415,7 @@ export function ModalVisualizarDuplicidades({
                 {/* Comparação dos Itens do Grupo */}
                 <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {grupo.itens.map((item, idx) => {
-                    const statusInfo = STATUS_ENVELOPAMENTO[item.status?.toUpperCase()] || STATUS_ENVELOPAMENTO.PENDENTE_ENVELOPAMENTO;
+                    const statusInfo = getStatusInfo(item.status);
                     const isPrimeiro = idx === 0;
 
                     return (
@@ -399,7 +535,8 @@ export function ModalVisualizarDuplicidades({
           alignItems: 'center',
           justifyContent: 'space-between',
           fontSize: '0.80rem',
-          color: 'var(--slate-400)'
+          color: 'var(--slate-400)',
+          flexShrink: 0
         }}>
           <span>
             Dica: Mantenha apenas a ocorrência com o romaneio/dados corretos e exclua as cópias redundantes.
