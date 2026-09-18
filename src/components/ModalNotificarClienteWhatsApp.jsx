@@ -252,14 +252,15 @@ export function ModalNotificarClienteWhatsApp({
 
     let texto = `*COMUNICADO DE BLOCOS ENVELOPADOS & LIBERADOS*\n\n`;
     texto += `*Cliente:* ${clienteSelecionado}\n\n`;
-    texto += `Informamos que os blocos abaixo foram *ENVELOPADOS* e encontram-se *LIBERADOS PARA CARREGAMENTO* :\n\n`;
+    texto += `Informamos que os blocos abaixo foram *ENVELOPADOS* e encontram-se *LIBERADOS PARA CARREGAMENTO* :\n`;
 
     blocosParaEnvio.forEach((b, idx) => {
-      const numRom = b.numero_romaneio ? ` | Rom: *${b.numero_romaneio}*` : '';
-      const mat = b.material ? ` | *${b.material}*` : '';
+      const mat = b.material ? `*${b.material}*` : '-';
       const peso = formatarPesoKg(b.peso_kg);
       const ped = formatarNomePedreira(b.pedreira_nome || b.pedreira_id);
-      texto += `${idx + 1}. Bloco *${b.numero_bloco}*${numRom}${mat} | ${peso} (${ped})\n\n`;
+      const numRom = b.numero_romaneio ? ` | Rom: *${b.numero_romaneio}*` : '';
+      
+      texto += `${idx + 1}. Bloco nº *${b.numero_bloco}* | ${mat} | ${peso} (${ped})${numRom}\n\n`;
     });
 
     return texto.trim();
