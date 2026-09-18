@@ -19,11 +19,13 @@ import {
   Building2, 
   ShieldCheck,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  MessageSquare
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { STATUS_ENVELOPAMENTO } from '../services/envelopamentoService';
 import { PEDREIRAS_CEARA, saoMesmaPedreira, formatarDataBR } from '../services/agendamentoService';
+import { ModalNotificarClienteWhatsApp } from './ModalNotificarClienteWhatsApp';
 
 export function GraficosEnvelopamento({ envelopamentos = [] }) {
   // Filtros de Análise
@@ -35,6 +37,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
   const [filtroCliente, setFiltroCliente] = useState('todos');
   const [filtroStatus, setFiltroStatus] = useState('todos');
   const [tipoGraficoTempo, setTipoGraficoTempo] = useState('barras'); // 'barras' ou 'linha'
+  const [modalWhatsAppAberto, setModalWhatsAppAberto] = useState(false);
 
   // Lista única de Clientes
   const listaClientesUnicos = useMemo(() => {
@@ -408,6 +411,26 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
           </div>
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => setModalWhatsAppAberto(true)}
+              className="btn btn-primary"
+              style={{
+                padding: '9px 16px',
+                fontSize: '0.84rem',
+                fontWeight: 700,
+                gap: 8,
+                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                borderColor: '#4ade80',
+                color: '#fff',
+                boxShadow: '0 2px 10px rgba(34, 197, 94, 0.3)'
+              }}
+              title="Notificar cliente com o resumo formatado dos blocos envelopados via WhatsApp"
+            >
+              <MessageSquare size={16} />
+              Notificar Cliente (WhatsApp)
+            </button>
+
             <button
               type="button"
               onClick={exportarAnaliseExcel}
@@ -1298,6 +1321,15 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
         </div>
       </div>
 
+      {/* Modal de Disparo de WhatsApp para o Cliente */}
+      {modalWhatsAppAberto && (
+        <ModalNotificarClienteWhatsApp
+          aberto={modalWhatsAppAberto}
+          onFechar={() => setModalWhatsAppAberto(false)}
+          envelopamentos={envelopamentos}
+          clienteInicial={filtroCliente !== 'todos' ? filtroCliente : ''}
+        />
+      )}
     </div>
   );
 }

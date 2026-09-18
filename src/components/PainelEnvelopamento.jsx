@@ -29,7 +29,8 @@ import {
   X,
   History,
   ShieldAlert,
-  BarChart3
+  BarChart3,
+  MessageSquare
 } from 'lucide-react';
 import { 
   listarEnvelopamentos, 
@@ -51,6 +52,7 @@ import { ModalGestaoClientes } from './ModalGestaoClientes';
 import { ModalImportarRomaneioPdf } from './ModalImportarRomaneioPdf';
 import { ModalHistoricoEnvelopamentos } from './ModalHistoricoEnvelopamentos';
 import { ModalVisualizarDuplicidades } from './ModalVisualizarDuplicidades';
+import { ModalNotificarClienteWhatsApp } from './ModalNotificarClienteWhatsApp';
 import { GraficosEnvelopamento } from './GraficosEnvelopamento';
 
 export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
@@ -61,6 +63,8 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [modalPdfAberto, setModalPdfAberto] = useState(false);
   const [modalClientesAberto, setModalClientesAberto] = useState(false);
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
+  const [modalWhatsAppAberto, setModalWhatsAppAberto] = useState(false);
+  const [clienteNotificarWhatsApp, setClienteNotificarWhatsApp] = useState('');
   const [historicoFiltroBloco, setHistoricoFiltroBloco] = useState('');
   const [modalDuplicidadesAberto, setModalDuplicidadesAberto] = useState(false);
   const [confirmacaoModal, setConfirmacaoModal] = useState({
@@ -685,6 +689,28 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           >
             <FileText size={17} color="#0284c7" />
             Importar PDF Romaneio
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setClienteNotificarWhatsApp('');
+              setModalWhatsAppAberto(true);
+            }}
+            className="btn"
+            style={{
+              padding: '9px 15px',
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              gap: 6,
+              background: 'rgba(34, 197, 94, 0.15)',
+              border: '1px solid rgba(34, 197, 94, 0.45)',
+              color: '#4ade80'
+            }}
+            title="Enviar resumo de blocos envelopados para o cliente via WhatsApp"
+          >
+            <MessageSquare size={16} />
+            Notificar WhatsApp
           </button>
 
           <button
@@ -2442,6 +2468,17 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Disparo de WhatsApp para o Cliente */}
+      {modalWhatsAppAberto && (
+        <ModalNotificarClienteWhatsApp
+          aberto={modalWhatsAppAberto}
+          onFechar={() => setModalWhatsAppAberto(false)}
+          envelopamentos={todosEnvelopamentos}
+          clienteInicial={clienteNotificarWhatsApp}
+          pedreiraOperador={pedreiraOperador}
+        />
       )}
     </div>
   );
