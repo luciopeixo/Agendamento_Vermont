@@ -1017,7 +1017,7 @@ export function PainelGestao({
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h1 style={{ fontSize: '1.4rem', margin: 0, color: '#fff' }}>
-              Painel Operacional de Carregamentos
+              Controle de Carregamento
             </h1>
             {isAdmin ? (
               <span className="badge badge-warning" style={{ fontSize: '0.75rem' }}>🛡️ Admin Geral</span>

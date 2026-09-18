@@ -112,10 +112,10 @@ export function Navbar({
             type="button"
             onClick={() => setAbaAtiva('painel')}
             className={`btn navbar-btn ${abaAtiva === 'painel' ? 'btn-vermont' : 'btn-secondary'}`}
-            title="Acessar o Painel de Carregamento"
+            title="Acessar o Controle de Carregamento"
           >
             {isAdmin ? <ListChecks size={17} /> : <Lock size={15} color="#4ade80" />}
-            <span>Painel de Carregamento</span>
+            <span>Controle de Carregamento</span>
           </button>
 
           {/* Controle de Envelopamento - Exclusivo Usuários Internos (Logados / Admin / Pedreiras) */}

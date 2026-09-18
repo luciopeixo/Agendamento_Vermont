@@ -200,10 +200,10 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
         </div>
 
         <h2 style={{ fontSize: '1.4rem', margin: '0 0 6px 0', color: '#fff' }}>
-          Acesso Restrito • Painel de Carregamento
+          Acesso Restrito • Controle de Carregamento
         </h2>
         <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--slate-400)' }}>
-          Painel confidencial de controle de carregamento e romaneios das pedreiras da Vermont Mineração
+          Acesso confidencial ao controle de carregamento e romaneios das pedreiras da Vermont Mineração
         </p>
 
         {erro && (
@@ -283,7 +283,7 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
               </>
             ) : (
               <>
-                Entrar no Painel de Carregamento <ArrowRight size={18} />
+                Entrar no Controle de Carregamento <ArrowRight size={18} />
               </>
             )}
           </button>
