@@ -28,7 +28,8 @@ import {
   Filter,
   X,
   History,
-  ShieldAlert
+  ShieldAlert,
+  BarChart3
 } from 'lucide-react';
 import { 
   listarEnvelopamentos, 
@@ -49,10 +50,12 @@ import { ModalGestaoClientes } from './ModalGestaoClientes';
 import { ModalImportarRomaneioPdf } from './ModalImportarRomaneioPdf';
 import { ModalHistoricoEnvelopamentos } from './ModalHistoricoEnvelopamentos';
 import { ModalVisualizarDuplicidades } from './ModalVisualizarDuplicidades';
+import { GraficosEnvelopamento } from './GraficosEnvelopamento';
 
 export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [envelopamentos, setEnvelopamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  const [abaSubmodulo, setAbaSubmodulo] = useState('gestao'); // 'gestao' ou 'graficos'
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
   const [modalPdfAberto, setModalPdfAberto] = useState(false);
   const [modalClientesAberto, setModalClientesAberto] = useState(false);
@@ -663,8 +666,68 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         </div>
       </div>
 
-      {/* Cards de Métricas / 3 Status Oficiais */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 20 }}>
+      {/* Navegação entre Submódulos: Gestão Operacional vs Gráficos & Análise */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 20,
+        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        paddingBottom: 12
+      }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setAbaSubmodulo('gestao')}
+            className="btn"
+            style={{
+              padding: '9px 18px',
+              fontSize: '0.86rem',
+              fontWeight: 700,
+              gap: 8,
+              borderRadius: 8,
+              background: abaSubmodulo === 'gestao' ? 'var(--vermont-green-subtle)' : 'transparent',
+              border: abaSubmodulo === 'gestao' ? '1px solid var(--vermont-green-border)' : '1px solid transparent',
+              color: abaSubmodulo === 'gestao' ? '#4ade80' : 'var(--slate-400)',
+              boxShadow: abaSubmodulo === 'gestao' ? '0 0 15px rgba(0, 118, 44, 0.35)' : 'none',
+              transition: 'all 0.2s'
+            }}
+          >
+            <Layers size={16} />
+            Gestão de Blocos
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAbaSubmodulo('graficos')}
+            className="btn"
+            style={{
+              padding: '9px 18px',
+              fontSize: '0.86rem',
+              fontWeight: 700,
+              gap: 8,
+              borderRadius: 8,
+              background: abaSubmodulo === 'graficos' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
+              border: abaSubmodulo === 'graficos' ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid transparent',
+              color: abaSubmodulo === 'graficos' ? '#38bdf8' : 'var(--slate-400)',
+              boxShadow: abaSubmodulo === 'graficos' ? '0 0 15px rgba(56, 189, 248, 0.3)' : 'none',
+              transition: 'all 0.2s'
+            }}
+          >
+            <BarChart3 size={16} />
+            Gráficos & Análise de Envelopamentos
+          </button>
+        </div>
+      </div>
+
+      {abaSubmodulo === 'graficos' ? (
+        <GraficosEnvelopamento envelopamentos={envelopamentos} />
+      ) : (
+        <>
+          {/* Cards de Métricas / 3 Status Oficiais */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 20 }}>
         
         {/* Total */}
         <div className="glass-panel" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, borderLeft: '4px solid #64748b' }}>
@@ -2173,6 +2236,8 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             <X size={14} /> Cancelar
           </button>
         </div>
+      )}
+      </>
       )}
 
       {/* Modal de Cadastro / Edição de Bloco */}
