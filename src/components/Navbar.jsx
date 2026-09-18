@@ -12,11 +12,16 @@ export function Navbar({
   return (
     <header className="navbar-container">
       <div className="navbar-inner">
-        {/* Logo & Marca Vermont Mineração - Atalho Clicável para Página Inicial */}
+        {/* Logo & Marca Vermont Mineração - Atalho Clicável para Página Inicial e Duplo-Clique Interno */}
         <div 
           onClick={() => setAbaAtiva('agendar')}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setAbaAtiva('painel');
+          }}
           className="navbar-brand"
-          title="Clique para ir à página inicial (Novo Agendamento)"
+          title="Página Inicial - Vermont Mineração"
+          style={{ cursor: 'pointer' }}
         >
           <img 
             src="https://vermontmineracao.com/wp-content/uploads/2022/07/logo-vermont-site-1.png" 
@@ -108,17 +113,20 @@ export function Navbar({
             <span>Novo Agendamento</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setAbaAtiva('painel')}
-            className={`btn navbar-btn ${abaAtiva === 'painel' ? 'btn-vermont' : 'btn-secondary'}`}
-            title="Acessar o Controle de Carregamento"
-          >
-            {isAdmin ? <ListChecks size={17} /> : <Lock size={15} color="#4ade80" />}
-            <span>Controle de Carregamento</span>
-          </button>
+          {/* Controle de Carregamento - Exibido EXCLUSIVAMENTE para usuários internos autenticados */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setAbaAtiva('painel')}
+              className={`btn navbar-btn ${abaAtiva === 'painel' ? 'btn-vermont' : 'btn-secondary'}`}
+              title="Acessar o Controle de Carregamento"
+            >
+              <ListChecks size={17} />
+              <span>Controle de Carregamento</span>
+            </button>
+          )}
 
-          {/* Controle de Envelopamento - Exclusivo Usuários Internos (Logados / Admin / Pedreiras) */}
+          {/* Controle de Envelopamento - Exibido EXCLUSIVAMENTE para usuários internos autenticados */}
           {isAdmin && (
             <button
               type="button"

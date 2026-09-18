@@ -12,7 +12,27 @@ import { EMAIL_NOTIFICACAO_DESTINO, isSupabaseConfigurado, carregarBaseMotorista
 import { supabase } from './lib/supabase';
 
 export function App() {
-  const [abaAtiva, setAbaAtiva] = useState('agendar');
+  // Determina a aba inicial com base na URL (ex: ?admin, ?login, #/admin, #/login)
+  const [abaAtiva, setAbaAtiva] = useState(() => {
+    try {
+      const search = (window.location.search || '').toLowerCase();
+      const hash = (window.location.hash || '').toLowerCase();
+      const path = (window.location.pathname || '').toLowerCase();
+      
+      if (
+        search.includes('admin') || search.includes('login') || search.includes('painel') || search.includes('controle') ||
+        hash.includes('admin') || hash.includes('login') || hash.includes('painel') || hash.includes('controle') ||
+        path.endsWith('/admin') || path.endsWith('/login') || path.endsWith('/painel')
+      ) {
+        if (search.includes('envelop') || hash.includes('envelop')) {
+          return 'envelopamento';
+        }
+        return 'painel';
+      }
+    } catch (e) {}
+    return 'agendar';
+  });
+
   const [modalRegrasAberto, setModalRegrasAberto] = useState(false);
   const [agendamentoConcluido, setAgendamentoConcluido] = useState(null);
   
@@ -25,6 +45,47 @@ export function App() {
     document.body.className = `fundo-${temaFundo}`;
     localStorage.setItem('vermont_tema_fundo', temaFundo);
   }, [temaFundo]);
+
+  // Roteamento inteligente por URL Secreta e Atalhos de Teclado
+  useEffect(() => {
+    const verificarRotaUrl = () => {
+      try {
+        const search = (window.location.search || '').toLowerCase();
+        const hash = (window.location.hash || '').toLowerCase();
+        const path = (window.location.pathname || '').toLowerCase();
+
+        if (
+          search.includes('admin') || search.includes('login') || search.includes('painel') || search.includes('controle') ||
+          hash.includes('admin') || hash.includes('login') || hash.includes('painel') || hash.includes('controle') ||
+          path.endsWith('/admin') || path.endsWith('/login') || path.endsWith('/painel')
+        ) {
+          if (search.includes('envelop') || hash.includes('envelop')) {
+            setAbaAtiva('envelopamento');
+          } else {
+            setAbaAtiva('painel');
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('popstate', verificarRotaUrl);
+    window.addEventListener('hashchange', verificarRotaUrl);
+
+    // Atalho secreto de teclado para conveniência da equipe (Ctrl+Shift+L ou Alt+L)
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'l') || (e.altKey && e.key.toLowerCase() === 'l')) {
+        e.preventDefault();
+        setAbaAtiva(prev => prev === 'agendar' ? 'painel' : 'agendar');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('popstate', verificarRotaUrl);
+      window.removeEventListener('hashchange', verificarRotaUrl);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   // Sincronização inicial global da base de motoristas de todos os dispositivos
   useEffect(() => {
@@ -173,9 +234,18 @@ export function App() {
     setAgendamentoConcluido(null);
   };
 
+  const handleVoltarAgendamento = () => {
+    try {
+      if (window.location.search || window.location.hash) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch (e) {}
+    setAbaAtiva('agendar');
+  };
+
   const handleNovoAgendamento = () => {
     setAgendamentoConcluido(null);
-    setAbaAtiva('agendar');
+    handleVoltarAgendamento();
   };
 
   return (
@@ -199,7 +269,7 @@ export function App() {
           ) : !isAutenticado ? (
             <AdminLogin 
               onLoginSucesso={handleLoginSucesso}
-              onVoltar={() => setAbaAtiva('agendar')}
+              onVoltar={handleVoltarAgendamento}
             />
           ) : abaAtiva === 'envelopamento' ? (
             <PainelEnvelopamento 
