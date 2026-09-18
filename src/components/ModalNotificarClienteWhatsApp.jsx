@@ -4,17 +4,12 @@ import {
   Send, 
   Copy, 
   Check, 
-  Search, 
   Calendar, 
   Building2, 
   Phone, 
-  CheckCircle2, 
   Box, 
-  Layers, 
-  MapPin, 
   MessageSquare,
   Sparkles,
-  RefreshCw,
   AlertCircle
 } from 'lucide-react';
 import { obterClientesDoBancoDeDados } from '../services/envelopamentoService';
@@ -28,16 +23,14 @@ export function ModalNotificarClienteWhatsApp({
   pedreiraOperador = ''
 }) {
   const [clientesDb, setClientesDb] = useState([]);
-  const [clienteSelecionado, setClienteSelecionado] = useState(clienteInicial || '');
-  const [filtroPeriodo, setFiltroPeriodo] = useState('7_dias'); // 'hoje', 'ontem', '7_dias', 'mes_atual', 'todos', 'custom'
+  const [filtroPeriodo, setFiltroPeriodo] = useState('ontem'); // 'ontem', 'hoje', '7_dias', 'mes_atual', 'todos', 'custom'
   const [dataInicioCustom, setDataInicioCustom] = useState('');
   const [dataFimCustom, setDataFimCustom] = useState('');
+  const [clienteSelecionado, setClienteSelecionado] = useState(clienteInicial || '');
   const [filtroPedreira, setFiltroPedreira] = useState('todas');
-  const [filtroStatus, setFiltroStatus] = useState('envelopado'); // 'envelopado' ou 'todos'
   const [telefoneDestino, setTelefoneDestino] = useState('');
   const [blocosSelecionadosIds, setBlocosSelecionadosIds] = useState(new Set());
   const [copiado, setCopiado] = useState(false);
-  const [buscaCliente, setBuscaCliente] = useState('');
 
   // Carrega cadastro de clientes para puxar telefones automaticamente
   useEffect(() => {
@@ -48,55 +41,25 @@ export function ModalNotificarClienteWhatsApp({
     }
   }, [aberto]);
 
-  // Lista única de clientes presentes nos envelopamentos + cadastrados
-  const listaClientes = useMemo(() => {
-    const mapa = new Map();
-    (envelopamentos || []).forEach(item => {
-      const nome = (item.cliente_nome || '').trim().toUpperCase();
-      if (nome) {
-        if (!mapa.has(nome)) {
-          mapa.set(nome, { nome, cnpj: item.cliente_cnpj || '', telefone: '' });
-        }
-      }
-    });
+  // Função auxiliar para formatar peso em kg sem gerar NaN
+  const formatarPesoKg = (peso) => {
+    if (peso === undefined || peso === null || peso === '') return '10.000 kg';
+    const limpo = String(peso).replace(/\./g, '').replace(',', '.').trim();
+    const num = parseFloat(limpo);
+    if (isNaN(num)) return `${peso} kg`;
+    return `${num.toLocaleString('pt-BR')} kg`;
+  };
 
-    clientesDb.forEach(c => {
-      const nome = (c.nome || '').trim().toUpperCase();
-      if (nome) {
-        const existente = mapa.get(nome) || { nome, cnpj: c.cnpj || '', telefone: '' };
-        if (c.telefone) existente.telefone = c.telefone;
-        mapa.set(nome, existente);
-      }
-    });
+  // Função para formatar o nome da pedreira de forma amigável: "Massapê - Del Mare"
+  const formatarNomePedreira = (pedNome = '') => {
+    if (!pedNome) return 'Pedreira Vermont';
+    let nomeLimpo = String(pedNome).replace(/\s*-\s*CE\s*/i, ' - ').trim();
+    nomeLimpo = nomeLimpo.replace(/\((.*?)\)/g, '$1').trim();
+    return nomeLimpo;
+  };
 
-    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [envelopamentos, clientesDb]);
-
-  // Se veio clienteInicial ou se só tem um cliente
-  useEffect(() => {
-    if (aberto) {
-      if (clienteInicial) {
-        setClienteSelecionado(clienteInicial.trim().toUpperCase());
-      } else if (listaClientes.length > 0 && !clienteSelecionado) {
-        setClienteSelecionado(listaClientes[0].nome);
-      }
-    }
-  }, [aberto, clienteInicial, listaClientes]);
-
-  // Atualiza telefone automaticamente quando o cliente selecionado muda
-  useEffect(() => {
-    if (clienteSelecionado) {
-      const cliObj = listaClientes.find(c => c.nome.toUpperCase() === clienteSelecionado.toUpperCase());
-      if (cliObj && cliObj.telefone) {
-        setTelefoneDestino(cliObj.telefone);
-      }
-    }
-  }, [clienteSelecionado, listaClientes]);
-
-  // Filtra os blocos conforme o cliente e o período selecionado
-  const blocosFiltrados = useMemo(() => {
-    if (!clienteSelecionado) return [];
-
+  // Helper de limites de datas
+  const limitesData = useMemo(() => {
     const hoje = new Date();
     hoje.setHours(23, 59, 59, 999);
 
@@ -132,27 +95,101 @@ export function ModalNotificarClienteWhatsApp({
       }
     }
 
-    return (envelopamentos || []).filter(item => {
-      // Cliente
-      const cliNome = (item.cliente_nome || '').trim().toUpperCase();
-      if (cliNome !== clienteSelecionado.toUpperCase()) {
-        return false;
-      }
+    return { dataMin, dataMax };
+  }, [filtroPeriodo, dataInicioCustom, dataFimCustom]);
 
-      // Status (padrão: envelopado)
-      if (filtroStatus === 'envelopado' && item.status !== 'envelopado') {
-        return false;
-      }
+  // Lista dinâmica: APENAS os clientes que tiveram blocos ENVELOPADOS no período selecionado
+  const clientesDisponiveisNoPeriodo = useMemo(() => {
+    const { dataMin, dataMax } = limitesData;
+    const mapa = new Map();
 
-      // Pedreira
+    (envelopamentos || []).forEach(item => {
+      // Considera apenas status envelopado
+      if (item.status !== 'envelopado') return;
+
+      // Filtro de Pedreira (se houver)
       if (filtroPedreira !== 'todas') {
         const ped = item.pedreira_nome || item.pedreira_id || '';
-        if (!saoMesmaPedreira(ped, filtroPedreira)) {
-          return false;
-        }
+        if (!saoMesmaPedreira(ped, filtroPedreira)) return;
       }
 
-      // Data de Envelopamento / Cadastro / Romaneio
+      // Filtro de Data
+      const dataStr = item.data_liberacao || item.data_envelopamento || item.data_cadastro || item.data_romaneio || item.created_at;
+      if (dataStr && (dataMin || dataMax)) {
+        try {
+          let dt = null;
+          if (dataStr.includes('-')) {
+            const [y, m, d] = dataStr.slice(0, 10).split('-').map(Number);
+            dt = new Date(y, m - 1, d, 12, 0, 0);
+          } else if (dataStr.includes('/')) {
+            const [d, m, y] = dataStr.split('/').map(Number);
+            dt = new Date(y, m - 1, d, 12, 0, 0);
+          }
+          if (dt) {
+            if (dataMin && dt < dataMin) return;
+            if (dataMax && dt > dataMax) return;
+          }
+        } catch (e) {}
+      }
+
+      const nome = (item.cliente_nome || '').trim().toUpperCase();
+      if (nome) {
+        if (!mapa.has(nome)) {
+          const cliDb = clientesDb.find(c => (c.nome || '').trim().toUpperCase() === nome);
+          mapa.set(nome, {
+            nome,
+            cnpj: item.cliente_cnpj || cliDb?.cnpj || '',
+            telefone: cliDb?.telefone || '',
+            totalBlocos: 1
+          });
+        } else {
+          mapa.get(nome).totalBlocos += 1;
+        }
+      }
+    });
+
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [envelopamentos, clientesDb, limitesData, filtroPedreira]);
+
+  // Sincroniza o cliente selecionado quando o período/lista muda
+  useEffect(() => {
+    if (clientesDisponiveisNoPeriodo.length > 0) {
+      const aindaExiste = clientesDisponiveisNoPeriodo.some(c => c.nome === clienteSelecionado);
+      if (!aindaExiste) {
+        setClienteSelecionado(clientesDisponiveisNoPeriodo[0].nome);
+      }
+    } else {
+      setClienteSelecionado('');
+    }
+  }, [clientesDisponiveisNoPeriodo]);
+
+  // Atualiza telefone automaticamente quando o cliente muda
+  useEffect(() => {
+    if (clienteSelecionado) {
+      const cliObj = clientesDisponiveisNoPeriodo.find(c => c.nome === clienteSelecionado) 
+        || clientesDb.find(c => (c.nome || '').trim().toUpperCase() === clienteSelecionado.toUpperCase());
+      if (cliObj && cliObj.telefone) {
+        setTelefoneDestino(cliObj.telefone);
+      }
+    }
+  }, [clienteSelecionado, clientesDisponiveisNoPeriodo, clientesDb]);
+
+  // Filtra os blocos envelopados do cliente selecionado no período
+  const blocosFiltrados = useMemo(() => {
+    if (!clienteSelecionado) return [];
+    const { dataMin, dataMax } = limitesData;
+
+    return (envelopamentos || []).filter(item => {
+      if (item.status !== 'envelopado') return false;
+
+      const cliNome = (item.cliente_nome || '').trim().toUpperCase();
+      if (cliNome !== clienteSelecionado.toUpperCase()) return false;
+
+      if (filtroPedreira !== 'todas') {
+        const ped = item.pedreira_nome || item.pedreira_id || '';
+        if (!saoMesmaPedreira(ped, filtroPedreira)) return false;
+      }
+
       const dataStr = item.data_liberacao || item.data_envelopamento || item.data_cadastro || item.data_romaneio || item.created_at;
       if (dataStr && (dataMin || dataMax)) {
         try {
@@ -173,9 +210,9 @@ export function ModalNotificarClienteWhatsApp({
 
       return true;
     });
-  }, [envelopamentos, clienteSelecionado, filtroPeriodo, dataInicioCustom, dataFimCustom, filtroPedreira, filtroStatus]);
+  }, [envelopamentos, clienteSelecionado, limitesData, filtroPedreira]);
 
-  // Inicializa a seleção de todos os blocos encontrados
+  // Inicializa todos os blocos encontrados como marcados por padrão
   useEffect(() => {
     if (blocosFiltrados.length > 0) {
       const novoSet = new Set(blocosFiltrados.map(b => b.id || b.numero_bloco));
@@ -202,79 +239,33 @@ export function ModalNotificarClienteWhatsApp({
     }
   };
 
-  // Blocos efetivamente selecionados para inclusão na mensagem
+  // Blocos selecionados para envio
   const blocosParaEnvio = useMemo(() => {
     return blocosFiltrados.filter(b => blocosSelecionadosIds.has(b.id || b.numero_bloco));
   }, [blocosFiltrados, blocosSelecionadosIds]);
 
-  // Cálculo de peso total
-  const pesoTotalKg = useMemo(() => {
-    return blocosParaEnvio.reduce((acc, item) => {
-      if (!item.peso_kg) return acc;
-      const num = parseFloat(String(item.peso_kg).replace(/\./g, '').replace(',', '.'));
-      return acc + (isNaN(num) ? 0 : num);
-    }, 0);
-  }, [blocosParaEnvio]);
-
-  const pesoTotalToneladas = (pesoTotalKg / 1000).toFixed(1);
-
-  // Pedreiras envolvidas
-  const pedreirasEnvolvidas = useMemo(() => {
-    const s = new Set();
-    blocosParaEnvio.forEach(b => {
-      if (b.pedreira_nome) s.add(b.pedreira_nome);
-      else if (b.pedreira_id) s.add(b.pedreira_id);
-    });
-    return Array.from(s).join(' / ') || 'Unidades Vermont';
-  }, [blocosParaEnvio]);
-
-  // Formatação do label de período
-  const periodoLabel = useMemo(() => {
-    const hojeStr = formatarDataBR(new Date().toISOString().slice(0, 10));
-    if (filtroPeriodo === 'hoje') return `Hoje (${hojeStr})`;
-    if (filtroPeriodo === 'ontem') return 'Ontem';
-    if (filtroPeriodo === '7_dias') return 'Últimos 7 Dias';
-    if (filtroPeriodo === 'mes_atual') return 'Mês Atual';
-    if (filtroPeriodo === 'custom') {
-      const dtI = dataInicioCustom ? formatarDataBR(dataInicioCustom) : '';
-      const dtF = dataFimCustom ? formatarDataBR(dataFimCustom) : '';
-      if (dtI && dtF) return `${dtI} a ${dtF}`;
-      if (dtI) return `A partir de ${dtI}`;
-      if (dtF) return `Até ${dtF}`;
-      return 'Período Personalizado';
-    }
-    return 'Todo o Histórico';
-  }, [filtroPeriodo, dataInicioCustom, dataFimCustom]);
-
-  // Mensagem padronizada oficial
+  // Mensagem padronizada oficial exata conforme solicitado
   const mensagemWhatsApp = useMemo(() => {
     if (!clienteSelecionado || blocosParaEnvio.length === 0) {
       return '';
     }
 
-    let texto = `🏛️ *GRUPO VERMONT MINERAÇÃO*\n`;
-    texto += `📋 *COMUNICADO DE BLOCOS ENVELOPADOS & LIBERADOS*\n\n`;
-    texto += `🏢 *Cliente:* ${clienteSelecionado}\n`;
-    texto += `📅 *Período:* ${periodoLabel}\n`;
-    texto += `📍 *Pedreira / Unidade:* ${pedreirasEnvolvidas}\n\n`;
-    texto += `Informamos que os blocos abaixo foram *ENVELOPADOS* e encontram-se *LIBERADOS PARA CARREGAMENTO* no pátio:\n\n`;
-    texto += `📦 *LISTAGEM DE BLOCOS (${blocosParaEnvio.length} blocos • ${pesoTotalToneladas} t):*\n`;
+    let texto = `*COMUNICADO DE BLOCOS ENVELOPADOS & LIBERADOS*\n\n`;
+    texto += `*Cliente:* ${clienteSelecionado}\n\n`;
+    texto += `Informamos que os blocos abaixo foram *ENVELOPADOS* e encontram-se *LIBERADOS PARA CARREGAMENTO* :\n\n`;
 
     blocosParaEnvio.forEach((b, idx) => {
       const numRom = b.numero_romaneio ? ` | Rom: *${b.numero_romaneio}*` : '';
       const mat = b.material ? ` | *${b.material}*` : '';
-      const peso = b.peso_kg ? ` | ${Number(b.peso_kg).toLocaleString('pt-BR')} kg` : '';
-      const ped = b.pedreira_nome ? ` (${b.pedreira_nome.split('-')[0].trim()})` : '';
-      texto += `${idx + 1}. Bloco *${b.numero_bloco}*${numRom}${mat}${peso}${ped}\n`;
+      const peso = formatarPesoKg(b.peso_kg);
+      const ped = formatarNomePedreira(b.pedreira_nome || b.pedreira_id);
+      texto += `${idx + 1}. Bloco *${b.numero_bloco}*${numRom}${mat} | ${peso} (${ped})\n\n`;
     });
 
-    texto += `\n✅ *Status:* Liberado para agendamento de transporte e retirada.\n`;
-    texto += `🔗 *Portal de Agendamento • Grupo Vermont*`;
+    return texto.trim();
+  }, [clienteSelecionado, blocosParaEnvio]);
 
-    return texto;
-  }, [clienteSelecionado, blocosParaEnvio, periodoLabel, pedreirasEnvolvidas, pesoTotalToneladas]);
-
-  // Disparo via WhatsApp
+  // Disparo para WhatsApp
   const handleEnviarWhatsApp = () => {
     if (!mensagemWhatsApp) return;
 
@@ -324,7 +315,7 @@ export function ModalNotificarClienteWhatsApp({
     }}>
       <div className="glass-panel animate-scale" style={{
         width: '100%',
-        maxWidth: 880,
+        maxWidth: 860,
         maxHeight: '92vh',
         background: '#09110d',
         border: '1px solid var(--vermont-green-border)',
@@ -335,9 +326,9 @@ export function ModalNotificarClienteWhatsApp({
         overflow: 'hidden'
       }}>
         
-        {/* Cabeçalho do Modal */}
+        {/* Cabeçalho */}
         <div style={{
-          padding: '18px 24px',
+          padding: '16px 22px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           display: 'flex',
           alignItems: 'center',
@@ -346,9 +337,9 @@ export function ModalNotificarClienteWhatsApp({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 42,
-              height: 42,
-              borderRadius: 12,
+              width: 40,
+              height: 40,
+              borderRadius: 10,
               background: 'rgba(34, 197, 94, 0.2)',
               border: '1px solid rgba(34, 197, 94, 0.4)',
               display: 'flex',
@@ -356,17 +347,14 @@ export function ModalNotificarClienteWhatsApp({
               justifyContent: 'center',
               color: '#4ade80'
             }}>
-              <MessageSquare size={22} />
+              <MessageSquare size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', margin: 0, color: '#fff', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h2 style={{ fontSize: '1.15rem', margin: 0, color: '#fff', fontWeight: 800 }}>
                 Notificar Cliente via WhatsApp
-                <span style={{ fontSize: '0.72rem', padding: '2px 8px', borderRadius: 6, background: '#16a34a', color: '#fff', fontWeight: 700 }}>
-                  Resumo Padronizado
-                </span>
               </h2>
-              <span style={{ fontSize: '0.80rem', color: 'var(--slate-400)' }}>
-                Selecione o cliente e as datas para gerar a mensagem com os blocos envelopados
+              <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
+                Selecione o período para listar apenas os clientes com blocos envelopados na data
               </span>
             </div>
           </div>
@@ -375,99 +363,30 @@ export function ModalNotificarClienteWhatsApp({
             type="button"
             onClick={onFechar}
             className="btn btn-secondary"
-            style={{ padding: '8px 10px', borderRadius: 8, color: 'var(--slate-400)' }}
+            style={{ padding: '6px 10px', borderRadius: 8, color: 'var(--slate-400)' }}
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Corpo com Scroll */}
-        <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ padding: '18px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
           
-          {/* Passo 1: Seleção de Cliente e Telefone */}
+          {/* Passo 1: Seleção de Período */}
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: 14,
             background: 'rgba(255, 255, 255, 0.03)',
-            padding: 16,
+            padding: 14,
             borderRadius: 12,
             border: '1px solid rgba(255, 255, 255, 0.07)'
           }}>
-            {/* Seleção do Cliente */}
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 6 }}>
-                <Building2 size={14} color="#38bdf8" /> CLIENTE COMPRADOR:
-              </label>
-              <select
-                className="form-select"
-                value={clienteSelecionado}
-                onChange={(e) => setClienteSelecionado(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  minHeight: 42,
-                  borderRadius: 8,
-                  background: 'rgba(8, 12, 16, 0.95)',
-                  color: '#fff',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  fontSize: '0.86rem',
-                  fontWeight: 600
-                }}
-              >
-                <option value="">Selecione o Cliente...</option>
-                {listaClientes.map(c => (
-                  <option key={c.nome} value={c.nome}>
-                    {c.nome} {c.telefone ? `📞 (${c.telefone})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* WhatsApp do Cliente */}
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 6 }}>
-                <Phone size={14} color="#4ade80" /> WHATSAPP DE DESTINO:
-              </label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="(85) 99999-9999 ou 5585999999999"
-                value={telefoneDestino}
-                onChange={(e) => setTelefoneDestino(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  minHeight: 42,
-                  borderRadius: 8,
-                  background: 'rgba(8, 12, 16, 0.95)',
-                  color: '#4ade80',
-                  border: '1px solid rgba(34, 197, 94, 0.4)',
-                  fontSize: '0.86rem',
-                  fontWeight: 700
-                }}
-              />
-              <span style={{ fontSize: '0.68rem', color: 'var(--slate-400)', display: 'block', marginTop: 3 }}>
-                * Se deixar em branco, o WhatsApp abrirá para você escolher o contato manualmente.
-              </span>
-            </div>
-          </div>
-
-          {/* Passo 2: Seleção de Período com Pílulas Rápidas */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.03)',
-            padding: 16,
-            borderRadius: 12,
-            border: '1px solid rgba(255, 255, 255, 0.07)'
-          }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 10 }}>
-              <Calendar size={14} color="#fbbf24" /> PERÍODO / DATAS DOS BLOCOS:
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 8 }}>
+              <Calendar size={14} color="#fbbf24" /> 1. SELECIONE O PERÍODO DOS BLOCOS ENVELOPADOS:
             </label>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               {[
-                { id: 'hoje', label: 'Hoje' },
                 { id: 'ontem', label: 'Ontem' },
+                { id: 'hoje', label: 'Hoje' },
                 { id: '7_dias', label: 'Últimos 7 Dias' },
                 { id: 'mes_atual', label: 'Mês Atual' },
                 { id: 'todos', label: 'Todo o Histórico' },
@@ -486,7 +405,7 @@ export function ModalNotificarClienteWhatsApp({
                       fontWeight: 700,
                       cursor: 'pointer',
                       border: ativo ? '1px solid #4ade80' : '1px solid rgba(255, 255, 255, 0.12)',
-                      background: ativo ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                      background: ativo ? 'rgba(34, 197, 94, 0.25)' : 'rgba(255, 255, 255, 0.04)',
                       color: ativo ? '#4ade80' : 'var(--slate-300)',
                       transition: 'all 0.15s'
                     }}
@@ -497,7 +416,7 @@ export function ModalNotificarClienteWhatsApp({
               })}
             </div>
 
-            {/* Inputs de Data Personalizada */}
+            {/* Inputs de Data Customizada */}
             {filtroPeriodo === 'custom' && (
               <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -524,63 +443,130 @@ export function ModalNotificarClienteWhatsApp({
             )}
           </div>
 
-          {/* Passo 3: Blocos Encontrados com Checkboxes */}
+          {/* Passo 2: Seleção do Cliente (Filtrado pelo Período) & Telefone */}
           <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: 14,
             background: 'rgba(255, 255, 255, 0.03)',
-            padding: 16,
+            padding: 14,
             borderRadius: 12,
             border: '1px solid rgba(255, 255, 255, 0.07)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Box size={16} color="#4ade80" />
-                <span style={{ fontSize: '0.84rem', color: '#fff', fontWeight: 700 }}>
-                  Blocos Envelopados Encontrados ({blocosFiltrados.length})
-                </span>
-                {blocosParaEnvio.length > 0 && (
-                  <span style={{ fontSize: '0.76rem', color: '#4ade80', background: 'rgba(34,197,94,0.15)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
-                    {blocosParaEnvio.length} selecionados • {pesoTotalToneladas} t
-                  </span>
-                )}
-              </div>
-
-              {blocosFiltrados.length > 0 && (
-                <button
-                  type="button"
-                  onClick={toggleTodos}
+            {/* Cliente */}
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 6 }}>
+                <Building2 size={14} color="#38bdf8" /> 2. CLIENTE COM BLOCOS NO PERÍODO:
+              </label>
+              
+              {clientesDisponiveisNoPeriodo.length === 0 ? (
+                <div style={{
+                  padding: '10px 12px',
+                  background: 'rgba(245, 158, 11, 0.1)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  borderRadius: 8,
+                  fontSize: '0.80rem',
+                  color: '#fbbf24'
+                }}>
+                  Nenhum cliente teve blocos envelopados neste período.
+                </div>
+              ) : (
+                <select
+                  className="form-select"
+                  value={clienteSelecionado}
+                  onChange={(e) => setClienteSelecionado(e.target.value)}
                   style={{
-                    fontSize: '0.74rem',
-                    padding: '4px 10px',
-                    borderRadius: 6,
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: 'var(--slate-300)',
-                    cursor: 'pointer'
+                    width: '100%',
+                    padding: '9px 12px',
+                    minHeight: 42,
+                    borderRadius: 8,
+                    background: 'rgba(8, 12, 16, 0.95)',
+                    color: '#fff',
+                    border: '1px solid rgba(34, 197, 94, 0.5)',
+                    fontSize: '0.86rem',
+                    fontWeight: 700
                   }}
                 >
-                  {blocosSelecionadosIds.size === blocosFiltrados.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
-                </button>
+                  {clientesDisponiveisNoPeriodo.map(c => (
+                    <option key={c.nome} value={c.nome}>
+                      {c.nome} ({c.totalBlocos} bloco{c.totalBlocos > 1 ? 's' : ''})
+                    </option>
+                  ))}
+                </select>
               )}
             </div>
 
-            {blocosFiltrados.length === 0 ? (
-              <div style={{
-                padding: '24px 16px',
-                textAlign: 'center',
-                color: 'var(--slate-400)',
-                fontSize: '0.82rem',
-                background: 'rgba(0,0,0,0.2)',
-                borderRadius: 8
-              }}>
-                <AlertCircle size={24} color="#f59e0b" style={{ margin: '0 auto 8px', display: 'block' }} />
-                Nenhum bloco com status <strong>"Envelopado"</strong> encontrado para este cliente no período selecionado.
-                <div style={{ marginTop: 6, fontSize: '0.74rem', color: 'var(--slate-500)' }}>
-                  Tente alterar o período para "Todo o Histórico" ou verificar se há blocos cadastrados para este cliente.
+            {/* WhatsApp de Destino */}
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 6 }}>
+                <Phone size={14} color="#4ade80" /> WHATSAPP DO DESTINATÁRIO:
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="(85) 99999-9999 ou 5585999999999"
+                value={telefoneDestino}
+                onChange={(e) => setTelefoneDestino(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  minHeight: 42,
+                  borderRadius: 8,
+                  background: 'rgba(8, 12, 16, 0.95)',
+                  color: '#4ade80',
+                  border: '1px solid rgba(34, 197, 94, 0.4)',
+                  fontSize: '0.86rem',
+                  fontWeight: 700
+                }}
+              />
+              <span style={{ fontSize: '0.68rem', color: 'var(--slate-400)', display: 'block', marginTop: 3 }}>
+                * Se deixar em branco, o WhatsApp abrirá para selecionar o contato.
+              </span>
+            </div>
+          </div>
+
+          {/* Passo 3: Lista de Blocos com Checkboxes */}
+          {clienteSelecionado && (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.03)',
+              padding: 14,
+              borderRadius: 12,
+              border: '1px solid rgba(255, 255, 255, 0.07)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Box size={16} color="#4ade80" />
+                  <span style={{ fontSize: '0.84rem', color: '#fff', fontWeight: 700 }}>
+                    Blocos Envelopados ({blocosFiltrados.length})
+                  </span>
+                  {blocosParaEnvio.length > 0 && (
+                    <span style={{ fontSize: '0.76rem', color: '#4ade80', background: 'rgba(34,197,94,0.15)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                      {blocosParaEnvio.length} selecionado{blocosParaEnvio.length > 1 ? 's' : ''}
+                    </span>
+                  )}
                 </div>
+
+                {blocosFiltrados.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={toggleTodos}
+                    style={{
+                      fontSize: '0.74rem',
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      color: 'var(--slate-300)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {blocosSelecionadosIds.size === blocosFiltrados.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                  </button>
+                )}
               </div>
-            ) : (
+
               <div style={{
-                maxHeight: 180,
+                maxHeight: 160,
                 overflowY: 'auto',
                 display: 'flex',
                 flexDirection: 'column',
@@ -590,7 +576,8 @@ export function ModalNotificarClienteWhatsApp({
                 {blocosFiltrados.map(b => {
                   const id = b.id || b.numero_bloco;
                   const selecionado = blocosSelecionadosIds.has(id);
-                  const dtFormatada = b.data_liberacao ? formatarDataBR(b.data_liberacao) : (b.data_romaneio ? formatarDataBR(b.data_romaneio) : '');
+                  const pedFormatada = formatarNomePedreira(b.pedreira_nome || b.pedreira_id);
+                  const pesoFmt = formatarPesoKg(b.peso_kg);
 
                   return (
                     <div
@@ -602,8 +589,8 @@ export function ModalNotificarClienteWhatsApp({
                         justifyContent: 'space-between',
                         padding: '8px 12px',
                         borderRadius: 8,
-                        background: selecionado ? 'rgba(34, 197, 94, 0.10)' : 'rgba(0,0,0,0.25)',
-                        border: selecionado ? '1px solid rgba(34, 197, 94, 0.35)' : '1px solid rgba(255, 255, 255, 0.05)',
+                        background: selecionado ? 'rgba(34, 197, 94, 0.12)' : 'rgba(0,0,0,0.25)',
+                        border: selecionado ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(255, 255, 255, 0.05)',
                         cursor: 'pointer',
                         transition: 'all 0.15s'
                       }}
@@ -612,7 +599,7 @@ export function ModalNotificarClienteWhatsApp({
                         <input
                           type="checkbox"
                           checked={selecionado}
-                          onChange={() => {}} // controlado pelo onClick da div
+                          onChange={() => {}}
                           style={{ cursor: 'pointer', accentColor: '#22c55e', width: 16, height: 16 }}
                         />
                         <div>
@@ -633,23 +620,22 @@ export function ModalNotificarClienteWhatsApp({
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.76rem', color: 'var(--slate-400)' }}>
-                        {b.pedreira_nome && <span>{b.pedreira_nome}</span>}
-                        {b.peso_kg && <strong style={{ color: '#fbbf24' }}>{Number(b.peso_kg).toLocaleString('pt-BR')} kg</strong>}
-                        {dtFormatada && <span>{dtFormatada}</span>}
+                        <span>({pedFormatada})</span>
+                        <strong style={{ color: '#fbbf24' }}>{pesoFmt}</strong>
                       </div>
                     </div>
                   );
                 })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Passo 4: Prévia da Mensagem Formatada */}
+          {/* Passo 4: Prévia da Mensagem (Formato WhatsApp) */}
           {mensagemWhatsApp && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                 <label style={{ fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Sparkles size={14} color="#4ade80" /> PRÉVIA DA MENSAGEM (FORMATO WHATSAPP):
+                  <Sparkles size={14} color="#4ade80" /> PRÉVIA DA MENSAGEM:
                 </label>
                 <button
                   type="button"
@@ -677,12 +663,12 @@ export function ModalNotificarClienteWhatsApp({
                 border: '1px solid rgba(34, 197, 94, 0.3)',
                 borderRadius: 12,
                 padding: '14px 18px',
-                fontSize: '0.80rem',
+                fontSize: '0.82rem',
                 color: '#e2e8f0',
                 lineHeight: 1.5,
                 whiteSpace: 'pre-wrap',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
-                maxHeight: 160,
+                maxHeight: 180,
                 overflowY: 'auto',
                 boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.5)'
               }}>
@@ -695,7 +681,7 @@ export function ModalNotificarClienteWhatsApp({
 
         {/* Rodapé com Ações */}
         <div style={{
-          padding: '16px 24px',
+          padding: '16px 22px',
           borderTop: '1px solid rgba(255, 255, 255, 0.1)',
           display: 'flex',
           alignItems: 'center',
