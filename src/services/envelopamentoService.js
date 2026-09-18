@@ -377,8 +377,27 @@ export const verificarDuplicidadeBloco = ({
 export const verificarDuplicidadeIndividual = verificarDuplicidadeBloco;
 
 /**
+ * Converte qualquer representação de peso para float padronizado em kg
+ */
+export const normalizarPeso = (peso) => {
+  if (!peso && peso !== 0) return 0;
+  const limpo = String(peso).replace(/[^\d,-]/g, '').replace(',', '.');
+  const num = parseFloat(limpo);
+  return isNaN(num) ? 0 : Math.round(num * 100) / 100;
+};
+
+/**
  * Analisa uma lista de blocos (ex: importação PDF ou lote) identificando duplicidades
  * tanto em relação aos registros já salvos no sistema quanto entre si mesmos.
+ * 
+ * Regras Inteligentes:
+ * 1. Bloco idêntico já cadastrado (mesmo cliente, material, pedreira e peso):
+ *    -> Marcado como duplicado/já cadastrado (NÃO é necessário reimportar, desmarcado por padrão).
+ * 2. Bloco já cadastrado, MAS com peso alterado no romaneio novo:
+ *    -> Sugerido para atualização de peso (ehAtualizacaoPeso: true, marcado por padrão),
+ *       mantendo RIGOROSAMENTE o status já salvo no pátio (envelopado, sem_envelopamento ou pendente).
+ * 3. Bloco novo:
+ *    -> Marcado como novo e selecionado por padrão para importação com status sugerido.
  */
 export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = []) => {
   const mapaExistentes = new Map();
@@ -409,16 +428,50 @@ export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = 
     });
 
     if (!chave) {
-      return { ...item, ehDuplicado: false, motivoDuplicidade: null, itemOriginal: null };
+      return { 
+        ...item, 
+        ehDuplicado: false, 
+        ehAtualizacaoPeso: false,
+        motivoDuplicidade: null, 
+        itemOriginal: null 
+      };
     }
 
     if (mapaExistentes.has(chave)) {
       const original = mapaExistentes.get(chave);
       const romOrig = original.numero_romaneio || 'S/N';
+      
+      const pesoNovoNum = normalizarPeso(item.peso_kg);
+      const pesoAntigoNum = normalizarPeso(original.peso_kg);
+      
+      // Verifica se o peso foi preenchido ou modificado
+      const pesoMudou = (pesoNovoNum > 0 && pesoAntigoNum > 0 && Math.abs(pesoNovoNum - pesoAntigoNum) > 0.01) ||
+                        (pesoNovoNum > 0 && (!original.peso_kg || pesoAntigoNum === 0));
+
+      if (pesoMudou) {
+        // Bloco já existe, mas o peso mudou: sugere atualizar o peso mantendo o status do banco
+        return {
+          ...item,
+          id: original.id,
+          ehDuplicado: false,
+          ehAtualizacaoPeso: true,
+          pesoOriginal: original.peso_kg || '',
+          pesoNovo: item.peso_kg || '',
+          status: original.status || item.status || 'pendente_envelopamento', // PRESERVA RIGOROSAMENTE O STATUS DO BANCO
+          statusOriginalPreservado: original.status,
+          motivoDuplicidade: `Peso alterado de ${original.peso_kg || 'sem peso'} para ${item.peso_kg} kg (Status mantido: ${original.status})`,
+          itemOriginal: original
+        };
+      }
+
+      // Bloco já cadastrado e sem alteração de peso (não é necessário reimportar)
       return {
         ...item,
+        id: original.id,
         ehDuplicado: true,
-        motivoDuplicidade: `Já cadastrado no sistema (Romaneio: ${romOrig}, Status: ${original.status})`,
+        ehAtualizacaoPeso: false,
+        pesoOriginal: original.peso_kg || '',
+        motivoDuplicidade: `Já cadastrado no sistema (Romaneio: ${romOrig}, Status: ${original.status}) - Sem alterações`,
         itemOriginal: original
       };
     }
@@ -427,13 +480,20 @@ export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = 
       return {
         ...item,
         ehDuplicado: true,
+        ehAtualizacaoPeso: false,
         motivoDuplicidade: `Repetido neste mesmo romaneio/lote (Bloco duplicado)`,
         itemOriginal: null
       };
     }
 
     chavesNoLote.set(chave, idx);
-    return { ...item, ehDuplicado: false, motivoDuplicidade: null, itemOriginal: null };
+    return { 
+      ...item, 
+      ehDuplicado: false, 
+      ehAtualizacaoPeso: false,
+      motivoDuplicidade: null, 
+      itemOriginal: null 
+    };
   });
 };
 
@@ -1024,12 +1084,12 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
 
   const locais = carregarEnvelopamentosLocais();
 
-  // Filtragem estrita contra duplicidades
+  // Filtragem estrita contra duplicidades idênticas sem alteração
   const itensAvaliados = identificarDuplicidadesEmLista(itens, locais);
-  const itensValidos = itensAvaliados.filter(item => !item.ehDuplicado);
+  const itensValidos = itensAvaliados.filter(item => !item.ehDuplicado || item.ehAtualizacaoPeso);
 
   if (itensValidos.length === 0) {
-    throw new Error('Inclusão bloqueada: Todos os blocos informados já se encontram cadastrados no sistema para este cliente, material e pedreira.');
+    throw new Error('Inclusão bloqueada: Todos os blocos informados já se encontram cadastrados no sistema sem alterações de peso.');
   }
 
   const agora = new Date().toISOString();
@@ -1039,11 +1099,41 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
   for (const dados of itensValidos) {
     if (!dados.numero_bloco) continue;
 
-    const id = dados.id || `env_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    // Se for atualização de peso de um bloco existente
+    if (dados.ehAtualizacaoPeso && dados.itemOriginal) {
+      const orig = dados.itemOriginal;
+      const pesoNovo = String(dados.pesoNovo || dados.peso_kg || orig.peso_kg || '').trim();
+      const pesoAntigo = dados.pesoOriginal || orig.peso_kg || 'sem peso';
+      
+      const observacaoAtualizada = orig.observacoes 
+        ? `${orig.observacoes} | [Peso atualizado de ${pesoAntigo} para ${pesoNovo} kg via Romaneio ${dados.numero_romaneio || orig.numero_romaneio || ''}]` 
+        : `Peso atualizado de ${pesoAntigo} para ${pesoNovo} kg via Romaneio ${dados.numero_romaneio || orig.numero_romaneio || ''}`;
+
+      const registroAtualizado = {
+        ...orig,
+        peso_kg: pesoNovo,
+        numero_romaneio: String(dados.numero_romaneio || orig.numero_romaneio || '').trim().toUpperCase(),
+        data_romaneio: String(dados.data_romaneio || orig.data_romaneio || '').trim(),
+        observacoes: observacaoAtualizada,
+        // PRESERVA RIGOROSAMENTE O STATUS JÁ SALVO NO BANCO
+        status: orig.status || 'pendente_envelopamento',
+        updated_at: agora
+      };
+
+      registrosCompletos.push(registroAtualizado);
+      rowsParaDB.push(formatarItemParaSupabaseEnvelopamentos(registroAtualizado));
+      continue;
+    }
+
+    // Se for bloco novo
+    const id = dados.id && !dados.id.startsWith('pdf_') ? dados.id : `env_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     let statusNormalizado = dados.status || 'pendente_envelopamento';
-    if (statusNormalizado === 'pendente') statusNormalizado = 'pendente_envelopamento';
-    if (statusNormalizado === 'em_envelopamento') statusNormalizado = 'em_andamento';
-    if (statusNormalizado === 'liberado' || statusNormalizado === 'conferido') statusNormalizado = 'envelopado';
+    if (statusNormalizado === 'pendente' || statusNormalizado === 'em_envelopamento' || statusNormalizado === 'em_andamento') {
+      statusNormalizado = 'pendente_envelopamento';
+    }
+    if (statusNormalizado === 'liberado' || statusNormalizado === 'conferido') {
+      statusNormalizado = 'envelopado';
+    }
 
     const registroCompleto = {
       id,
@@ -1057,10 +1147,10 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
       pedreira_id: dados.pedreira_id || '',
       pedreira_nome: dados.pedreira_nome || '',
       status: statusNormalizado,
-      responsavel_envelopamento: dados.responsavel_envelopamento || (statusNormalizado === 'em_andamento' ? usuarioNome : null),
+      responsavel_envelopamento: dados.responsavel_envelopamento || null,
       responsavel_liberacao: dados.responsavel_liberacao || (statusNormalizado === 'envelopado' || statusNormalizado === 'sem_envelopamento' ? usuarioNome : null),
       data_cadastro: dados.data_cadastro || agora,
-      data_envelopamento: dados.data_envelopamento || (statusNormalizado === 'em_andamento' ? agora : null),
+      data_envelopamento: dados.data_envelopamento || null,
       data_liberacao: dados.data_liberacao || (statusNormalizado === 'envelopado' || statusNormalizado === 'sem_envelopamento' ? agora : null),
       observacoes: dados.observacoes || '',
       agendamento_id: dados.agendamento_id || null,
@@ -1091,8 +1181,9 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
   // 3. Registrar no histórico
   try {
     for (const reg of registrosCompletos) {
+      const ehAtualizacao = itensValidos.some(iv => iv.numero_bloco === reg.numero_bloco && iv.ehAtualizacaoPeso);
       await registrarHistoricoEnvelopamento({
-        tipo_acao: 'IMPORTACAO_ROMANEIO',
+        tipo_acao: ehAtualizacao ? 'ATUALIZACAO_PESO_ROMANEIO' : 'IMPORTACAO_ROMANEIO',
         numero_bloco: reg.numero_bloco,
         cliente_nome: reg.cliente_nome,
         material: reg.material,
@@ -1100,7 +1191,9 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
         numero_romaneio: reg.numero_romaneio,
         status_novo: reg.status,
         usuario_nome: usuarioNome,
-        detalhes: `Importado via Romaneio Nº ${reg.numero_romaneio || 'S/N'}`
+        detalhes: ehAtualizacao 
+          ? `Peso atualizado no Romaneio Nº ${reg.numero_romaneio || 'S/N'} para ${reg.peso_kg} kg (Status preservado: ${reg.status})` 
+          : `Importado via Romaneio Nº ${reg.numero_romaneio || 'S/N'}`
       });
     }
   } catch (eH) {}
