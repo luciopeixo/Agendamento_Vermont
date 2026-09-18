@@ -248,11 +248,15 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
       .slice(0, 10);
   }, [itensFiltrados]);
 
-  // Agrupamento Temporal (por Data de Cadastro / Romaneio)
-  const dadosPorData = useMemo(() => {
+  // Agrupamento Temporal de Blocos Envelopados (Quantidade de blocos envelopados por dia)
+  const dadosPorDataEnvelopados = useMemo(() => {
     const mapa = {};
-    itensFiltrados.forEach(item => {
-      const dataStr = item.data_cadastro || item.created_at || item.data_romaneio;
+    // Considera apenas blocos com status 'envelopado' dentro do recorte filtrado
+    const blocosEnvelopados = itensFiltrados.filter(i => i.status === 'envelopado');
+
+    blocosEnvelopados.forEach(item => {
+      // Prioridade de data: data_liberacao (conclusão) -> data_envelopamento -> data_cadastro -> data_romaneio -> created_at -> updated_at
+      const dataStr = item.data_liberacao || item.data_envelopamento || item.data_cadastro || item.data_romaneio || item.created_at || item.updated_at;
       let dataKey = 'Outros';
       if (dataStr) {
         if (dataStr.includes('-')) {
@@ -266,19 +270,29 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
       }
 
       if (!mapa[dataKey]) {
-        mapa[dataKey] = { data: dataKey, total: 0, envelopado: 0, pendente: 0, sem_envelopamento: 0 };
+        mapa[dataKey] = { data: dataKey, totalEnvelopados: 0, pesoKg: 0 };
       }
-      mapa[dataKey].total += 1;
-      if (item.status === 'envelopado') mapa[dataKey].envelopado += 1;
-      else if (item.status === 'sem_envelopamento') mapa[dataKey].sem_envelopamento += 1;
-      else mapa[dataKey].pendente += 1;
+      mapa[dataKey].totalEnvelopados += 1;
+
+      if (item.peso_kg) {
+        const p = parseFloat(String(item.peso_kg).replace(/\./g, '').replace(',', '.'));
+        if (!isNaN(p)) mapa[dataKey].pesoKg += p;
+      }
     });
 
     return Object.values(mapa)
-      .filter(d => d.data !== 'Outros')
+      .filter(d => d.data !== 'Outros' && d.totalEnvelopados > 0)
       .sort((a, b) => a.data.localeCompare(b.data))
-      .slice(-30); // Últimas 30 datas registradas
+      .slice(-30); // Últimos 30 dias com envelopamentos registrados
   }, [itensFiltrados]);
+
+  const maxQtdEnvelopadosDia = Math.max(1, ...dadosPorDataEnvelopados.map(d => d.totalEnvelopados));
+  const mediaEnvelopadosDia = dadosPorDataEnvelopados.length > 0 
+    ? (qtdEnvelopados / dadosPorDataEnvelopados.length).toFixed(1) 
+    : '0.0';
+  const diaPicoEnvelopamento = dadosPorDataEnvelopados.reduce((max, cur) => 
+    cur.totalEnvelopados > (max?.totalEnvelopados || 0) ? cur : max, null
+  );
 
   // Resumo por Romaneios Consolidados
   const dadosPorRomaneio = useMemo(() => {
@@ -355,7 +369,6 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
     XLSX.writeFile(wb, `analise_envelopamentos_vermont_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const maxQtdTempo = Math.max(1, ...dadosPorData.map(d => d.total));
   const maxQtdPedreira = Math.max(1, ...dadosPorPedreira.map(d => d.total));
   const maxQtdCliente = Math.max(1, ...dadosPorCliente.map(d => d.total));
 
@@ -767,7 +780,162 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
         </div>
       </div>
 
-      {/* 3. Linha de Gráficos Principais (Distribuição de Status + Volume por Pedreira) */}
+      {/* 3. Evolução Temporal de Blocos Envelopados (Posicionado Abaixo dos KPIs) */}
+      <div className="glass-panel" style={{
+        padding: '22px 24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 18,
+        border: '1px solid rgba(34, 197, 94, 0.25)',
+        background: 'rgba(10, 20, 15, 0.65)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: 'rgba(34, 197, 94, 0.15)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#4ade80'
+            }}>
+              <TrendingUp size={20} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: '#fff', fontWeight: 800 }}>
+                Evolução Temporal de Blocos Envelopados
+              </h3>
+              <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
+                Quantidade de blocos envelopados por dia (histórico de produtividade)
+              </span>
+            </div>
+          </div>
+
+          {/* Badges Rápidos de Performance */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{
+              padding: '6px 12px',
+              borderRadius: 8,
+              background: 'rgba(34, 197, 94, 0.12)',
+              border: '1px solid rgba(34, 197, 94, 0.25)',
+              fontSize: '0.78rem',
+              color: '#4ade80',
+              fontWeight: 700
+            }}>
+              Total: <strong>{qtdEnvelopados}</strong> blocos
+            </div>
+            <div style={{
+              padding: '6px 12px',
+              borderRadius: 8,
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              fontSize: '0.78rem',
+              color: 'var(--slate-300)',
+              fontWeight: 600
+            }}>
+              Média: <strong style={{ color: '#fff' }}>{mediaEnvelopadosDia}</strong> / dia ativo
+            </div>
+            {diaPicoEnvelopamento && (
+              <div style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                fontSize: '0.78rem',
+                color: '#fbbf24',
+                fontWeight: 600
+              }}>
+                Pico: <strong style={{ color: '#fff' }}>{diaPicoEnvelopamento.totalEnvelopados} blocos</strong> ({diaPicoEnvelopamento.data.split('-').reverse().slice(0, 2).join('/')})
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Gráfico de Barras Verticais de Envelopados */}
+        {dadosPorDataEnvelopados.length === 0 ? (
+          <div style={{
+            padding: '36px 20px',
+            textAlign: 'center',
+            color: 'var(--slate-400)',
+            fontSize: '0.86rem',
+            background: 'rgba(0,0,0,0.2)',
+            borderRadius: 10
+          }}>
+            Nenhum bloco com status "Envelopado" encontrado no período ou filtros selecionados.
+          </div>
+        ) : (
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: 10,
+            minHeight: 200,
+            padding: '24px 12px 12px',
+            overflowX: 'auto',
+            background: 'rgba(0, 0, 0, 0.22)',
+            borderRadius: 10,
+            border: '1px solid rgba(255, 255, 255, 0.05)'
+          }}>
+            {dadosPorDataEnvelopados.map(d => {
+              const alturaPct = maxQtdEnvelopadosDia > 0 
+                ? Math.max(12, (d.totalEnvelopados / maxQtdEnvelopadosDia) * 100) 
+                : 12;
+              const [ano, mes, dia] = d.data.split('-');
+              const labelData = `${dia}/${mes}`;
+              const pesoTon = (d.pesoKg / 1000).toFixed(1);
+
+              return (
+                <div 
+                  key={d.data} 
+                  title={`Data: ${dia}/${mes}/${ano}\nBlocos Envelopados: ${d.totalEnvelopados}\nPeso Total: ${pesoTon} t`}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 6,
+                    minWidth: 46,
+                    flex: 1,
+                    height: '100%',
+                    justifyContent: 'flex-end'
+                  }}
+                >
+                  <span style={{
+                    fontSize: '0.76rem',
+                    color: '#4ade80',
+                    fontWeight: 800,
+                    textShadow: '0 0 8px rgba(74, 222, 128, 0.5)'
+                  }}>
+                    {d.totalEnvelopados}
+                  </span>
+
+                  {/* Barra Vertical de Envelopamento */}
+                  <div style={{
+                    width: '100%',
+                    maxWidth: 28,
+                    height: `${alturaPct}%`,
+                    background: 'linear-gradient(180deg, #4ade80 0%, #16a34a 100%)',
+                    borderRadius: '6px 6px 2px 2px',
+                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.35)',
+                    transition: 'transform 0.2s ease, opacity 0.2s',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scaleY(1.04)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scaleY(1)'; }}
+                  />
+
+                  <span style={{ fontSize: '0.70rem', color: 'var(--slate-300)', fontWeight: 600, whiteSpace: 'nowrap', marginTop: 2 }}>
+                    {labelData}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 4. Linha de Gráficos Principais (Distribuição de Status + Volume por Pedreira) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 18 }}>
         
         {/* Gráfico 1: Distribuição de Status (Donut Visual + Barra de Progresso) */}
@@ -962,7 +1130,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
         </div>
       </div>
 
-      {/* 4. Linha de Gráficos Secundários (Top Clientes + Materiais) */}
+      {/* 5. Linha de Gráficos Secundários (Top Clientes + Materiais) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 18 }}>
         
         {/* Top 10 Clientes */}
@@ -1068,112 +1236,6 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
                 );
               })
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* 5. Linha do Tempo / Evolução Temporal */}
-      <div className="glass-panel" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <TrendingUp size={18} color="#22c55e" />
-            <h3 style={{ fontSize: '1.05rem', margin: 0, color: '#fff', fontWeight: 700 }}>
-              Evolução Temporal de Blocos Cadastrados
-            </h3>
-          </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>
-            Últimos registros consolidados por data
-          </span>
-        </div>
-
-        {dadosPorData.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--slate-400)', fontSize: '0.84rem' }}>
-            Nenhum histórico temporal no período selecionado.
-          </div>
-        ) : (
-          <div style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: 8,
-            height: 180,
-            padding: '16px 8px 10px',
-            overflowX: 'auto',
-            borderBottom: '1px solid rgba(255,255,255,0.1)'
-          }}>
-            {dadosPorData.map(d => {
-              const alturaPct = maxQtdTempo > 0 ? Math.max(8, (d.total / maxQtdTempo) * 100) : 8;
-              const [ano, mes, dia] = d.data.split('-');
-              const labelData = `${dia}/${mes}`;
-
-              return (
-                <div key={d.data} style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 6,
-                  minWidth: 42,
-                  flex: 1
-                }}>
-                  <span style={{ fontSize: '0.70rem', color: '#fff', fontWeight: 700 }}>
-                    {d.total}
-                  </span>
-
-                  {/* Barra Vertical Empilhada */}
-                  <div style={{
-                    width: '100%',
-                    maxWidth: 24,
-                    height: `${alturaPct}%`,
-                    background: 'rgba(255,255,255,0.06)',
-                    borderRadius: 4,
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column-reverse',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
-                  }}>
-                    <div 
-                      style={{ 
-                        height: `${(d.envelopado / d.total) * 100}%`, 
-                        background: '#22c55e' 
-                      }} 
-                      title={`${d.data}: ${d.envelopado} Envelopados`} 
-                    />
-                    <div 
-                      style={{ 
-                        height: `${(d.sem_envelopamento / d.total) * 100}%`, 
-                        background: '#0284c7' 
-                      }} 
-                      title={`${d.data}: ${d.sem_envelopamento} Sem Envelopamento`} 
-                    />
-                    <div 
-                      style={{ 
-                        height: `${(d.pendente / d.total) * 100}%`, 
-                        background: '#f59e0b' 
-                      }} 
-                      title={`${d.data}: ${d.pendente} Pendentes`} 
-                    />
-                  </div>
-
-                  <span style={{ fontSize: '0.66rem', color: 'var(--slate-400)', whiteSpace: 'nowrap' }}>
-                    {labelData}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, fontSize: '0.76rem', color: 'var(--slate-300)', marginTop: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: '#22c55e' }} />
-            <span>Envelopado</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: '#0284c7' }} />
-            <span>Sem Envelopamento</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: '#f59e0b' }} />
-            <span>Pendente</span>
           </div>
         </div>
       </div>

@@ -42,7 +42,8 @@ import {
   STATUS_ENVELOPAMENTO,
   inscreverEnvelopamentosRealtime,
   gerarChaveDuplicidade,
-  compararNumeroBlocoDecrescente
+  compararNumeroBlocoDecrescente,
+  normalizarPedreira
 } from '../services/envelopamentoService';
 import { PEDREIRAS_CEARA, formatarDataHoraBR } from '../services/agendamentoService';
 import { ModalCadastrarBlocoEnvelopamento } from './ModalCadastrarBlocoEnvelopamento';
@@ -53,7 +54,7 @@ import { ModalVisualizarDuplicidades } from './ModalVisualizarDuplicidades';
 import { GraficosEnvelopamento } from './GraficosEnvelopamento';
 
 export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
-  const [envelopamentos, setEnvelopamentos] = useState([]);
+  const [todosEnvelopamentos, setTodosEnvelopamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [abaSubmodulo, setAbaSubmodulo] = useState('gestao'); // 'gestao' ou 'graficos'
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
@@ -95,12 +96,8 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const carregarDados = async (silencioso = false) => {
     if (!silencioso) setCarregando(true);
     try {
-      const dados = await listarEnvelopamentos({
-        pedreira: filtroPedreira,
-        status: filtroStatus,
-        busca: buscaTexto
-      });
-      setEnvelopamentos(dados);
+      const dados = await listarEnvelopamentos();
+      setTodosEnvelopamentos(dados || []);
     } catch (err) {
       console.error('Erro ao carregar envelopamentos:', err);
     } finally {
@@ -118,7 +115,46 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, [filtroPedreira, filtroStatus, buscaTexto]);
+  }, []);
+
+  // Lista filtrada para a visualização da tabela/matriz do Controle de Envelopamento
+  const envelopamentos = useMemo(() => {
+    return (todosEnvelopamentos || []).filter(item => {
+      if (filtroPedreira) {
+        const pF = normalizarPedreira(filtroPedreira);
+        const pI = normalizarPedreira(item.pedreira_id, item.pedreira_nome);
+        if (pF && pI && pF !== pI && !pI.startsWith(pF) && !pF.startsWith(pI)) {
+          return false;
+        }
+      }
+      if (filtroStatus && item.status !== filtroStatus) return false;
+      if (buscaTexto) {
+        const termo = buscaTexto.toLowerCase().trim();
+        const termoSemZeros = termo.replace(/^0+/, '');
+        const bloco = String(item.numero_bloco || '').toLowerCase();
+        const cli = String(item.cliente_nome || '').toLowerCase();
+        const cnpj = String(item.cliente_cnpj || '').toLowerCase();
+        const mat = String(item.material || '').toLowerCase();
+        const ped = String(item.pedreira_nome || '').toLowerCase();
+        const rom = String(item.numero_romaneio || '').toLowerCase();
+        const dataRom = String(item.data_romaneio || '').toLowerCase();
+        const obs = String(item.observacoes || '').toLowerCase();
+
+        const bate = bloco.includes(termo) ||
+                     cli.includes(termo) ||
+                     cnpj.includes(termo) ||
+                     mat.includes(termo) ||
+                     ped.includes(termo) ||
+                     rom.includes(termo) ||
+                     (termoSemZeros && rom.includes(termoSemZeros)) ||
+                     dataRom.includes(termo) ||
+                     obs.includes(termo);
+
+        if (!bate) return false;
+      }
+      return true;
+    });
+  }, [todosEnvelopamentos, filtroPedreira, filtroStatus, buscaTexto]);
 
   const metricas = calcularMetricasEnvelopamento(envelopamentos);
 
@@ -723,7 +759,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       </div>
 
       {abaSubmodulo === 'graficos' ? (
-        <GraficosEnvelopamento envelopamentos={envelopamentos} />
+        <GraficosEnvelopamento envelopamentos={todosEnvelopamentos} />
       ) : (
         <>
           {/* Cards de Métricas / 3 Status Oficiais */}
