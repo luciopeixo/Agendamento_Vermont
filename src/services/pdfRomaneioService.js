@@ -43,39 +43,65 @@ export const extrairTextoDoPdf = async (arquivoOuBuffer) => {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
     
-    // Agrupar itens de texto por coordenada Y aproximada (linhas)
-    const linhasMap = new Map();
-    const TOLERANCIA_Y = 3.5; // pixels de tolerância para considerar na mesma linha
-
+    // Coletar itens com coordenadas válidas
+    const validItems = [];
     for (const item of textContent.items) {
       if (!item.str || item.str.trim() === '') continue;
-      
-      const y = Math.round(item.transform[5]);
-      const x = item.transform[4];
-      
-      // Encontrar chave de Y próxima
-      let chaveYEncontrada = null;
-      for (const key of linhasMap.keys()) {
-        if (Math.abs(key - y) <= TOLERANCIA_Y) {
-          chaveYEncontrada = key;
-          break;
-        }
-      }
-
-      const chaveY = chaveYEncontrada !== null ? chaveYEncontrada : y;
-      if (!linhasMap.has(chaveY)) {
-        linhasMap.set(chaveY, []);
-      }
-      linhasMap.get(chaveY).push({ x, text: item.str });
+      validItems.push({
+        str: item.str,
+        x: item.transform[4],
+        y: item.transform[5]
+      });
     }
 
-    // Ordenar linhas do topo para o rodapé (Y decrescente no PDF)
-    const chavesOrdenadas = Array.from(linhasMap.keys()).sort((a, b) => b - a);
-    
-    const linhasTexto = chavesOrdenadas.map(y => {
-      // Ordenar itens da linha da esquerda para a direita (X crescente)
-      const itensLinha = linhasMap.get(y).sort((a, b) => a.x - b.x);
-      return itensLinha.map(it => it.text.trim()).join(' ');
+    // Ordenar itens por coordenada Y decrescente (do topo para o rodapé)
+    validItems.sort((a, b) => b.y - a.y);
+
+    // Agrupamento robusto por linha (clustering dinâmico por baseline)
+    const TOLERANCIA_Y = 5.0; // tolerância para consolidar colunas da mesma linha
+    const clustersLinhas = [];
+    let linhaAtual = null;
+
+    for (const item of validItems) {
+      if (!linhaAtual) {
+        linhaAtual = {
+          ySum: item.y,
+          count: 1,
+          minY: item.y,
+          maxY: item.y,
+          avgY: item.y,
+          items: [item]
+        };
+        clustersLinhas.push(linhaAtual);
+      } else {
+        const diffAvg = Math.abs(item.y - linhaAtual.avgY);
+        const diffMinMax = Math.abs(item.y - linhaAtual.minY);
+
+        if (diffAvg <= TOLERANCIA_Y || diffMinMax <= TOLERANCIA_Y) {
+          linhaAtual.items.push(item);
+          linhaAtual.ySum += item.y;
+          linhaAtual.count++;
+          linhaAtual.avgY = linhaAtual.ySum / linhaAtual.count;
+          linhaAtual.minY = Math.min(linhaAtual.minY, item.y);
+          linhaAtual.maxY = Math.max(linhaAtual.maxY, item.y);
+        } else {
+          linhaAtual = {
+            ySum: item.y,
+            count: 1,
+            minY: item.y,
+            maxY: item.y,
+            avgY: item.y,
+            items: [item]
+          };
+          clustersLinhas.push(linhaAtual);
+        }
+      }
+    }
+
+    // Para cada linha, ordenar itens por X crescente (esquerda para direita)
+    const linhasTexto = clustersLinhas.map(l => {
+      l.items.sort((a, b) => a.x - b.x);
+      return l.items.map(it => it.str.trim()).join(' ');
     });
 
     paginasTexto.push(linhasTexto.join('\n'));
@@ -629,7 +655,7 @@ export const processarRomaneioPdfTexto = async (textoCompleto) => {
   const blocosJaAdicionados = new Set();
 
   for (let i = 0; i < linhas.length; i++) {
-    const linha = linhas[i];
+    let linha = linhas[i];
 
     // Ignorar linhas de cabeçalho, rodapé ou quebras de página
     if (
@@ -658,9 +684,14 @@ export const processarRomaneioPdfTexto = async (textoCompleto) => {
       continue;
     }
 
+    // Se a linha atual contém apenas o bloco ou bloco + material e a próxima linha tem as dimensões, junta as duas
+    if (i + 1 < linhas.length && !/\d+(?:[,.]\d+)?\s*[xX*]\s*\d+/.test(linha) && /\d+(?:[,.]\d+)?\s*[xX*]\s*\d+/.test(linhas[i + 1])) {
+      linha = `${linha} ${linhas[i + 1]}`;
+    }
+
     // Padrão de linha de bloco Vermont:
-    // Começa com número do bloco (ex: 36/26 ou 63/26. ou 839/26 ou 747/26 ou 1826 ou 0126 ou 126 ou 1/26), seguido do nome do material e dimensões
-    const matchLinhaBloco = linha.match(/^([0-9]{1,6}(?:\/[0-9]{2,4})?\.?|[0-9A-Z/.-]+)\s+([A-ZÀ-Ú\s]+?)\s+(\d+[,.]\d{2,3}\s*x\s*.*)$/i);
+    // Começa com número do bloco (ex: 209426, 211926, 36/26, 63/26., 747/26, 190/26A, 1826, 0126, 126), seguido do nome do material e dimensões (ex: 3,280 x 1,800 x 1,600)
+    const matchLinhaBloco = linha.match(/^(?:(?:\d{1,3}[.)\s-]+)?)\s*([0-9]{1,6}(?:\/[0-9]{2,4})?[-\s]?[A-Za-z]?|[0-9]{3,7}[A-Za-z]?|VT-[0-9A-Za-z]+)\s+([A-ZÀ-Ú0-9\s/().-]+?)\s+(\d+(?:[,.]\d+)?\s*[xX*]\s*\d+(?:[,.]\d+)?\s*[xX*]\s*.*)$/i);
     
     if (matchLinhaBloco) {
       const isThorOuArgos = clienteNome.includes('THOR') || clienteNome.includes('ARGOS');
@@ -669,7 +700,7 @@ export const processarRomaneioPdfTexto = async (textoCompleto) => {
       const materialBruto = matchLinhaBloco[2].trim();
       const restanteLinha = matchLinhaBloco[3].trim();
       
-      // Evitar blocos duplicados acidentais
+      // Evitar blocos duplicados acidentais no mesmo arquivo
       if (blocosJaAdicionados.has(numeroBloco)) {
         continue;
       }
