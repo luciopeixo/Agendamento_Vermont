@@ -429,6 +429,16 @@ export const extrairChavesComparacaoBloco = (numeroBloco) => {
     chaves.add(`${seq}${letra}`);
   }
 
+  // Se é número com sufixo alfabético de 1 a 5 caracteres (ex: 2438TM, 0426TBL, 0326IBW, 3526A, 132/26B)
+  const matchNumSufixo = apenasAlfaNum.match(/^(\d+)([A-Z]{1,5})$/);
+  if (matchNumSufixo) {
+    const [, num, sufixo] = matchNumSufixo;
+    chaves.add(num);
+    chaves.add(`${num} ${sufixo}`);
+    chaves.add(`${num}-${sufixo}`);
+    chaves.add(`${num}${sufixo}`);
+  }
+
   // Se é número de 5 dígitos sem barra com final de ano (ex: 74726 -> 747/26)
   if (/^\d{5}$/.test(apenasAlfaNum) && (apenasAlfaNum.endsWith('24') || apenasAlfaNum.endsWith('25') || apenasAlfaNum.endsWith('26') || apenasAlfaNum.endsWith('27') || apenasAlfaNum.endsWith('28'))) {
     const base = apenasAlfaNum.slice(0, 3);
@@ -499,9 +509,9 @@ export const extrairObservacoesEEnvelopamento = (textoCompleto) => {
       dentroSecaoEnvelopamento = true;
     }
 
-    // Padrão 1: Linha contendo bloco (com ou sem sufixo de letra) e valor em R$
-    // Ex: "190/26A- R$ 2.396,80", "190/26B- R$ 1.027,20", "36/26 - R$ 3.507,84", "74726 - R$ 2.042,88", "1826- R$ 3.617,60"
-    const matchBlocoValor = linha.match(/(?:(?:BLOCO|BL\.?|N[º°]?)\s*)?([0-9]{1,6}(?:\/[0-9]{2,4})?[-\s]?[A-Za-z]?|[0-9]{3,7}[A-Za-z]?|VT-[0-9A-Za-z]+)\s*[-:]?\s*(?:\([^\)]*\)\s*)?R?\$?\s*([\d.]+,\d{2})/i);
+    // Padrão 1: Linha contendo bloco (com ou sem sufixo de letra/código) e valor em R$
+    // Ex: "190/26A- R$ 2.396,80", "2438TM - R$ 3.232,00", "2438 TM - R$ 3.232,00", "36/26 - R$ 3.507,84", "74726 - R$ 2.042,88"
+    const matchBlocoValor = linha.match(/(?:(?:BLOCO|BL\.?|N[º°]?)\s*)?([0-9]{1,6}(?:\/[0-9]{2,4})?(?:[-\s]*[A-Za-z0-9]{1,6})?|[0-9]{2,7}(?:[-\s]*[A-Za-z0-9]{1,6})?|VT-[0-9A-Za-z]+)\s*[-:]?\s*(?:\([^\)]*\)\s*)?R?\$?\s*([\d.]+,\d{2})/i);
 
     if (matchBlocoValor) {
       const blocoBruto = matchBlocoValor[1].trim().toUpperCase().replace(/[.\s-]+$/, '').replace(/^[.\s-]+/, '');
@@ -528,9 +538,9 @@ export const extrairObservacoesEEnvelopamento = (textoCompleto) => {
     }
 
     // Padrão 2: Se estamos dentro de uma seção de Envelopamento e a linha lista blocos
-    // Ex: "190/26A, 190/26B" ou "Blocos: 190/26A"
+    // Ex: "190/26A, 190/26B" ou "Blocos: 190/26A" ou "2438TM, 2439TM"
     if (dentroSecaoEnvelopamento && !/^(prazo|vencimento|obs|nota|frete|total|desconto)/i.test(linha)) {
-      const possiveisBlocos = linha.matchAll(/\b([0-9]{1,6}\/[0-9]{2,4}[-\s]?[A-Za-z]?|[0-9]{3,7}[A-Za-z]?)\b/g);
+      const possiveisBlocos = linha.matchAll(/\b([0-9]{1,6}\/[0-9]{2,4}[-\s]?[A-Za-z0-9]{1,5}|[0-9]{2,7}[-\s]?[A-Za-z0-9]{1,5}|VT-[0-9A-Za-z]+)\b/g);
       for (const m of possiveisBlocos) {
         const blocoIdentificado = m[1].trim().toUpperCase().replace(/[.\s-]+$/, '').replace(/^[.\s-]+/, '');
         // Ignorar coisas como "02" de "02 mantas" ou datas completas como "23/03/2026"
@@ -690,15 +700,43 @@ export const processarRomaneioPdfTexto = async (textoCompleto) => {
     }
 
     // Padrão de linha de bloco Vermont:
-    // Começa com número do bloco (ex: 209426, 211926, 36/26, 63/26., 747/26, 190/26A, 1826, 0126, 126), seguido do nome do material e dimensões (ex: 3,280 x 1,800 x 1,600)
-    const matchLinhaBloco = linha.match(/^(?:(?:\d{1,3}[.)\s-]+)?)\s*([0-9]{1,6}(?:\/[0-9]{2,4})?[-\s]?[A-Za-z]?|[0-9]{3,7}[A-Za-z]?|VT-[0-9A-Za-z]+)\s+([A-ZÀ-Ú0-9\s/().-]+?)\s+(\d+(?:[,.]\d+)?\s*[xX*]\s*\d+(?:[,.]\d+)?\s*[xX*]\s*.*)$/i);
+    // Identifica linhas que possuem a estrutura de tabela de blocos com dimensões (ex: 3,100 x 1,950 x 2,000)
+    const matchDimensoes = linha.match(/^(.+?)\s+(\d+(?:[,.]\d+)?\s*[xX*]\s*\d+(?:[,.]\d+)?\s*[xX*]\s*.*)$/i);
     
-    if (matchLinhaBloco) {
+    if (matchDimensoes) {
+      let parteAnterior = matchDimensoes[1].trim().replace(/^(?:\d{1,3}[.)\s-]+)\s*/, '');
+      const restanteLinha = matchDimensoes[2].trim();
+
+      // Expressão para localizar onde se inicia o nome do material ou tipo de rocha
+      const regexInicioMaterial = /\b(QUARTZITO|GRANITO|BASALTO|MARMORE|MÁRMORE|PEGMATITO|ROCHA|TAJ\s*MAHAL|NEGRESCO|DEL\s*MARE|NAURIKA|ZITAN|CRISTALLO|RAFFINATO|GUINESS|NOUVEAU|SCENARIO|CHATEAU\s*BLANC|BRECCIA|INFINITY|ROMA\s*IMPERIALE|BLUE\s*DEEP|BLUE\s*MARE|BLUE\s*ROMA|TELLUS|ATLANTIC|BROWN\s*STRINGS|JJ\s*BROWN|PANETTONE|EVORA|KOUROS|BROWNIE|ILLUSION|VERDE\s*ESPIRAL|PERLA\s*VENATA|SERROTE|JAIBARAS|BEBERIBE)\b/i;
+
+      let numeroBlocoBruto = '';
+      let materialBruto = '';
+
+      const matchMat = parteAnterior.match(regexInicioMaterial);
+      if (matchMat && matchMat.index !== undefined && matchMat.index > 0) {
+        numeroBlocoBruto = parteAnterior.slice(0, matchMat.index).trim();
+        materialBruto = parteAnterior.slice(matchMat.index).trim();
+      } else {
+        // Fallback: se não achar pelo nome do material, separa pelo primeiro padrão de bloco
+        const matchFallback = parteAnterior.match(/^([0-9]{1,6}(?:\/[0-9]{2,4})?(?:[\s-]+[A-Za-z0-9]{1,6})?|[0-9]{2,7}(?:[\s-]+[A-Za-z0-9]{1,6})?|VT-[0-9A-Za-z]+)\s+(.*)$/i);
+        if (matchFallback) {
+          numeroBlocoBruto = matchFallback[1].trim();
+          materialBruto = matchFallback[2].trim();
+        } else {
+          const parts = parteAnterior.split(/\s+/);
+          numeroBlocoBruto = parts[0] || '';
+          materialBruto = parts.slice(1).join(' ') || '';
+        }
+      }
+
+      // Validação: prosseguir apenas se houver identificador numérico de bloco
+      if (!numeroBlocoBruto || !/\d/.test(numeroBlocoBruto)) {
+        continue;
+      }
+
       const isThorOuArgos = clienteNome.includes('THOR') || clienteNome.includes('ARGOS');
-      const numeroBlocoBruto = matchLinhaBloco[1].trim().toUpperCase().replace(/[.\s]+$/, '');
       const numeroBloco = sanitizarNumeroBloco(numeroBlocoBruto, isThorOuArgos);
-      const materialBruto = matchLinhaBloco[2].trim();
-      const restanteLinha = matchLinhaBloco[3].trim();
       
       // Evitar blocos duplicados acidentais no mesmo arquivo
       if (blocosJaAdicionados.has(numeroBloco)) {

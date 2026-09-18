@@ -2574,24 +2574,31 @@ export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false) {
   // 2. Remove conteúdos explicativos entre parênteses (ex: "1256926 (QUARTZITO)" -> "1256926")
   str = str.replace(/\s*\([^)]*\)/g, '');
   
-  // 3. Se contiver traço com texto explicativo e não outro número de bloco ou sufixo de letra
-  // Ex: "1256926 - TAJ MAHAL" -> "1256926", mas "190/26 - A" -> "190/26A"
+  // 3. Se contiver traço com texto explicativo e não outro número de bloco ou sufixo de letra/código (ex: TM, TBL, IBW, A, B)
+  // Ex: "1256926 - TAJ MAHAL" -> "1256926", mas "190/26 - A" -> "190/26A", "2438 - TM" -> "2438TM"
   const partesTraco = str.split(/\s*[-–]\s*/);
   if (partesTraco.length > 1) {
-    if (/^[A-Za-z]$/.test(partesTraco[1])) {
+    if (/^[A-Za-z0-9]{1,5}$/.test(partesTraco[1])) {
       str = `${partesTraco[0]}${partesTraco[1].toUpperCase()}`;
     } else if (!/^\d+$/.test(partesTraco[1]) && !/^VT-/i.test(partesTraco[1]) && !/^\d{1,}\/\d{2,}$/.test(partesTraco[1])) {
       str = partesTraco[0];
     }
   }
 
-  // 4. Remove palavras descritivas comuns caso fiquem soltas no texto (ex: "1256926 TAJ MAHAL" -> "1256926")
-  str = str.replace(/\s+(?:TAJ\s+MAHAL|QUARTZITO|GRANITO|MARMORE|CARGA\s*\d*|MATERIAL).*$/i, '');
+  // 4. Remove palavras descritivas comuns caso fiquem soltas no texto
+  str = str.replace(/\s+(?:TAJ\s+MAHAL|QUARTZITO|GRANITO|BASALTO|MARMORE|CARGA\s*\d*|MATERIAL).*$/i, '');
 
-  // 5. Remove pontuações desnecessárias no início ou fim (preserva letras, dígitos e '/')
-  str = str.replace(/^[^\w/]+|[^\w/]+$/g, '').trim();
+  // 5. Elimina qualquer espaço interno remanescente entre dígitos e sufixos de texto (ex: "2438 TM" -> "2438TM", "3526 A" -> "3526A", "0426 TBL" -> "0426TBL")
+  if (!str.startsWith('VT-')) {
+    str = str.replace(/\s+/g, '');
+  } else {
+    str = str.replace(/(VT-\w+)\s+/i, '$1');
+  }
 
-  // 6. Regra especial de padronização de blocos Vermont:
+  // 6. Remove pontuações desnecessárias no início ou fim (preserva letras, dígitos, '/' e '-')
+  str = str.replace(/^[^\w/-]+|[^\w/-]+$/g, '').trim();
+
+  // 7. Regra especial de padronização de blocos Vermont:
   // Se for 3 dígitos numéricos terminando com ano válido (ex: 126 -> 0126 / 01/26)
   if (/^\d{3}$/.test(str)) {
     const seq = str.slice(0, 1);
