@@ -185,9 +185,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             total: 0,
             envelopado: 0,
             sem_envelopamento: 0,
-            pendente_envelopamento: 0,
-            em_andamento: 0,
-            aguardando_corte_reparo: 0
+            pendente_envelopamento: 0
           }
         });
       }
@@ -200,9 +198,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
       if (item.status === 'envelopado') grupoCliente.metricas.envelopado++;
       else if (item.status === 'sem_envelopamento') grupoCliente.metricas.sem_envelopamento++;
-      else if (item.status === 'pendente_envelopamento' || item.status === 'pendente') grupoCliente.metricas.pendente_envelopamento++;
-      else if (item.status === 'em_andamento') grupoCliente.metricas.em_andamento++;
-      else if (item.status === 'aguardando_corte_reparo') grupoCliente.metricas.aguardando_corte_reparo++;
+      else grupoCliente.metricas.pendente_envelopamento++;
 
       // Agrupamento por Romaneio
       const chaveRom = `${cliNome}___${numRom}`;
@@ -217,9 +213,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             total: 0,
             envelopado: 0,
             sem_envelopamento: 0,
-            pendente_envelopamento: 0,
-            em_andamento: 0,
-            aguardando_corte_reparo: 0
+            pendente_envelopamento: 0
           }
         });
       }
@@ -232,9 +226,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
       if (item.status === 'envelopado') grupoRom.metricas.envelopado++;
       else if (item.status === 'sem_envelopamento') grupoRom.metricas.sem_envelopamento++;
-      else if (item.status === 'pendente_envelopamento' || item.status === 'pendente') grupoRom.metricas.pendente_envelopamento++;
-      else if (item.status === 'em_andamento') grupoRom.metricas.em_andamento++;
-      else if (item.status === 'aguardando_corte_reparo') grupoRom.metricas.aguardando_corte_reparo++;
+      else grupoRom.metricas.pendente_envelopamento++;
     });
 
     const parseDataRomaneio = (dataStr) => {
@@ -666,8 +658,8 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         </div>
       </div>
 
-      {/* Cards de Métricas / 5 Status Oficiais */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 20 }}>
+      {/* Cards de Métricas / 3 Status Oficiais */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 20 }}>
         
         {/* Total */}
         <div className="glass-panel" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, borderLeft: '4px solid #64748b' }}>
@@ -698,77 +690,8 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             <Clock size={20} color="#64748b" />
           </div>
           <div>
-            <span style={{ fontSize: '0.74rem', color: 'var(--slate-500)', display: 'block', fontWeight: 600 }}>Pendente Envelop.</span>
+            <span style={{ fontSize: '0.74rem', color: 'var(--slate-500)', display: 'block', fontWeight: 600 }}>Pendente de Envelop.</span>
             <strong style={{ fontSize: '1.4rem', color: '#64748b' }}>{metricas.pendente_envelopamento}</strong>
-          </div>
-        </div>
-
-        {/* Em andamento */}
-        <div 
-          onClick={() => setFiltroStatus(filtroStatus === 'em_andamento' ? '' : 'em_andamento')}
-          className="glass-panel" 
-          style={{ 
-            padding: '14px 18px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 12, 
-            borderLeft: '4px solid #f59e0b',
-            cursor: 'pointer',
-            background: filtroStatus === 'em_andamento' ? 'rgba(245, 158, 11, 0.15)' : undefined
-          }}
-        >
-          <div style={{ background: 'rgba(245, 158, 11, 0.2)', padding: 10, borderRadius: 10 }}>
-            <Layers size={20} color="#d97706" />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.74rem', color: 'var(--slate-500)', display: 'block', fontWeight: 600 }}>Em andamento</span>
-            <strong style={{ fontSize: '1.4rem', color: '#d97706' }}>{metricas.em_andamento}</strong>
-          </div>
-        </div>
-
-        {/* Aguardando corte e reparo */}
-        <div 
-          onClick={() => setFiltroStatus(filtroStatus === 'aguardando_corte_reparo' ? '' : 'aguardando_corte_reparo')}
-          className="glass-panel" 
-          style={{ 
-            padding: '14px 18px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 12, 
-            borderLeft: '4px solid #ef4444',
-            cursor: 'pointer',
-            background: filtroStatus === 'aguardando_corte_reparo' ? 'rgba(239, 68, 68, 0.15)' : undefined
-          }}
-        >
-          <div style={{ background: 'rgba(239, 68, 68, 0.2)', padding: 10, borderRadius: 10 }}>
-            <Scissors size={20} color="#dc2626" />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.74rem', color: 'var(--slate-500)', display: 'block', fontWeight: 600 }}>Aguard. Corte/Reparo</span>
-            <strong style={{ fontSize: '1.4rem', color: '#dc2626' }}>{metricas.aguardando_corte_reparo}</strong>
-          </div>
-        </div>
-
-        {/* Envelopado */}
-        <div 
-          onClick={() => setFiltroStatus(filtroStatus === 'envelopado' ? '' : 'envelopado')}
-          className="glass-panel" 
-          style={{ 
-            padding: '14px 18px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 12, 
-            borderLeft: '4px solid #16a34a',
-            cursor: 'pointer',
-            background: filtroStatus === 'envelopado' ? 'rgba(22, 163, 74, 0.15)' : undefined
-          }}
-        >
-          <div style={{ background: 'rgba(22, 163, 74, 0.2)', padding: 10, borderRadius: 10 }}>
-            <CheckCircle2 size={20} color="#16a34a" />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.74rem', color: 'var(--slate-500)', display: 'block', fontWeight: 600 }}>Envelopado</span>
-            <strong style={{ fontSize: '1.4rem', color: '#16a34a' }}>{metricas.envelopado}</strong>
           </div>
         </div>
 
@@ -792,6 +715,29 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           <div>
             <span style={{ fontSize: '0.74rem', color: 'var(--slate-500)', display: 'block', fontWeight: 600 }}>Sem Envelopamento</span>
             <strong style={{ fontSize: '1.4rem', color: '#0284c7' }}>{metricas.sem_envelopamento}</strong>
+          </div>
+        </div>
+
+        {/* Envelopado */}
+        <div 
+          onClick={() => setFiltroStatus(filtroStatus === 'envelopado' ? '' : 'envelopado')}
+          className="glass-panel" 
+          style={{ 
+            padding: '14px 18px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 12, 
+            borderLeft: '4px solid #16a34a',
+            cursor: 'pointer',
+            background: filtroStatus === 'envelopado' ? 'rgba(22, 163, 74, 0.15)' : undefined
+          }}
+        >
+          <div style={{ background: 'rgba(22, 163, 74, 0.2)', padding: 10, borderRadius: 10 }}>
+            <CheckCircle2 size={20} color="#16a34a" />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.74rem', color: 'var(--slate-500)', display: 'block', fontWeight: 600 }}>Envelopado</span>
+            <strong style={{ fontSize: '1.4rem', color: '#16a34a' }}>{metricas.envelopado}</strong>
           </div>
         </div>
       </div>
@@ -1175,40 +1121,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                       </span>
                     )}
 
-                    {grupo.metricas.em_andamento > 0 && (
-                      <span style={{
-                        fontSize: '0.74rem',
-                        padding: '3px 9px',
-                        borderRadius: 20,
-                        background: 'rgba(245, 158, 11, 0.15)',
-                        color: '#d97706',
-                        border: '1px solid #d97706',
-                        fontWeight: 700,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4
-                      }}>
-                        <Layers size={12} /> {grupo.metricas.em_andamento} Em andamento
-                      </span>
-                    )}
-
-                    {grupo.metricas.aguardando_corte_reparo > 0 && (
-                      <span style={{
-                        fontSize: '0.74rem',
-                        padding: '3px 9px',
-                        borderRadius: 20,
-                        background: 'rgba(239, 68, 68, 0.15)',
-                        color: '#dc2626',
-                        border: '1px solid #dc2626',
-                        fontWeight: 700,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4
-                      }}>
-                        <Scissors size={12} /> {grupo.metricas.aguardando_corte_reparo} Reparo
-                      </span>
-                    )}
-
                     <span style={{
                       fontSize: '0.78rem',
                       fontWeight: 700,
@@ -1355,32 +1267,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                   fontWeight: 700
                                 }}>
                                   {rom.metricas.pendente_envelopamento} Pendente{rom.metricas.pendente_envelopamento > 1 ? 's' : ''}
-                                </span>
-                              )}
-                              {rom.metricas.em_andamento > 0 && (
-                                <span style={{
-                                  fontSize: '0.70rem',
-                                  padding: '2px 7px',
-                                  borderRadius: 12,
-                                  background: 'rgba(245, 158, 11, 0.15)',
-                                  color: '#d97706',
-                                  border: '1px solid #d97706',
-                                  fontWeight: 700
-                                }}>
-                                  {rom.metricas.em_andamento} Em andamento
-                                </span>
-                              )}
-                              {rom.metricas.aguardando_corte_reparo > 0 && (
-                                <span style={{
-                                  fontSize: '0.70rem',
-                                  padding: '2px 7px',
-                                  borderRadius: 12,
-                                  background: 'rgba(239, 68, 68, 0.15)',
-                                  color: '#dc2626',
-                                  border: '1px solid #dc2626',
-                                  fontWeight: 700
-                                }}>
-                                  {rom.metricas.aguardando_corte_reparo} Reparo
                                 </span>
                               )}
 
@@ -1635,8 +1521,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                             border: `1px solid ${statusInfo.border}`
                                           }}>
                                             {b.status === 'envelopado' && <CheckCircle2 size={12} />}
-                                            {b.status === 'em_andamento' && <Layers size={12} />}
-                                            {b.status === 'aguardando_corte_reparo' && <Scissors size={12} />}
                                             {b.status === 'pendente_envelopamento' && <Clock size={12} />}
                                             {b.status === 'sem_envelopamento' && <Ban size={12} />}
                                             <span>{statusInfo.label}</span>
@@ -1657,15 +1541,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                           ) : b.status === 'sem_envelopamento' && b.responsavel_liberacao ? (
                                             <div style={{ fontSize: '0.74rem', color: '#0284c7' }}>
                                               <span>Liberado direto por: <strong>{b.responsavel_liberacao}</strong></span>
-                                            </div>
-                                          ) : b.status === 'em_andamento' && b.responsavel_envelopamento ? (
-                                            <div style={{ fontSize: '0.74rem', color: '#d97706' }}>
-                                              <span>Envelopando: <strong>{b.responsavel_envelopamento}</strong></span>
-                                              {b.data_envelopamento && (
-                                                <span style={{ display: 'block', color: 'var(--slate-400)', fontSize: '0.70rem' }}>
-                                                  Início: {formatarDataHoraBR(b.data_envelopamento)}
-                                                </span>
-                                              )}
                                             </div>
                                           ) : (
                                             <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>
@@ -1708,12 +1583,12 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                                 <button
                                                   type="button"
                                                   disabled={executando}
-                                                  onClick={() => handleAvancarStatus(b, 'em_andamento')}
-                                                  className="btn btn-secondary"
-                                                  style={{ padding: '4px 8px', fontSize: '0.72rem', gap: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', borderColor: '#f59e0b' }}
-                                                  title="Iniciar Envelopamento no pátio"
+                                                  onClick={() => handleAvancarStatus(b, 'envelopado')}
+                                                  className="btn btn-vermont"
+                                                  style={{ padding: '4px 8px', fontSize: '0.72rem', gap: 4 }}
+                                                  title="Finalizar e marcar como Envelopado"
                                                 >
-                                                  <Play size={11} /> Iniciar
+                                                  <CheckCircle2 size={12} /> Envelopado
                                                 </button>
                                                 <button
                                                   type="button"
@@ -1728,7 +1603,20 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                               </>
                                             )}
 
-                                            {b.status === 'em_andamento' && (
+                                            {b.status === 'envelopado' && (
+                                              <button
+                                                type="button"
+                                                disabled={executando}
+                                                onClick={() => handleAvancarStatus(b, 'pendente_envelopamento')}
+                                                className="btn btn-secondary"
+                                                style={{ padding: '4px 7px', fontSize: '0.70rem', color: 'var(--slate-400)' }}
+                                                title="Reverter para Pendente de Envelopamento"
+                                              >
+                                                Reverter
+                                              </button>
+                                            )}
+
+                                            {b.status === 'sem_envelopamento' && (
                                               <>
                                                 <button
                                                   type="button"
@@ -1736,47 +1624,21 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                                   onClick={() => handleAvancarStatus(b, 'envelopado')}
                                                   className="btn btn-vermont"
                                                   style={{ padding: '4px 8px', fontSize: '0.72rem', gap: 4 }}
-                                                  title="Finalizar e marcar como Envelopado"
+                                                  title="Alterar para Envelopado"
                                                 >
                                                   <CheckCircle2 size={12} /> Envelopado
                                                 </button>
                                                 <button
                                                   type="button"
                                                   disabled={executando}
-                                                  onClick={() => handleAvancarStatus(b, 'aguardando_corte_reparo')}
+                                                  onClick={() => handleAvancarStatus(b, 'pendente_envelopamento')}
                                                   className="btn btn-secondary"
-                                                  style={{ padding: '4px 7px', fontSize: '0.70rem', color: '#dc2626' }}
-                                                  title="Necessita de corte ou reparo"
+                                                  style={{ padding: '4px 7px', fontSize: '0.70rem', color: 'var(--slate-400)' }}
+                                                  title="Reverter para Pendente de Envelopamento"
                                                 >
-                                                  Corte
+                                                  Reverter
                                                 </button>
                                               </>
-                                            )}
-
-                                            {b.status === 'aguardando_corte_reparo' && (
-                                              <button
-                                                type="button"
-                                                disabled={executando}
-                                                onClick={() => handleAvancarStatus(b, 'em_andamento')}
-                                                className="btn btn-secondary"
-                                                style={{ padding: '4px 8px', fontSize: '0.72rem', gap: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', borderColor: '#f59e0b' }}
-                                                title="Retomar para processo de envelopamento"
-                                              >
-                                                <Play size={11} /> Retomar
-                                              </button>
-                                            )}
-
-                                            {(b.status === 'envelopado' || b.status === 'sem_envelopamento') && (
-                                              <button
-                                                type="button"
-                                                disabled={executando}
-                                                onClick={() => handleAvancarStatus(b, 'em_andamento')}
-                                                className="btn btn-secondary"
-                                                style={{ padding: '4px 6px', fontSize: '0.70rem', color: 'var(--slate-400)' }}
-                                                title="Reverter para Em Andamento"
-                                              >
-                                                Reverter
-                                              </button>
                                             )}
 
                                             <button
@@ -2002,8 +1864,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                           border: `1px solid ${statusInfo.border}`
                         }}>
                           {b.status === 'envelopado' && <CheckCircle2 size={13} />}
-                          {b.status === 'em_andamento' && <Layers size={13} />}
-                          {b.status === 'aguardando_corte_reparo' && <Scissors size={13} />}
                           {b.status === 'pendente_envelopamento' && <Clock size={13} />}
                           {b.status === 'sem_envelopamento' && <Ban size={13} />}
                           <span>{statusInfo.label}</span>
@@ -2023,15 +1883,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                         ) : b.status === 'sem_envelopamento' && b.responsavel_liberacao ? (
                           <div style={{ fontSize: '0.74rem', color: '#0284c7' }}>
                             <span>Liberado direto por: <strong>{b.responsavel_liberacao}</strong></span>
-                          </div>
-                        ) : b.status === 'em_andamento' && b.responsavel_envelopamento ? (
-                          <div style={{ fontSize: '0.74rem', color: '#d97706' }}>
-                            <span>Envelopando: <strong>{b.responsavel_envelopamento}</strong></span>
-                            {b.data_envelopamento && (
-                              <span style={{ display: 'block', color: 'var(--slate-400)', fontSize: '0.70rem' }}>
-                                Início: {formatarDataHoraBR(b.data_envelopamento)}
-                              </span>
-                            )}
                           </div>
                         ) : (
                           <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>
@@ -2073,12 +1924,12 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                               <button
                                 type="button"
                                 disabled={executando}
-                                onClick={() => handleAvancarStatus(b, 'em_andamento')}
-                                className="btn btn-secondary"
-                                style={{ padding: '5px 8px', fontSize: '0.74rem', gap: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', borderColor: '#f59e0b' }}
-                                title="Iniciar Envelopamento no pátio"
+                                onClick={() => handleAvancarStatus(b, 'envelopado')}
+                                className="btn btn-vermont"
+                                style={{ padding: '5px 8px', fontSize: '0.74rem', gap: 4 }}
+                                title="Finalizar e marcar como Envelopado"
                               >
-                                <Play size={12} /> Iniciar
+                                <CheckCircle2 size={13} /> Envelopado
                               </button>
                               <button
                                 type="button"
@@ -2093,7 +1944,20 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                             </>
                           )}
 
-                          {b.status === 'em_andamento' && (
+                          {b.status === 'envelopado' && (
+                            <button
+                              type="button"
+                              disabled={executando}
+                              onClick={() => handleAvancarStatus(b, 'pendente_envelopamento')}
+                              className="btn btn-secondary"
+                              style={{ padding: '5px 7px', fontSize: '0.70rem', color: 'var(--slate-400)' }}
+                              title="Reverter para Pendente de Envelopamento"
+                            >
+                              Reverter
+                            </button>
+                          )}
+
+                          {b.status === 'sem_envelopamento' && (
                             <>
                               <button
                                 type="button"
@@ -2101,47 +1965,21 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                 onClick={() => handleAvancarStatus(b, 'envelopado')}
                                 className="btn btn-vermont"
                                 style={{ padding: '5px 8px', fontSize: '0.74rem', gap: 4 }}
-                                title="Finalizar e marcar como Envelopado"
+                                title="Alterar para Envelopado"
                               >
                                 <CheckCircle2 size={13} /> Envelopado
                               </button>
                               <button
                                 type="button"
                                 disabled={executando}
-                                onClick={() => handleAvancarStatus(b, 'aguardando_corte_reparo')}
+                                onClick={() => handleAvancarStatus(b, 'pendente_envelopamento')}
                                 className="btn btn-secondary"
-                                style={{ padding: '5px 7px', fontSize: '0.72rem', color: '#dc2626' }}
-                                title="Necessita de corte ou reparo"
+                                style={{ padding: '5px 7px', fontSize: '0.70rem', color: 'var(--slate-400)' }}
+                                title="Reverter para Pendente de Envelopamento"
                               >
-                                Corte/Reparo
+                                Reverter
                               </button>
                             </>
-                          )}
-
-                          {b.status === 'aguardando_corte_reparo' && (
-                            <button
-                              type="button"
-                              disabled={executando}
-                              onClick={() => handleAvancarStatus(b, 'em_andamento')}
-                              className="btn btn-secondary"
-                              style={{ padding: '5px 8px', fontSize: '0.74rem', gap: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', borderColor: '#f59e0b' }}
-                              title="Retomar para processo de envelopamento"
-                            >
-                              <Play size={12} /> Retomar
-                            </button>
-                          )}
-
-                          {(b.status === 'envelopado' || b.status === 'sem_envelopamento') && (
-                            <button
-                              type="button"
-                              disabled={executando}
-                              onClick={() => handleAvancarStatus(b, 'em_andamento')}
-                              className="btn btn-secondary"
-                              style={{ padding: '5px 6px', fontSize: '0.70rem', color: 'var(--slate-400)' }}
-                              title="Reverter para Em Andamento"
-                            >
-                              Reverter
-                            </button>
                           )}
 
                           <button
@@ -2261,75 +2099,6 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             <button
               type="button"
               disabled={executandoLote}
-              onClick={() => handleAlterarStatusLote('sem_envelopamento')}
-              className="btn"
-              style={{
-                background: 'rgba(56, 189, 248, 0.2)',
-                color: '#38bdf8',
-                border: '1px solid rgba(56, 189, 248, 0.5)',
-                padding: '6px 11px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                borderRadius: 7,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                cursor: 'pointer'
-              }}
-              title="Marcar todos os selecionados como Sem Envelopamento"
-            >
-              <Ban size={13} /> Sem Envelopamento
-            </button>
-
-            <button
-              type="button"
-              disabled={executandoLote}
-              onClick={() => handleAlterarStatusLote('em_andamento')}
-              className="btn"
-              style={{
-                background: 'rgba(245, 158, 11, 0.2)',
-                color: '#fbbf24',
-                border: '1px solid rgba(245, 158, 11, 0.5)',
-                padding: '6px 11px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                borderRadius: 7,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                cursor: 'pointer'
-              }}
-              title="Marcar todos os selecionados como Em Andamento"
-            >
-              <Layers size={13} /> Em Andamento
-            </button>
-
-            <button
-              type="button"
-              disabled={executandoLote}
-              onClick={() => handleAlterarStatusLote('aguardando_corte_reparo')}
-              className="btn"
-              style={{
-                background: 'rgba(239, 68, 68, 0.18)',
-                color: '#f87171',
-                border: '1px solid rgba(239, 68, 68, 0.45)',
-                padding: '6px 11px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                borderRadius: 7,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                cursor: 'pointer'
-              }}
-              title="Marcar todos os selecionados como Aguardando Corte/Reparo"
-            >
-              <Scissors size={13} /> Corte/Reparo
-            </button>
-
-            <button
-              type="button"
-              disabled={executandoLote}
               onClick={() => handleAlterarStatusLote('pendente_envelopamento')}
               className="btn"
               style={{
@@ -2345,9 +2114,9 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                 gap: 5,
                 cursor: 'pointer'
               }}
-              title="Marcar todos os selecionados como Não Envelopado / Pendente"
+              title="Marcar todos os selecionados como Pendente de Envelopamento"
             >
-              <Clock size={13} /> Não Envelopado
+              <Clock size={13} /> Pendente de Envelopamento
             </button>
           </div>
 

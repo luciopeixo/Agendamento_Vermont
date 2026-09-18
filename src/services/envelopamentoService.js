@@ -4,7 +4,7 @@ const LOCAL_STORAGE_KEY = 'vermont_envelopamentos_locais';
 const CLIENTES_STORAGE_KEY = 'vermont_clientes_cadastrados';
 
 /**
- * Definição oficial dos Status de Envelopamento de Bloco da Vermont Mineração
+ * Definição oficial dos 3 Status de Envelopamento de Bloco da Vermont Mineração
  */
 export const STATUS_ENVELOPAMENTO = {
   PENDENTE_ENVELOPAMENTO: {
@@ -13,31 +13,7 @@ export const STATUS_ENVELOPAMENTO = {
     cor: '#94a3b8',
     bg: 'rgba(148, 163, 184, 0.15)',
     border: '#64748b',
-    descricao: 'Aguardando início do envelopamento no pátio'
-  },
-  EM_ANDAMENTO: {
-    id: 'em_andamento',
-    label: 'Em andamento',
-    cor: '#f59e0b',
-    bg: 'rgba(245, 158, 11, 0.15)',
-    border: '#d97706',
-    descricao: 'Bloco passando pelo processo físico de envelopamento'
-  },
-  AGUARDANDO_CORTE_REPARO: {
-    id: 'aguardando_corte_reparo',
-    label: 'Aguardando corte e reparo',
-    cor: '#f87171',
-    bg: 'rgba(239, 68, 68, 0.15)',
-    border: '#dc2626',
-    descricao: 'Bloco necessita de corte ou reparo antes de ser liberado'
-  },
-  ENVELOPADO: {
-    id: 'envelopado',
-    label: 'Envelopado',
-    cor: '#4ade80',
-    bg: 'rgba(34, 197, 94, 0.15)',
-    border: '#22c55e',
-    descricao: 'Bloco devidamente envelopado e liberado'
+    descricao: 'Aguardando envelopamento no pátio'
   },
   SEM_ENVELOPAMENTO: {
     id: 'sem_envelopamento',
@@ -46,6 +22,14 @@ export const STATUS_ENVELOPAMENTO = {
     bg: 'rgba(56, 189, 248, 0.15)',
     border: '#0284c7',
     descricao: 'Bloco liberado sem necessidade de envelopamento'
+  },
+  ENVELOPADO: {
+    id: 'envelopado',
+    label: 'Envelopado',
+    cor: '#4ade80',
+    bg: 'rgba(34, 197, 94, 0.15)',
+    border: '#22c55e',
+    descricao: 'Bloco devidamente envelopado e liberado'
   }
 };
 
@@ -496,12 +480,14 @@ export const listarEnvelopamentos = async (filtros = {}) => {
     dados = dadosLocais;
   }
 
-  // Normalizar status legados caso existam
+  // Normalizar status legados caso existam para os 3 status oficiais
   dados = dados.map(item => {
     let st = item.status;
-    if (st === 'pendente') st = 'pendente_envelopamento';
-    if (st === 'em_envelopamento') st = 'em_andamento';
-    if (st === 'conferido' || st === 'liberado') st = 'envelopado';
+    if (st === 'pendente' || st === 'em_envelopamento' || st === 'em_andamento' || st === 'aguardando_corte_reparo') {
+      st = 'pendente_envelopamento';
+    } else if (st === 'conferido' || st === 'liberado') {
+      st = 'envelopado';
+    }
     return { ...item, status: st };
   });
 
@@ -1352,16 +1338,14 @@ export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelo
 };
 
 /**
- * Calcula os totais e métricas para os cards de resumo com os status oficiais
+ * Calcula os totais e métricas para os cards de resumo com os 3 status oficiais
  */
 export const calcularMetricasEnvelopamento = (lista = []) => {
   return {
     total: lista.length,
-    pendente_envelopamento: lista.filter(i => i.status === 'pendente_envelopamento' || i.status === 'pendente').length,
-    em_andamento: lista.filter(i => i.status === 'em_andamento' || i.status === 'em_envelopamento').length,
-    aguardando_corte_reparo: lista.filter(i => i.status === 'aguardando_corte_reparo').length,
-    envelopado: lista.filter(i => i.status === 'envelopado' || i.status === 'liberado' || i.status === 'conferido').length,
-    sem_envelopamento: lista.filter(i => i.status === 'sem_envelopamento').length
+    pendente_envelopamento: lista.filter(i => i.status === 'pendente_envelopamento' || i.status === 'pendente' || i.status === 'em_andamento' || i.status === 'aguardando_corte_reparo').length,
+    sem_envelopamento: lista.filter(i => i.status === 'sem_envelopamento').length,
+    envelopado: lista.filter(i => i.status === 'envelopado' || i.status === 'liberado' || i.status === 'conferido').length
   };
 };
 
