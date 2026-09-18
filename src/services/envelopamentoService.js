@@ -149,19 +149,28 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
   let obs = row.observacoes || '';
   let rom = row.numero_romaneio || '';
   let peso = row.peso_kg || '';
-  let dataRom = row.data_romaneio || '';
+  let dataRom = row.data_romaneio || row.data_emissao || '';
 
   const matchRom = obs.match(/\[ROM:\s*([^\]]+)\]/i);
-  if (matchRom) rom = matchRom[1].trim();
+  if (matchRom) {
+    rom = matchRom[1].trim();
+  } else if (!rom) {
+    const matchRomTexto = obs.match(/(?:Romaneio\s+N[º°o]?\s*|Romaneio\s+|ROM:\s*)([0-9A-Za-z/]+)/i);
+    if (matchRomTexto) rom = matchRomTexto[1].trim();
+  }
 
   const matchPeso = obs.match(/\[PESO:\s*([^\]]+)\]/i);
-  if (matchPeso) peso = matchPeso[1].trim();
+  if (matchPeso) {
+    peso = matchPeso[1].trim();
+  } else if (!peso) {
+    const matchPesoTexto = obs.match(/(?:Peso:\s*|Peso\s*|PESO:\s*)([0-9.,]+)\s*(?:kg)?/i);
+    if (matchPesoTexto) peso = matchPesoTexto[1].trim();
+  }
 
   const matchData = obs.match(/\[DATA_ROM:\s*([^\]]+)\]/i);
-  if (matchData) dataRom = matchData[1].trim();
-
-  // Fallback: extrair data do texto "Romaneio Nº ... (DD/MM/YYYY)" caso não haja a tag explícita
-  if (!dataRom) {
+  if (matchData) {
+    dataRom = matchData[1].trim();
+  } else if (!dataRom) {
     const matchDataTexto = obs.match(/(?:Romaneio\s+N[º°o]?\s*[0-9A-Za-z/]+\s*\(([0-9]{2}\/[0-9]{2}\/[0-9]{4})\)|([0-9]{2}\/[0-9]{2}\/[0-9]{4}))/i);
     if (matchDataTexto) {
       dataRom = matchDataTexto[1] || matchDataTexto[2];
@@ -643,19 +652,38 @@ export const listarEnvelopamentos = async (filtros = {}) => {
 
   // Aplicar filtros em memória
   return dados.filter(item => {
-    if (filtros.pedreira && item.pedreira_nome !== filtros.pedreira) return false;
+    if (filtros.pedreira) {
+      const pF = normalizarPedreira(filtros.pedreira);
+      const pI = normalizarPedreira(item.pedreira_id, item.pedreira_nome);
+      if (pF && pI && pF !== pI && !pI.startsWith(pF) && !pF.startsWith(pI)) {
+        return false;
+      }
+    }
     if (filtros.status && item.status !== filtros.status) return false;
     if (filtros.cliente && !String(item.cliente_nome || '').toLowerCase().includes(filtros.cliente.toLowerCase())) return false;
     if (filtros.busca) {
       const termo = filtros.busca.toLowerCase().trim();
+      const termoSemZeros = termo.replace(/^0+/, '');
       const bloco = String(item.numero_bloco || '').toLowerCase();
       const cli = String(item.cliente_nome || '').toLowerCase();
+      const cnpj = String(item.cliente_cnpj || '').toLowerCase();
       const mat = String(item.material || '').toLowerCase();
       const ped = String(item.pedreira_nome || '').toLowerCase();
       const rom = String(item.numero_romaneio || '').toLowerCase();
       const dataRom = String(item.data_romaneio || '').toLowerCase();
       const obs = String(item.observacoes || '').toLowerCase();
-      if (!bloco.includes(termo) && !cli.includes(termo) && !mat.includes(termo) && !ped.includes(termo) && !rom.includes(termo) && !dataRom.includes(termo) && !obs.includes(termo)) {
+
+      const bate = bloco.includes(termo) ||
+                   cli.includes(termo) ||
+                   cnpj.includes(termo) ||
+                   mat.includes(termo) ||
+                   ped.includes(termo) ||
+                   rom.includes(termo) ||
+                   (termoSemZeros && rom.includes(termoSemZeros)) ||
+                   dataRom.includes(termo) ||
+                   obs.includes(termo);
+
+      if (!bate) {
         return false;
       }
     }

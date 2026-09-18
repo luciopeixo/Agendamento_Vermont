@@ -987,7 +987,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
            ========================================================================= */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {gruposPorCliente.map((grupo) => {
-            const isExpandido = clientesExpandidos.has(grupo.clienteNome);
+            const isExpandido = buscaTexto ? true : clientesExpandidos.has(grupo.clienteNome);
             const pedreirasStr = Array.from(grupo.pedreiras).join(', ') || 'Polo Vermont';
 
             return (
@@ -1159,7 +1159,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                 {isExpandido && (
                   <div style={{ padding: '12px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(0,0,0,0.06)' }}>
                     {grupo.romaneios.map((rom) => {
-                      const isRomExpandido = romaneiosExpandidos.has(rom.chaveRomaneio);
+                      const isRomExpandido = buscaTexto ? true : romaneiosExpandidos.has(rom.chaveRomaneio);
                       const pedreirasRomStr = Array.from(rom.pedreiras).join(', ') || 'Polo Vermont';
 
                       return (
