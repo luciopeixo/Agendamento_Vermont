@@ -36,6 +36,7 @@ import {
   atualizarStatusEnvelopamentosEmLote,
   excluirEnvelopamento, 
   excluirEnvelopamentosEmLote,
+  excluirRomaneioTotalmente,
   calcularMetricasEnvelopamento, 
   STATUS_ENVELOPAMENTO,
   inscreverEnvelopamentosRealtime,
@@ -478,12 +479,16 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
     solicitarConfirmacao({
       titulo: `Excluir Romaneio Completo (${nomeRom})`,
       mensagem: `⚠️ ATENÇÃO: Deseja realmente remover TODOS os ${rom.blocos.length} bloco(s) do ${nomeRom}?`,
-      detalhes: 'Todos os blocos vinculados a este romaneio serão excluídos permanentemente.',
+      detalhes: 'Todos os blocos vinculados a este romaneio serão excluídos permanentemente do banco de dados e do sistema.',
       textoBotao: 'Sim, Excluir Todos os Blocos',
       onConfirmar: async () => {
         try {
           const ids = rom.blocos.map(b => b.id);
-          await excluirEnvelopamentosEmLote(ids);
+          await excluirRomaneioTotalmente({
+            numeroRomaneio: rom.numeroRomaneio,
+            clienteNome: rom.clienteNome,
+            ids: ids
+          }, usuarioNome);
           await carregarDados();
         } catch (err) {
           console.error('Erro ao excluir romaneio:', err);

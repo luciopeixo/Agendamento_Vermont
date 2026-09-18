@@ -1097,8 +1097,13 @@ export const excluirEnvelopamento = async (id, usuarioNome = 'Equipe Vermont') =
 
   if (isSupabaseConfigurado()) {
     try {
-      await supabase.from('envelopamentos').delete().eq('id', id);
-    } catch (err) {}
+      const { error } = await supabase.from('envelopamentos').delete().eq('id', id);
+      if (error) {
+        console.error('[Envelopamento] Erro ao excluir no Supabase:', error);
+      }
+    } catch (err) {
+      console.warn('[Envelopamento] Exceção ao excluir no Supabase:', err);
+    }
   }
 
   // Registrar histórico de exclusão
@@ -1134,10 +1139,18 @@ export const excluirEnvelopamentosEmLote = async (ids = [], usuarioNome = 'Equip
   salvarEnvelopamentosLocais(novaLista);
 
   if (isSupabaseConfigurado()) {
-    try {
-      await supabase.from('envelopamentos').delete().in('id', ids);
-    } catch (err) {
-      console.warn('Erro ao excluir lote no Supabase:', err);
+    // Excluir em lotes de até 30 IDs para evitar restrições de tamanho de query no Supabase PostgREST
+    const chunkSize = 30;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      try {
+        const { error } = await supabase.from('envelopamentos').delete().in('id', chunk);
+        if (error) {
+          console.error('[Envelopamento] Erro ao excluir lote no Supabase:', error);
+        }
+      } catch (err) {
+        console.warn('[Envelopamento] Exceção ao excluir lote no Supabase:', err);
+      }
     }
   }
 
@@ -1157,6 +1170,86 @@ export const excluirEnvelopamentosEmLote = async (ids = [], usuarioNome = 'Equip
     }
   } catch (eH) {}
 
+  notificarAlteracaoEnvelopamento();
+  return true;
+};
+
+/**
+ * Exclui totalmente um romaneio e todos os seus blocos associados, garantindo limpeza profunda
+ * tanto por lista de IDs quanto por tags de romaneio no banco de dados e no cache local.
+ */
+export const excluirRomaneioTotalmente = async ({
+  numeroRomaneio = '',
+  clienteNome = '',
+  ids = []
+}, usuarioNome = 'Equipe Vermont') => {
+  const romNorm = normalizarRomaneio(numeroRomaneio);
+  const locais = carregarEnvelopamentosLocais();
+  const setIds = new Set(ids || []);
+
+  // 1. Identifica todos os blocos locais que batem com os IDs ou com o número do romaneio
+  const excluidos = locais.filter(item => {
+    if (setIds.has(item.id)) return true;
+    if (romNorm) {
+      const romItem = normalizarRomaneio(item.numero_romaneio);
+      if (romItem && romItem === romNorm) return true;
+      if (item.observacoes && (item.observacoes.includes(`[ROM:${numeroRomaneio}]`) || item.observacoes.includes(`[ROM:${romNorm}]`))) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  const idsParaExcluir = Array.from(new Set([...ids, ...excluidos.map(e => e.id)]));
+  const idsSetCompleto = new Set(idsParaExcluir);
+
+  // 2. Remove imediatamente do LocalStorage
+  const novaLista = locais.filter(item => !idsSetCompleto.has(item.id));
+  salvarEnvelopamentosLocais(novaLista);
+
+  // 3. Remove do Supabase com tratamento em lotes e consultas por tag de observação
+  if (isSupabaseConfigurado()) {
+    // 3.1 Exclusão por IDs em chunks
+    const chunkSize = 30;
+    for (let i = 0; i < idsParaExcluir.length; i += chunkSize) {
+      const chunk = idsParaExcluir.slice(i, i + chunkSize);
+      try {
+        const { error } = await supabase.from('envelopamentos').delete().in('id', chunk);
+        if (error) {
+          console.error('[Envelopamento] Erro ao excluir lote por ID no Supabase:', error);
+        }
+      } catch (eChunk) {
+        console.warn('[Envelopamento] Exceção ao excluir chunk no Supabase:', eChunk);
+      }
+    }
+
+    // 3.2 Exclusão adicional por tag de observações para limpar eventuais duplicatas órfãs
+    if (romNorm) {
+      try {
+        await supabase.from('envelopamentos').delete().ilike('observacoes', `%[ROM:${numeroRomaneio}]%`);
+        if (romNorm !== numeroRomaneio) {
+          await supabase.from('envelopamentos').delete().ilike('observacoes', `%[ROM:${romNorm}]%`);
+        }
+      } catch (eTag) {
+        console.warn('[Envelopamento] Exceção ao limpar tags de romaneio no Supabase:', eTag);
+      }
+    }
+  }
+
+  // 4. Registrar histórico da exclusão
+  try {
+    const qtd = excluidos.length || idsParaExcluir.length;
+    await registrarHistoricoEnvelopamento({
+      tipo_acao: 'EXCLUSAO_ROMANEIO',
+      numero_bloco: excluidos[0]?.numero_bloco || 'ROMANEIO_COMPLETO',
+      numero_romaneio: numeroRomaneio || romNorm,
+      cliente_nome: clienteNome || (excluidos[0]?.cliente_nome) || 'Não especificado',
+      usuario_nome: usuarioNome,
+      detalhes: `Romaneio Nº ${numeroRomaneio || romNorm} excluído completamente (${qtd} bloco(s) removidos)`
+    });
+  } catch (eH) {}
+
+  // 5. Notificar ouvintes
   notificarAlteracaoEnvelopamento();
   return true;
 };
