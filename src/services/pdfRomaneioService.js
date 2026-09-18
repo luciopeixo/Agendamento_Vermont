@@ -302,30 +302,54 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
  */
 export const extrairChavesComparacaoBloco = (numeroBloco) => {
   if (!numeroBloco) return [];
-  const limpo = String(numeroBloco).trim().toUpperCase().replace(/[.\s]+$/, '');
+  const limpo = String(numeroBloco).trim().toUpperCase().replace(/[.\s-]+$/, '').replace(/^[.\s-]+/, '');
   const apenasAlfaNum = limpo.replace(/[^0-9A-Z]/g, '');
   const chaves = new Set([limpo, apenasAlfaNum]);
 
-  // Se tem barra (ex: 36/26, 1/26, 01/26, 747/26, 1256/26)
+  // Se tem hífen (ex: 190/26-A -> 190/26A)
+  if (limpo.includes('-')) {
+    chaves.add(limpo.replace(/-/g, ''));
+    chaves.add(limpo.replace(/-/g, '/'));
+  }
+
+  // Se tem barra (ex: 36/26, 1/26, 01/26, 747/26, 190/26A, 190/26-A)
   if (limpo.includes('/')) {
     const partes = limpo.split('/');
     const seq = partes[0]?.trim();
-    const ano = partes[1]?.trim();
+    const resto = partes[1]?.trim(); // ex: "26", "26A", "26-A", "26 A"
+
     if (seq) {
       chaves.add(seq);
       if (/^\d$/.test(seq)) {
         chaves.add(`0${seq}`); // "01"
       }
     }
-    if (seq && ano) {
-      chaves.add(`${seq}${ano}`); // "3626"
-      if (/^\d$/.test(seq)) {
-        chaves.add(`0${seq}/${ano}`); // "01/26"
-        chaves.add(`0${seq}${ano}`); // "0126"
-      }
-      if (seq.startsWith('0') && seq.length === 2) {
-        chaves.add(`${seq.slice(1)}/${ano}`); // "1/26"
-        chaves.add(`${seq.slice(1)}${ano}`); // "126"
+
+    if (seq && resto) {
+      const matchAnoLetra = resto.match(/^(\d{2,4})[-\s]?([A-Z])?$/);
+      if (matchAnoLetra) {
+        const ano = matchAnoLetra[1];
+        const letra = matchAnoLetra[2] || '';
+        
+        chaves.add(`${seq}${ano}${letra}`); // "19026A"
+        chaves.add(`${seq}/${ano}${letra}`); // "190/26A"
+        if (letra) {
+          chaves.add(`${seq}/${ano}-${letra}`); // "190/26-A"
+          chaves.add(`${seq}/${ano} ${letra}`); // "190/26 A"
+          chaves.add(`${seq}${letra}`); // "190A"
+          chaves.add(`${seq}-${letra}`); // "190-A"
+        }
+
+        if (/^\d$/.test(seq)) {
+          chaves.add(`0${seq}/${ano}${letra}`); // "01/26A"
+          chaves.add(`0${seq}${ano}${letra}`); // "0126A"
+        }
+        if (seq.startsWith('0') && seq.length === 2) {
+          chaves.add(`${seq.slice(1)}/${ano}${letra}`); // "1/26A"
+          chaves.add(`${seq.slice(1)}${ano}${letra}`); // "126A"
+        }
+      } else {
+        chaves.add(`${seq}${resto}`);
       }
     }
   }
@@ -344,6 +368,16 @@ export const extrairChavesComparacaoBloco = (numeroBloco) => {
     }
   }
 
+  // Se for 4 caracteres com sufixo de letra (ex: 126A -> 01/26A, 1/26A, 0126A)
+  const match3NumLetra = apenasAlfaNum.match(/^(\d)(\d{2})([A-Z])$/);
+  if (match3NumLetra) {
+    const [, seq, ano, letra] = match3NumLetra;
+    chaves.add(`0${seq}${ano}${letra}`);
+    chaves.add(`0${seq}/${ano}${letra}`);
+    chaves.add(`${seq}/${ano}${letra}`);
+    chaves.add(`${seq}${letra}`);
+  }
+
   // Se for 4 dígitos numéricos (ex: 0126, 3626, 1826)
   if (/^\d{4}$/.test(apenasAlfaNum)) {
     const seq = apenasAlfaNum.slice(0, 2);
@@ -360,12 +394,32 @@ export const extrairChavesComparacaoBloco = (numeroBloco) => {
     }
   }
 
+  // Se for 5 caracteres com ano e letra (ex: 3626A, 0126A)
+  const match4NumLetra = apenasAlfaNum.match(/^(\d{2})(\d{2})([A-Z])$/);
+  if (match4NumLetra) {
+    const [, seq, ano, letra] = match4NumLetra;
+    chaves.add(`${seq}/${ano}${letra}`);
+    chaves.add(`${seq}/${ano}-${letra}`);
+    chaves.add(`${seq}${letra}`);
+  }
+
   // Se é número de 5 dígitos sem barra com final de ano (ex: 74726 -> 747/26)
   if (/^\d{5}$/.test(apenasAlfaNum) && (apenasAlfaNum.endsWith('24') || apenasAlfaNum.endsWith('25') || apenasAlfaNum.endsWith('26') || apenasAlfaNum.endsWith('27') || apenasAlfaNum.endsWith('28'))) {
     const base = apenasAlfaNum.slice(0, 3);
     const ano = apenasAlfaNum.slice(3);
     chaves.add(`${base}/${ano}`);
     chaves.add(base);
+  }
+
+  // Se for 6 caracteres com base 3 + ano 2 + letra (ex: 19026A -> 190/26A)
+  const match5NumLetra = apenasAlfaNum.match(/^(\d{3})(\d{2})([A-Z])$/);
+  if (match5NumLetra) {
+    const [, base, ano, letra] = match5NumLetra;
+    chaves.add(`${base}/${ano}${letra}`);
+    chaves.add(`${base}/${ano}-${letra}`);
+    chaves.add(`${base}/${ano} ${letra}`);
+    chaves.add(`${base}${letra}`);
+    chaves.add(`${base}-${letra}`);
   }
 
   // Se for 6 dígitos (ex: 125626 -> 1256/26)
@@ -381,13 +435,13 @@ export const extrairChavesComparacaoBloco = (numeroBloco) => {
 
 /**
  * Analisa a seção OBSERVAÇÕES do romaneio e mapeia valores de envelopamento por bloco
- * com suporte a múltiplas páginas e variações de notação (ex: 36/26, 126, 74726 vs 747/26).
+ * com suporte a múltiplas páginas e variações de notação (ex: 190/26A, 190/26B, 36/26, 126, 74726 vs 747/26).
  */
 export const extrairObservacoesEEnvelopamento = (textoCompleto) => {
   const resultado = {
     textoObservacoes: '',
     semEnvelopamentoGeral: false,
-    envelopamentoPorBloco: new Map() // chaveNormalizada -> { numeroOriginal, valor, detalhe }
+    envelopamentoPorBloco: new Map() // chaveNormalizada -> { blocoOriginal, valor, detalhe }
   };
 
   // Pode haver mais de uma seção OBSERVAÇÕES em PDFs com múltiplas páginas
@@ -409,28 +463,66 @@ export const extrairObservacoesEEnvelopamento = (textoCompleto) => {
     resultado.semEnvelopamentoGeral = true;
   }
 
-  // Buscar linhas de envelopamento por bloco:
-  // Ex: "36/26- R$ 3.507,84" ou "63/26.- R$ 273,56" ou "74726 - R$ 2.042,88" ou "1826- R$ 3.617,60" ou "126 - R$ 1.500,00"
-  const regexLinhaBlocoValor = /(?:^|[\s\n\r])(?:(?:BLOCO|BL\.?|N[º°]?)\s*)?([0-9]{1,6}(?:\/[0-9]{2,4})?\.?|[0-9]{3,7}\.?)\s*[-:]?\s*(?:\([^\)]*\)\s*)?R?\$?\s*([\d.]+,\d{2})/gmi;
-  let matchItem;
+  // Processar linha por linha da seção observações
+  const linhasObs = textoObsFinal.split('\n').map(l => l.trim()).filter(Boolean);
+  let dentroSecaoEnvelopamento = false;
 
-  while ((matchItem = regexLinhaBlocoValor.exec(textoObsFinal)) !== null) {
-    const blocoBruto = matchItem[1].trim().toUpperCase().replace(/[.\s]+$/, '');
-    const valorStr = matchItem[2].trim();
-    const valorFloat = converterValorMonetarioParaFloat(valorStr);
+  for (const linha of linhasObs) {
+    // Verificar se é cabeçalho de seção de envelopamento (ex: "Envelopamento 02 mantas:", "Envelopamento:")
+    if (/^envelopamento/i.test(linha)) {
+      dentroSecaoEnvelopamento = true;
+    }
 
-    if (valorFloat > 0) {
-      const chaves = extrairChavesComparacaoBloco(blocoBruto);
-      const info = {
-        blocoOriginal: blocoBruto,
-        valor: valorFloat,
-        valorFormatado: valorStr,
-        detalhe: `Envelopamento nas Observações (R$ ${valorStr})`
-      };
+    // Padrão 1: Linha contendo bloco (com ou sem sufixo de letra) e valor em R$
+    // Ex: "190/26A- R$ 2.396,80", "190/26B- R$ 1.027,20", "36/26 - R$ 3.507,84", "74726 - R$ 2.042,88", "1826- R$ 3.617,60"
+    const matchBlocoValor = linha.match(/(?:(?:BLOCO|BL\.?|N[º°]?)\s*)?([0-9]{1,6}(?:\/[0-9]{2,4})?[-\s]?[A-Za-z]?|[0-9]{3,7}[A-Za-z]?|VT-[0-9A-Za-z]+)\s*[-:]?\s*(?:\([^\)]*\)\s*)?R?\$?\s*([\d.]+,\d{2})/i);
 
-      chaves.forEach(k => {
-        resultado.envelopamentoPorBloco.set(k, info);
-      });
+    if (matchBlocoValor) {
+      const blocoBruto = matchBlocoValor[1].trim().toUpperCase().replace(/[.\s-]+$/, '').replace(/^[.\s-]+/, '');
+      const valorStr = matchBlocoValor[2].trim();
+      const valorFloat = converterValorMonetarioParaFloat(valorStr);
+
+      // Não confundir cabeçalhos tipo "02" de "02 mantas" com número de bloco
+      const ehCabecalhoMantas = /mantas?/i.test(blocoBruto) || /mantas?/i.test(linha.replace(valorStr, ''));
+
+      if (valorFloat > 0 && !ehCabecalhoMantas) {
+        const chaves = extrairChavesComparacaoBloco(blocoBruto);
+        const info = {
+          blocoOriginal: blocoBruto,
+          valor: valorFloat,
+          valorFormatado: valorStr,
+          detalhe: `Envelopamento nas Observações (R$ ${valorStr})`
+        };
+
+        chaves.forEach(k => {
+          resultado.envelopamentoPorBloco.set(k, info);
+        });
+        continue;
+      }
+    }
+
+    // Padrão 2: Se estamos dentro de uma seção de Envelopamento e a linha lista blocos
+    // Ex: "190/26A, 190/26B" ou "Blocos: 190/26A"
+    if (dentroSecaoEnvelopamento && !/^(prazo|vencimento|obs|nota|frete|total|desconto)/i.test(linha)) {
+      const possiveisBlocos = linha.matchAll(/\b([0-9]{1,6}\/[0-9]{2,4}[-\s]?[A-Za-z]?|[0-9]{3,7}[A-Za-z]?)\b/g);
+      for (const m of possiveisBlocos) {
+        const blocoIdentificado = m[1].trim().toUpperCase().replace(/[.\s-]+$/, '').replace(/^[.\s-]+/, '');
+        // Ignorar coisas como "02" de "02 mantas" ou datas completas como "23/03/2026"
+        if (/^\d{2}$/.test(blocoIdentificado) || /^\d{2}\/\d{2}\/\d{4}$/.test(blocoIdentificado)) continue;
+
+        const chaves = extrairChavesComparacaoBloco(blocoIdentificado);
+        const info = {
+          blocoOriginal: blocoIdentificado,
+          valor: 0,
+          valorFormatado: 'Identificado nas observações',
+          detalhe: `Identificado na seção de Envelopamento (${linha})`
+        };
+        chaves.forEach(k => {
+          if (!resultado.envelopamentoPorBloco.has(k)) {
+            resultado.envelopamentoPorBloco.set(k, info);
+          }
+        });
+      }
     }
   }
 

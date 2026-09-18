@@ -2574,11 +2574,13 @@ export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false) {
   // 2. Remove conteúdos explicativos entre parênteses (ex: "1256926 (QUARTZITO)" -> "1256926")
   str = str.replace(/\s*\([^)]*\)/g, '');
   
-  // 3. Se contiver traço com texto explicativo e não outro número de bloco
-  // Ex: "1256926 - TAJ MAHAL" -> "1256926"
+  // 3. Se contiver traço com texto explicativo e não outro número de bloco ou sufixo de letra
+  // Ex: "1256926 - TAJ MAHAL" -> "1256926", mas "190/26 - A" -> "190/26A"
   const partesTraco = str.split(/\s*[-–]\s*/);
   if (partesTraco.length > 1) {
-    if (!/^\d+$/.test(partesTraco[1]) && !/^VT-/i.test(partesTraco[1]) && !/^\d{1,}\/\d{2,}$/.test(partesTraco[1])) {
+    if (/^[A-Za-z]$/.test(partesTraco[1])) {
+      str = `${partesTraco[0]}${partesTraco[1].toUpperCase()}`;
+    } else if (!/^\d+$/.test(partesTraco[1]) && !/^VT-/i.test(partesTraco[1]) && !/^\d{1,}\/\d{2,}$/.test(partesTraco[1])) {
       str = partesTraco[0];
     }
   }
