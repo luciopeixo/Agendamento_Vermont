@@ -15,8 +15,18 @@ build/
 *.tsbuildinfo
 
 # Variáveis de Ambiente e Credenciais Seguras (NUNCA SUBIR AO GITHUB)
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
 .env*
-*.env*
+*.env
+*.env.*
+*.local
 .secrets*
 *secret*
 *credential*
@@ -52,8 +62,13 @@ tmp/
 *.xls
 *.jsonl
 *.sql
+!supabase_envelopamentos_setup.sql
 *.sqlite
+*.sqlite3
 *.db
+*.db3
+*.s3db
+*.sl3
 data/
 dados/
 

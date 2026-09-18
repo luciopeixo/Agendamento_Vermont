@@ -17,7 +17,8 @@ import {
   STATUS_ENVELOPAMENTO, 
   gerarChaveDuplicidade,
   excluirEnvelopamento,
-  atualizarStatusEnvelopamento
+  atualizarStatusEnvelopamento,
+  compararNumeroBlocoDecrescente
 } from '../services/envelopamentoService';
 import { formatarDataHoraBR } from '../services/agendamentoService';
 
@@ -62,8 +63,10 @@ export function ModalVisualizarDuplicidades({
       mapa.get(chave).itens.push(item);
     });
 
-    // Retorna apenas os grupos que têm 2 ou mais ocorrências
-    return Array.from(mapa.values()).filter(g => g.itens.length > 1);
+    // Retorna apenas os grupos que têm 2 ou mais ocorrências em ordem decrescente
+    return Array.from(mapa.values())
+      .filter(g => g.itens.length > 1)
+      .sort((a, b) => compararNumeroBlocoDecrescente(a.numero_bloco, b.numero_bloco));
   }, [envelopamentos]);
 
   const totalBlocosDuplicados = gruposDuplicados.reduce((acc, g) => acc + g.itens.length, 0);

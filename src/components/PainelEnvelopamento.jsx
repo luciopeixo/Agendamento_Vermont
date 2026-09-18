@@ -39,7 +39,8 @@ import {
   calcularMetricasEnvelopamento, 
   STATUS_ENVELOPAMENTO,
   inscreverEnvelopamentosRealtime,
-  gerarChaveDuplicidade
+  gerarChaveDuplicidade,
+  compararNumeroBlocoDecrescente
 } from '../services/envelopamentoService';
 import { PEDREIRAS_CEARA, formatarDataHoraBR } from '../services/agendamentoService';
 import { ModalCadastrarBlocoEnvelopamento } from './ModalCadastrarBlocoEnvelopamento';
@@ -253,7 +254,11 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
     const lista = Array.from(mapaClientes.values()).map(cli => ({
       ...cli,
-      romaneios: Array.from(cli.romaneiosMap.values()).sort((a, b) => {
+      blocos: [...cli.blocos].sort(compararNumeroBlocoDecrescente),
+      romaneios: Array.from(cli.romaneiosMap.values()).map(rom => ({
+        ...rom,
+        blocos: [...rom.blocos].sort(compararNumeroBlocoDecrescente)
+      })).sort((a, b) => {
         const timeA = parseDataRomaneio(a.dataRomaneio);
         const timeB = parseDataRomaneio(b.dataRomaneio);
         if (timeB !== timeA) return timeB - timeA; // Mais recente primeiro
@@ -1800,7 +1805,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                 </tr>
               </thead>
               <tbody>
-                {envelopamentos.map((b) => {
+                {[...envelopamentos].sort(compararNumeroBlocoDecrescente).map((b) => {
                   const statusInfo = STATUS_ENVELOPAMENTO[b.status?.toUpperCase()] || STATUS_ENVELOPAMENTO.PENDENTE_ENVELOPAMENTO;
                   const executando = executandoAcaoId === b.id;
                   const isSelecionado = blocosSelecionados.has(b.id);

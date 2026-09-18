@@ -3,24 +3,6 @@ import { Lock, ShieldCheck, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-
 import { supabase } from '../lib/supabase';
 import { isSupabaseConfigurado } from '../services/agendamentoService';
 
-/**
- * Validação criptográfica de integridade da senha administrativa
- * sem expor senhas em texto puro no código ou repositório
- */
-async function validarHashSenha(senha) {
-  try {
-    if (typeof crypto !== 'undefined' && crypto.subtle) {
-      const msgUint8 = new TextEncoder().encode(senha);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      // Hash SHA-256 da chave institucional autorizada
-      return hashHex === 'e468e2118914aa3035ff100d5a5b6b2ee79517af009026fa1afd195fd6a8eb0b';
-    }
-  } catch (e) {}
-  return false;
-}
-
 export function AdminLogin({ onLoginSucesso, onVoltar }) {
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
@@ -28,7 +10,7 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
 
-  // Autenticação Segura via Supabase Auth com Fallback Institucional Vermont
+  // Autenticação Segura via Supabase Auth ou Variável de Ambiente (.env)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErro('');
@@ -74,6 +56,28 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
 
       const loginFinal = mapaLogins[loginBase] || loginBase;
       const emailAutenticacao = `${loginFinal}@sistema.local`;
+
+      const pedreiraNomeMap = {
+        'uruoca': 'Uruoca - CE (Taj Mahal)',
+        'tajmahal': 'Uruoca - CE (Taj Mahal)',
+        'negresco': 'Massapê - CE (Negresco)',
+        'massape': 'Massapê - CE (Negresco)',
+        'massape.negresco': 'Massapê - CE (Negresco)',
+        'delmare': 'Massapê - CE (Del Mare)',
+        'massape.delmare': 'Massapê - CE (Del Mare)',
+        'sobral': 'Sobral - CE (Jaibaras)',
+        'jaibaras': 'Sobral - CE (Jaibaras)',
+        'serrote': 'São Gonçalo do Amarante - CE (Serrote)',
+        'saogoncalo': 'São Gonçalo do Amarante - CE (Serrote)',
+        'sao_goncalo': 'São Gonçalo do Amarante - CE (Serrote)',
+        'beberibe': 'Beberibe - CE'
+      };
+
+      const isAdminUser = loginFinal === 'admin' || 
+                          loginBase === 'admin' || 
+                          loginBase === 'faturamento' || 
+                          loginBase === 'diretoria' || 
+                          loginBase === 'logistica';
 
       // 1. Tentar autenticação no Supabase Auth se configurado
       if (isSupabaseConfigurado()) {
@@ -128,36 +132,20 @@ export function AdminLogin({ onLoginSucesso, onVoltar }) {
         }
       }
 
-      // 2. Fallback de Acesso Administrativo Institucional Vermont
-      // Protegido por hash criptográfico e variável de ambiente (sem expor senhas no código)
-      const pedreiraNomeMap = {
-        'uruoca': 'Uruoca - CE (Taj Mahal)',
-        'tajmahal': 'Uruoca - CE (Taj Mahal)',
-        'negresco': 'Massapê - CE (Negresco)',
-        'massape': 'Massapê - CE (Negresco)',
-        'massape.negresco': 'Massapê - CE (Negresco)',
-        'delmare': 'Massapê - CE (Del Mare)',
-        'massape.delmare': 'Massapê - CE (Del Mare)',
-        'sobral': 'Sobral - CE (Jaibaras)',
-        'jaibaras': 'Sobral - CE (Jaibaras)',
-        'serrote': 'São Gonçalo do Amarante - CE (Serrote)',
-        'saogoncalo': 'São Gonçalo do Amarante - CE (Serrote)',
-        'sao_goncalo': 'São Gonçalo do Amarante - CE (Serrote)',
-        'beberibe': 'Beberibe - CE'
-      };
+      // 2. Fallback de Autenticação Segura via Variáveis de Ambiente (.env)
+      // Nenhuma senha ou hash fica exposta no código-fonte ou no repositório GitHub
+      const adminPasswordConfig = import.meta.env.VITE_ADMIN_PASSWORD || '';
+      const operadorPasswordConfig = import.meta.env.VITE_OPERADOR_PASSWORD || adminPasswordConfig || '';
 
-      const isAdminUser = loginFinal === 'admin' || 
-                          loginBase === 'admin' || 
-                          loginBase === 'faturamento' || 
-                          loginBase === 'diretoria' || 
-                          loginBase === 'logistica';
+      const isSenhaAdminValida = Boolean(adminPasswordConfig && senhaLimpa === adminPasswordConfig);
+      const isSenhaOperadorValida = Boolean(
+        !isAdminUser && (
+          (operadorPasswordConfig && senhaLimpa === operadorPasswordConfig) ||
+          (adminPasswordConfig && senhaLimpa === adminPasswordConfig)
+        )
+      );
 
-      const adminPasswordConfig = import.meta.env.VITE_ADMIN_PASSWORD;
-      const isHashValido = await validarHashSenha(senhaLimpa);
-      const isSenhaConfiguradaValida = Boolean(adminPasswordConfig && senhaLimpa === adminPasswordConfig);
-      const isSenhaOperacionalValida = Boolean(!isAdminUser && senhaLimpa.length >= 4);
-
-      if (isSenhaConfiguradaValida || isHashValido || isSenhaOperacionalValida) {
+      if (isSenhaAdminValida || isSenhaOperadorValida) {
         const mockUser = {
           id: `usr_${loginFinal}_${Date.now()}`,
           email: login.includes('@') ? login : `${loginFinal}@pedreira.local`,

@@ -323,6 +323,25 @@ export const normalizarMaterial = (material = '') => {
     .replace(/[^A-Z0-9]/g, '');
 };
 
+const collatorBlocos = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
+
+/**
+ * Compara dois blocos ou números de bloco em ordem DECRESCENTE (maior para o menor),
+ * tratando perfeitamente blocos numéricos puros (ex: 70526 > 69826 > 69626 > 69426),
+ * sufixos de letras (ex: 70526-B > 70526-A > 70526), prefixos (ex: VT-200 > VT-100)
+ * e subdivisões (ex: 70526/2 > 70526/1).
+ */
+export const compararNumeroBlocoDecrescente = (a, b) => {
+  const strA = String(a?.numero_bloco || a || '').trim().toUpperCase();
+  const strB = String(b?.numero_bloco || b || '').trim().toUpperCase();
+
+  if (!strA && !strB) return 0;
+  if (!strA) return 1;
+  if (!strB) return -1;
+
+  return collatorBlocos.compare(strB, strA);
+};
+
 /**
  * Gera uma chave unificada de duplicidade para Bloco + Cliente + Material + Pedreira
  */
