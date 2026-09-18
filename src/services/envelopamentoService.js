@@ -593,20 +593,47 @@ export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = 
 };
 
 /**
- * Consulta a lista de envelopamentos na nuvem diretamente na tabela oficial
+ * Consulta a lista de envelopamentos na nuvem com paginação automática,
+ * superando o limite restrito de 1.000 linhas por requisição do Supabase/PostgREST.
  */
 const consultarEnvelopamentosNuvem = async () => {
   if (!isSupabaseConfigurado()) return null;
 
   try {
-    const { data, error } = await supabase
-      .from('envelopamentos')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(20000);
+    let todosRegistros = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
 
-    if (!error && Array.isArray(data)) {
-      return data.map(parseItemDeSupabaseEnvelopamentos);
+    while (hasMore) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data, error } = await supabase
+        .from('envelopamentos')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) {
+        console.error('[Envelopamento] Erro ao paginar envelopamentos:', error);
+        break;
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
+        todosRegistros = todosRegistros.concat(data);
+        if (data.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+      }
+    }
+
+    if (todosRegistros.length > 0) {
+      return todosRegistros.map(parseItemDeSupabaseEnvelopamentos);
     }
   } catch (e) {
     console.warn('[Envelopamento] Falha ao consultar tabela envelopamentos:', e);
