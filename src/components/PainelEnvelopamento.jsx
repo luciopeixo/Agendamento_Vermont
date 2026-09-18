@@ -351,6 +351,11 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
   // Funções de Seleção Múltipla de Blocos para Ações em Lote
   const toggleSelecionarBloco = (id) => {
+    const item = envelopamentos.find(b => b.id === id);
+    if (item && item.status === 'sem_envelopamento') {
+      alert('Blocos com status "Sem Envelopamento" não podem ser alterados em lote. A alteração deve ser feita individualmente na linha do bloco.');
+      return;
+    }
     setBlocosSelecionados(prev => {
       const novo = new Set(prev);
       if (novo.has(id)) novo.delete(id);
@@ -360,10 +365,15 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   };
 
   const toggleSelecionarRomaneio = (rom) => {
-    const idsRom = (rom.blocos || []).map(b => b.id);
+    const blocosElegiveis = (rom.blocos || []).filter(b => b.status !== 'sem_envelopamento');
+    const idsRom = blocosElegiveis.map(b => b.id);
+    if (idsRom.length === 0) {
+      alert('Todos os blocos deste romaneio estão como "Sem Envelopamento" e só podem ser alterados individualmente.');
+      return;
+    }
     setBlocosSelecionados(prev => {
       const novo = new Set(prev);
-      const todosJaSelecionados = idsRom.length > 0 && idsRom.every(id => novo.has(id));
+      const todosJaSelecionados = idsRom.every(id => novo.has(id));
       if (todosJaSelecionados) {
         idsRom.forEach(id => novo.delete(id));
       } else {
@@ -379,19 +389,30 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
   const handleAlterarStatusLote = async (novoStatus) => {
     if (blocosSelecionados.size === 0) return;
+
+    // Filtrar estritamente apenas blocos que não estão como 'sem_envelopamento'
+    const idsElegiveis = Array.from(blocosSelecionados).filter(id => {
+      const item = envelopamentos.find(b => b.id === id);
+      return item && item.status !== 'sem_envelopamento';
+    });
+
+    if (idsElegiveis.length === 0) {
+      alert('Nenhum dos blocos selecionados pode ser alterado em lote. Blocos "Sem Envelopamento" devem ser alterados individualmente.');
+      return;
+    }
+
     const statusObj = STATUS_ENVELOPAMENTO[novoStatus?.toUpperCase()] || { label: novoStatus };
-    const count = blocosSelecionados.size;
+    const count = idsElegiveis.length;
 
     solicitarConfirmacao({
       titulo: `Alterar Status de ${count} Bloco(s)`,
       mensagem: `Deseja realmente alterar o status de ${count} bloco(s) selecionado(s) para "${statusObj.label}"?`,
-      detalhes: 'Todos os blocos marcados terão seu status atualizado em lote.',
+      detalhes: 'Todos os blocos marcados elegíveis terão seu status atualizado em lote.',
       textoBotao: `Sim, Alterar para ${statusObj.label}`,
       onConfirmar: async () => {
         setExecutandoLote(true);
         try {
-          const ids = Array.from(blocosSelecionados);
-          await atualizarStatusEnvelopamentosEmLote(ids, novoStatus, usuarioNome);
+          await atualizarStatusEnvelopamentosEmLote(idsElegiveis, novoStatus, usuarioNome);
           setBlocosSelecionados(new Set());
           await carregarDados();
         } catch (err) {
@@ -1374,30 +1395,43 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                 📦 {rom.blocos.length} Bloco{rom.blocos.length > 1 ? 's' : ''}
                               </span>
 
-                              {/* BOTÃO PARA SELECIONAR TODOS OS BLOCOS DO ROMANEIO */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleSelecionarRomaneio(rom);
-                                }}
-                                className="btn btn-secondary"
-                                style={{
-                                  padding: '3px 8px',
-                                  fontSize: '0.72rem',
-                                  color: rom.blocos.length > 0 && rom.blocos.every(b => blocosSelecionados.has(b.id)) ? '#38bdf8' : 'var(--slate-300)',
-                                  borderColor: rom.blocos.length > 0 && rom.blocos.every(b => blocosSelecionados.has(b.id)) ? '#38bdf8' : 'rgba(255,255,255,0.18)',
-                                  background: rom.blocos.length > 0 && rom.blocos.every(b => blocosSelecionados.has(b.id)) ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255,255,255,0.04)',
-                                  fontWeight: 700,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 4
-                                }}
-                                title="Selecionar ou desmarcar todos os blocos deste romaneio para alterar status em lote"
-                              >
-                                <CheckCheck size={12} />
-                                {rom.blocos.length > 0 && rom.blocos.every(b => blocosSelecionados.has(b.id)) ? 'Desmarcar Romaneio' : 'Selecionar Romaneio'}
-                              </button>
+                              {/* BOTÃO PARA SELECIONAR BLOCOS ELEGÍVEIS DO ROMANEIO */}
+                              {(() => {
+                                const blocosElegiveis = (rom.blocos || []).filter(b => b.status !== 'sem_envelopamento');
+                                const isTodosElegiveisSelecionados = blocosElegiveis.length > 0 && blocosElegiveis.every(b => blocosSelecionados.has(b.id));
+                                const nenhumElegivel = blocosElegiveis.length === 0;
+
+                                return (
+                                  <button
+                                    type="button"
+                                    disabled={nenhumElegivel}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleSelecionarRomaneio(rom);
+                                    }}
+                                    className="btn btn-secondary"
+                                    style={{
+                                      padding: '3px 8px',
+                                      fontSize: '0.72rem',
+                                      color: isTodosElegiveisSelecionados ? '#38bdf8' : (nenhumElegivel ? 'var(--slate-500)' : 'var(--slate-300)'),
+                                      borderColor: isTodosElegiveisSelecionados ? '#38bdf8' : (nenhumElegivel ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.18)'),
+                                      background: isTodosElegiveisSelecionados ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255,255,255,0.04)',
+                                      fontWeight: 700,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                      cursor: nenhumElegivel ? 'not-allowed' : 'pointer',
+                                      opacity: nenhumElegivel ? 0.55 : 1
+                                    }}
+                                    title={nenhumElegivel 
+                                      ? "Todos os blocos deste romaneio são 'Sem Envelopamento' (apenas alteração individual)" 
+                                      : (isTodosElegiveisSelecionados ? "Desmarcar blocos elegíveis deste romaneio" : "Selecionar blocos elegíveis deste romaneio para alteração em lote")}
+                                  >
+                                    <CheckCheck size={12} />
+                                    {nenhumElegivel ? 'Sem Env. (Individual)' : (isTodosElegiveisSelecionados ? 'Desmarcar Romaneio' : 'Selecionar Romaneio')}
+                                  </button>
+                                );
+                              })()}
 
                               {/* BOTÃO PARA DELETAR BLOCOS ENVELOPADOS DO ROMANEIO */}
                               {rom.metricas.envelopado > 0 && (
@@ -1454,13 +1488,30 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                 <thead>
                                   <tr style={{ background: 'rgba(0,0,0,0.25)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                                     <th style={{ padding: '8px 10px', width: '38px', textAlign: 'center' }}>
-                                      <input 
-                                        type="checkbox"
-                                        style={{ cursor: 'pointer', width: 16, height: 16, accentColor: '#0284c7' }}
-                                        checked={rom.blocos.length > 0 && rom.blocos.every(b => blocosSelecionados.has(b.id))}
-                                        onChange={() => toggleSelecionarRomaneio(rom)}
-                                        title="Selecionar / Desmarcar todos os blocos deste romaneio"
-                                      />
+                                      {(() => {
+                                        const blocosElegiveis = (rom.blocos || []).filter(b => b.status !== 'sem_envelopamento');
+                                        const isTodosElegiveisSelecionados = blocosElegiveis.length > 0 && blocosElegiveis.every(b => blocosSelecionados.has(b.id));
+                                        const nenhumElegivel = blocosElegiveis.length === 0;
+
+                                        return (
+                                          <input 
+                                            type="checkbox"
+                                            style={{ 
+                                              cursor: nenhumElegivel ? 'not-allowed' : 'pointer', 
+                                              width: 16, 
+                                              height: 16, 
+                                              accentColor: '#0284c7',
+                                              opacity: nenhumElegivel ? 0.35 : 1
+                                            }}
+                                            disabled={nenhumElegivel}
+                                            checked={isTodosElegiveisSelecionados}
+                                            onChange={() => toggleSelecionarRomaneio(rom)}
+                                            title={nenhumElegivel 
+                                              ? "Nenhum bloco elegível para seleção em lote neste romaneio (blocos 'Sem Envelopamento' são alterados individualmente)" 
+                                              : "Selecionar / Desmarcar blocos elegíveis deste romaneio"}
+                                          />
+                                        );
+                                      })()}
                                     </th>
                                     <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'left', width: '16%' }}>BLOCO / ROCHA</th>
                                     <th style={{ padding: '8px 12px', fontSize: '0.72rem', color: 'var(--slate-400)', textAlign: 'left', width: '17%' }}>PEDREIRA</th>
@@ -1491,10 +1542,19 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                         <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                                           <input 
                                             type="checkbox"
-                                            style={{ cursor: 'pointer', width: 16, height: 16, accentColor: '#0284c7' }}
-                                            checked={isSelecionado}
+                                            style={{ 
+                                              cursor: b.status === 'sem_envelopamento' ? 'not-allowed' : 'pointer', 
+                                              width: 16, 
+                                              height: 16, 
+                                              accentColor: '#0284c7',
+                                              opacity: b.status === 'sem_envelopamento' ? 0.35 : 1
+                                            }}
+                                            disabled={b.status === 'sem_envelopamento'}
+                                            checked={isSelecionado && b.status !== 'sem_envelopamento'}
                                             onChange={() => toggleSelecionarBloco(b.id)}
-                                            title={`Selecionar bloco ${b.numero_bloco}`}
+                                            title={b.status === 'sem_envelopamento' 
+                                              ? 'Blocos "Sem Envelopamento" não podem ser alterados em lote (alteração individual)' 
+                                              : `Selecionar bloco ${b.numero_bloco}`}
                                           />
                                         </td>
                                         {/* Bloco */}
@@ -1825,10 +1885,19 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                       <td style={{ padding: '12px 10px', textAlign: 'center' }}>
                         <input 
                           type="checkbox"
-                          style={{ cursor: 'pointer', width: 16, height: 16, accentColor: '#0284c7' }}
-                          checked={isSelecionado}
+                          style={{ 
+                            cursor: b.status === 'sem_envelopamento' ? 'not-allowed' : 'pointer', 
+                            width: 16, 
+                            height: 16, 
+                            accentColor: '#0284c7',
+                            opacity: b.status === 'sem_envelopamento' ? 0.35 : 1
+                          }}
+                          disabled={b.status === 'sem_envelopamento'}
+                          checked={isSelecionado && b.status !== 'sem_envelopamento'}
                           onChange={() => toggleSelecionarBloco(b.id)}
-                          title={`Selecionar bloco ${b.numero_bloco}`}
+                          title={b.status === 'sem_envelopamento' 
+                            ? 'Blocos "Sem Envelopamento" não podem ser alterados em lote (alteração individual)' 
+                            : `Selecionar bloco ${b.numero_bloco}`}
                         />
                       </td>
                       <td style={{ padding: '12px 14px' }}>
