@@ -261,6 +261,32 @@ export const normalizarNumeroBloco = (bloco = '') => {
 };
 
 /**
+ * Normaliza o número de romaneio para comparação independente de zeros à esquerda ou pontuação
+ */
+export const normalizarRomaneio = (rom = '') => {
+  const str = String(rom || '')
+    .trim()
+    .toUpperCase()
+    .replace(/^(N[º°.]*|ROMANEIO|N)\s*/i, '')
+    .replace(/^0+/, '')
+    .replace(/[^\w]/g, '');
+  return str;
+};
+
+/**
+ * Extrai a raiz textual significativa do nome do cliente, removendo tipos societários e palavras genéricas
+ */
+export const extrairRaizCliente = (nome = '') => {
+  return String(nome || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\b(LTDA|ME|EPP|EIRELI|S\/A|SA|SOCIEDADE|ANONIMA|LIMITADA|DO BRASIL|BRASIL|COMERCIO|EXPORTACAO|IMPORTACAO|ROCHAS|MINERACAO|MARMORES|GRANITOS|INDUSTRIA)\b/g, '')
+    .replace(/[^A-Z0-9]/g, '')
+    .trim();
+};
+
+/**
  * Normaliza a pedreira para identificação consistente
  */
 export const normalizarPedreira = (pedId = '', pedNome = '') => {
@@ -278,21 +304,19 @@ export const normalizarPedreira = (pedId = '', pedNome = '') => {
 };
 
 /**
- * Normaliza o cliente (preferência por dígitos do CNPJ, ou raiz textual do nome)
+ * Normaliza o cliente produzindo uma chave canônica estável,
+ * permitindo correspondência exata mesmo quando o CNPJ está preenchido em um registro e ausente no outro.
  */
 export const normalizarCliente = (nome = '', cnpj = '') => {
+  const raiz = extrairRaizCliente(nome);
+  if (raiz && raiz.length >= 3) {
+    return `CLI_${raiz.slice(0, 15)}`;
+  }
   const cnpjDigitos = String(cnpj || '').replace(/\D/g, '');
   if (cnpjDigitos.length === 14) {
     return `CNPJ_${cnpjDigitos}`;
   }
-  const nomeLimpo = String(nome || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toUpperCase()
-    .replace(/\b(LTDA|ME|EPP|EIRELI|S\/A|SA|SOCIEDADE|ANONIMA|LIMITADA|DO BRASIL|BRASIL|COMERCIO|EXPORTACAO|IMPORTACAO|ROCHAS|MINERACAO|MARMORES|GRANITOS)\b/g, '')
-    .replace(/[^A-Z0-9]/g, '')
-    .trim();
-  return `NOME_${nomeLimpo.slice(0, 15)}`;
+  return raiz ? `CLI_${raiz}` : 'CLI_GENERICO';
 };
 
 /**
@@ -327,6 +351,85 @@ export const compararNumeroBlocoDecrescente = (a, b) => {
 };
 
 /**
+ * Verifica de forma inteligente e profunda se dois registros referem-se rigorosamente ao mesmo bloco físico.
+ * Suporta:
+ * - Correspondência de número de bloco (com/sem barras, pontuações ou zeros à esquerda).
+ * - Correspondência definitiva por número de romaneio idêntico.
+ * - Correspondência por cliente com ou sem CNPJ (comparação fonética/raiz textual da empresa).
+ * - Correspondência por pedreira e material.
+ */
+export const saoBlocosCorrespondentes = (itemA, itemB) => {
+  if (!itemA || !itemB) return false;
+
+  const numA = normalizarNumeroBloco(itemA.numero_bloco || itemA);
+  const numB = normalizarNumeroBloco(itemB.numero_bloco || itemB);
+  if (!numA || !numB) return false;
+
+  const numASemBarra = numA.replace(/[\/\-_.]/g, '');
+  const numBSemBarra = numB.replace(/[\/\-_.]/g, '');
+
+  const blocoIgual = (numA === numB || numASemBarra === numBSemBarra);
+  if (!blocoIgual) return false;
+
+  // 1. Se ambos têm número de romaneio especificado e são iguais -> MATCH INCONDICIONAL (mesmo bloco no mesmo romaneio)
+  const romA = normalizarRomaneio(itemA.numero_romaneio || itemA.romaneio_numero);
+  const romB = normalizarRomaneio(itemB.numero_romaneio || itemB.romaneio_numero);
+  if (romA && romB && romA === romB) {
+    return true;
+  }
+
+  // 2. Validação de Cliente
+  const cnpjA = String(itemA.cliente_cnpj || '').replace(/\D/g, '');
+  const cnpjB = String(itemB.cliente_cnpj || '').replace(/\D/g, '');
+  const nomeA = String(itemA.cliente_nome || itemA.cliente || '').trim();
+  const nomeB = String(itemB.cliente_nome || itemB.cliente || '').trim();
+
+  let clienteBate = true;
+  if (cnpjA.length === 14 && cnpjB.length === 14) {
+    clienteBate = (cnpjA === cnpjB);
+  } else if (nomeA && nomeB) {
+    const rA = extrairRaizCliente(nomeA);
+    const rB = extrairRaizCliente(nomeB);
+    if (rA && rB) {
+      clienteBate = (rA === rB || rA.includes(rB) || rB.includes(rA));
+    }
+  }
+
+  if (!clienteBate) return false;
+
+  // 3. Validação de Pedreira
+  const pedA = normalizarPedreira(itemA.pedreira_id, itemA.pedreira_nome || itemA.pedreira);
+  const pedB = normalizarPedreira(itemB.pedreira_id, itemB.pedreira_nome || itemB.pedreira);
+  let pedreiraBate = true;
+  if (pedA && pedB) {
+    pedreiraBate = (pedA === pedB || (pedA.startsWith('massape') && pedB.startsWith('massape')));
+  }
+  if (!pedreiraBate) return false;
+
+  // 4. Validação de Material
+  const matA = normalizarMaterial(itemA.material);
+  const matB = normalizarMaterial(itemB.material);
+  let materialBate = true;
+  if (matA && matB) {
+    materialBate = (matA === matB || matA.includes(matB) || matB.includes(matA));
+  }
+  if (!materialBate) return false;
+
+  return true;
+};
+
+/**
+ * Encontra o registro correspondente em uma lista de envelopamentos
+ */
+export const encontrarItemCorrespondente = (itemAlvo, lista = [], ignorarId = null) => {
+  if (!itemAlvo) return null;
+  return (Array.isArray(lista) ? lista : []).find(item => {
+    if (ignorarId && item.id === ignorarId) return false;
+    return saoBlocosCorrespondentes(itemAlvo, item);
+  }) || null;
+};
+
+/**
  * Gera uma chave unificada de duplicidade para Bloco + Cliente + Material + Pedreira
  */
 export const gerarChaveDuplicidade = ({ numero_bloco, cliente_nome, cliente_cnpj, material, pedreira_id, pedreira_nome }) => {
@@ -348,25 +451,21 @@ export const verificarDuplicidadeBloco = ({
   material,
   pedreira_id,
   pedreira_nome,
+  numero_romaneio,
   idAtual = null,
   listaExistente = []
 }) => {
   if (!numero_bloco) return { ehDuplicado: false, existente: null };
-  const chaveAlvo = gerarChaveDuplicidade({ numero_bloco, cliente_nome, cliente_cnpj, material, pedreira_id, pedreira_nome });
-  if (!chaveAlvo) return { ehDuplicado: false, existente: null };
-
-  const existente = listaExistente.find(item => {
-    if (idAtual && item.id === idAtual) return false;
-    const chaveItem = gerarChaveDuplicidade({
-      numero_bloco: item.numero_bloco,
-      cliente_nome: item.cliente_nome,
-      cliente_cnpj: item.cliente_cnpj,
-      material: item.material,
-      pedreira_id: item.pedreira_id,
-      pedreira_nome: item.pedreira_nome
-    });
-    return chaveItem === chaveAlvo;
-  });
+  const alvo = {
+    numero_bloco,
+    cliente_nome,
+    cliente_cnpj,
+    material,
+    pedreira_id,
+    pedreira_nome,
+    numero_romaneio
+  };
+  const existente = encontrarItemCorrespondente(alvo, listaExistente, idAtual);
 
   return {
     ehDuplicado: !!existente,
@@ -378,10 +477,18 @@ export const verificarDuplicidadeIndividual = verificarDuplicidadeBloco;
 
 /**
  * Converte qualquer representação de peso para float padronizado em kg
+ * Suporta formatos brasileiros (36.312,00 kg / 36.312,00) e internacionais (36312.00)
  */
 export const normalizarPeso = (peso) => {
   if (!peso && peso !== 0) return 0;
-  const limpo = String(peso).replace(/[^\d,-]/g, '').replace(',', '.');
+  let str = String(peso).trim();
+  // Se contiver ponto e vírgula (ex: 36.312,00), remove ponto e troca vírgula por ponto
+  if (str.includes('.') && str.includes(',')) {
+    str = str.replace(/\./g, '').replace(',', '.');
+  } else if (str.includes(',')) {
+    str = str.replace(',', '.');
+  }
+  const limpo = str.replace(/[^\d.-]/g, '');
   const num = parseFloat(limpo);
   return isNaN(num) ? 0 : Math.round(num * 100) / 100;
 };
@@ -400,34 +507,10 @@ export const normalizarPeso = (peso) => {
  *    -> Marcado como novo e selecionado por padrão para importação com status sugerido.
  */
 export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = []) => {
-  const mapaExistentes = new Map();
-  listaExistente.forEach(item => {
-    const chave = gerarChaveDuplicidade({
-      numero_bloco: item.numero_bloco,
-      cliente_nome: item.cliente_nome,
-      cliente_cnpj: item.cliente_cnpj,
-      material: item.material,
-      pedreira_id: item.pedreira_id,
-      pedreira_nome: item.pedreira_nome
-    });
-    if (chave && !mapaExistentes.has(chave)) {
-      mapaExistentes.set(chave, item);
-    }
-  });
+  const processadosNoLote = [];
 
-  const chavesNoLote = new Map();
-
-  return listaNova.map((item, idx) => {
-    const chave = gerarChaveDuplicidade({
-      numero_bloco: item.numero_bloco,
-      cliente_nome: item.cliente_nome,
-      cliente_cnpj: item.cliente_cnpj,
-      material: item.material,
-      pedreira_id: item.pedreira_id,
-      pedreira_nome: item.pedreira_nome
-    });
-
-    if (!chave) {
+  return (Array.isArray(listaNova) ? listaNova : []).map((item) => {
+    if (!item || !item.numero_bloco) {
       return { 
         ...item, 
         ehDuplicado: false, 
@@ -437,10 +520,11 @@ export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = 
       };
     }
 
-    if (mapaExistentes.has(chave)) {
-      const original = mapaExistentes.get(chave);
+    // 1. Verificar correspondência com registros já existentes na base de dados
+    const original = encontrarItemCorrespondente(item, listaExistente);
+
+    if (original) {
       const romOrig = original.numero_romaneio || 'S/N';
-      
       const pesoNovoNum = normalizarPeso(item.peso_kg);
       const pesoAntigoNum = normalizarPeso(original.peso_kg);
       
@@ -476,7 +560,9 @@ export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = 
       };
     }
 
-    if (chavesNoLote.has(chave)) {
+    // 2. Verificar duplicidade em relação a blocos anteriores deste mesmo lote
+    const repetidoLote = processadosNoLote.find(p => saoBlocosCorrespondentes(item, p));
+    if (repetidoLote) {
       return {
         ...item,
         ehDuplicado: true,
@@ -486,11 +572,11 @@ export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = 
       };
     }
 
-    chavesNoLote.set(chave, idx);
+    processadosNoLote.push(item);
     return { 
       ...item, 
       ehDuplicado: false, 
-      ehAtualizacaoPeso: false,
+      ehAtualizacaoPeso: false, 
       motivoDuplicidade: null, 
       itemOriginal: null 
     };
@@ -1082,51 +1168,70 @@ export const excluirEnvelopamentosEmLote = async (ids = [], usuarioNome = 'Equip
 export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont') => {
   if (!Array.isArray(itens) || itens.length === 0) return [];
 
-  const locais = carregarEnvelopamentosLocais();
-
-  // Filtragem estrita contra duplicidades idênticas sem alteração
-  const itensAvaliados = identificarDuplicidadesEmLista(itens, locais);
-  const itensValidos = itensAvaliados.filter(item => !item.ehDuplicado || item.ehAtualizacaoPeso);
-
-  if (itensValidos.length === 0) {
-    throw new Error('Inclusão bloqueada: Todos os blocos informados já se encontram cadastrados no sistema sem alterações de peso.');
+  // 1. Sempre consulta a base mais recente (Supabase + LocalStorage) para evitar condições de corrida ou dados defasados
+  let locais = carregarEnvelopamentosLocais();
+  try {
+    const baseMaisRecente = await listarEnvelopamentos();
+    if (Array.isArray(baseMaisRecente) && baseMaisRecente.length > 0) {
+      locais = baseMaisRecente;
+    }
+  } catch (errDb) {
+    console.warn('[Envelopamento] Falha ao consultar base recente para importação:', errDb);
   }
 
   const agora = new Date().toISOString();
   const registrosCompletos = [];
   const rowsParaDB = [];
+  const idsJaProcessados = new Set();
 
-  for (const dados of itensValidos) {
-    if (!dados.numero_bloco) continue;
+  for (const dados of itens) {
+    if (!dados || !dados.numero_bloco) continue;
 
-    // Se for atualização de peso de um bloco existente
-    if (dados.ehAtualizacaoPeso && dados.itemOriginal) {
-      const orig = dados.itemOriginal;
-      const pesoNovo = String(dados.pesoNovo || dados.peso_kg || orig.peso_kg || '').trim();
-      const pesoAntigo = dados.pesoOriginal || orig.peso_kg || 'sem peso';
-      
-      const observacaoAtualizada = orig.observacoes 
-        ? `${orig.observacoes} | [Peso atualizado de ${pesoAntigo} para ${pesoNovo} kg via Romaneio ${dados.numero_romaneio || orig.numero_romaneio || ''}]` 
-        : `Peso atualizado de ${pesoAntigo} para ${pesoNovo} kg via Romaneio ${dados.numero_romaneio || orig.numero_romaneio || ''}`;
+    // Buscar se o bloco já existe na base de dados (mesmo bloco/cliente/romaneio)
+    const existente = encontrarItemCorrespondente(dados, locais);
 
-      const registroAtualizado = {
-        ...orig,
-        peso_kg: pesoNovo,
-        numero_romaneio: String(dados.numero_romaneio || orig.numero_romaneio || '').trim().toUpperCase(),
-        data_romaneio: String(dados.data_romaneio || orig.data_romaneio || '').trim(),
-        observacoes: observacaoAtualizada,
-        // PRESERVA RIGOROSAMENTE O STATUS JÁ SALVO NO BANCO
-        status: orig.status || 'pendente_envelopamento',
-        updated_at: agora
-      };
+    if (existente) {
+      if (idsJaProcessados.has(existente.id)) continue;
+      idsJaProcessados.add(existente.id);
 
-      registrosCompletos.push(registroAtualizado);
-      rowsParaDB.push(formatarItemParaSupabaseEnvelopamentos(registroAtualizado));
+      const pesoNovoNum = normalizarPeso(dados.pesoNovo || dados.peso_kg);
+      const pesoAntigoNum = normalizarPeso(existente.peso_kg);
+
+      const pesoMudou = (pesoNovoNum > 0 && pesoAntigoNum > 0 && Math.abs(pesoNovoNum - pesoAntigoNum) > 0.01) ||
+                        (pesoNovoNum > 0 && (!existente.peso_kg || pesoAntigoNum === 0));
+
+      if (dados.ehAtualizacaoPeso || pesoMudou) {
+        // Bloco existente com alteração de peso: atualiza apenas dados cadastrais mantendo RIGOROSAMENTE o status original
+        const pesoNovo = String(dados.pesoNovo || dados.peso_kg || existente.peso_kg || '').trim();
+        const pesoAntigo = existente.peso_kg || 'sem peso';
+        const romAtualizado = String(dados.numero_romaneio || existente.numero_romaneio || '').trim().toUpperCase();
+
+        const registroAtualizado = {
+          ...existente,
+          peso_kg: pesoNovo,
+          numero_romaneio: romAtualizado || existente.numero_romaneio,
+          data_romaneio: String(dados.data_romaneio || existente.data_romaneio || '').trim(),
+          observacoes: existente.observacoes 
+            ? `${existente.observacoes} | [Peso atualizado de ${pesoAntigo} para ${pesoNovo} kg via Romaneio ${romAtualizado}]` 
+            : `Peso atualizado de ${pesoAntigo} para ${pesoNovo} kg via Romaneio ${romAtualizado}`,
+          status: existente.status || 'pendente_envelopamento', // PRESERVA RIGOROSAMENTE O STATUS DO BANCO
+          updated_at: agora
+        };
+
+        registrosCompletos.push(registroAtualizado);
+        rowsParaDB.push(formatarItemParaSupabaseEnvelopamentos(registroAtualizado));
+      } else {
+        // Bloco idêntico já cadastrado sem alteração de peso: BLOQUEIA criação de nova linha
+        console.log(`[Importação] Bloco "${dados.numero_bloco}" já existe idêntico no Romaneio ${existente.numero_romaneio}. Nenhuma duplicata inserida.`);
+      }
       continue;
     }
 
-    // Se for bloco novo
+    // Bloco novo (não existe na base)
     const id = dados.id && !dados.id.startsWith('pdf_') ? dados.id : `env_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    if (idsJaProcessados.has(id)) continue;
+    idsJaProcessados.add(id);
+
     let statusNormalizado = dados.status || 'pendente_envelopamento';
     if (statusNormalizado === 'pendente' || statusNormalizado === 'em_envelopamento' || statusNormalizado === 'em_andamento') {
       statusNormalizado = 'pendente_envelopamento';
@@ -1162,6 +1267,10 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
     rowsParaDB.push(formatarItemParaSupabaseEnvelopamentos(registroCompleto));
   }
 
+  if (registrosCompletos.length === 0) {
+    return [];
+  }
+
   // 1. Atualizar LocalStorage mesclando
   const mapa = new Map();
   locais.forEach(item => { if (item?.id) mapa.set(item.id, item); });
@@ -1181,7 +1290,7 @@ export const importarBlocosEmLote = async (itens, usuarioNome = 'Equipe Vermont'
   // 3. Registrar no histórico
   try {
     for (const reg of registrosCompletos) {
-      const ehAtualizacao = itensValidos.some(iv => iv.numero_bloco === reg.numero_bloco && iv.ehAtualizacaoPeso);
+      const ehAtualizacao = itens.some(iv => iv.numero_bloco === reg.numero_bloco && iv.ehAtualizacaoPeso);
       await registrarHistoricoEnvelopamento({
         tipo_acao: ehAtualizacao ? 'ATUALIZACAO_PESO_ROMANEIO' : 'IMPORTACAO_ROMANEIO',
         numero_bloco: reg.numero_bloco,

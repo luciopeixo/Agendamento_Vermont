@@ -16,6 +16,7 @@ import {
 import { 
   STATUS_ENVELOPAMENTO, 
   gerarChaveDuplicidade,
+  saoBlocosCorrespondentes,
   excluirEnvelopamento,
   atualizarStatusEnvelopamento,
   compararNumeroBlocoDecrescente
@@ -32,39 +33,31 @@ export function ModalVisualizarDuplicidades({
   const [excluindoId, setExcluindoId] = useState(null);
   const [mensagemSucesso, setMensagemSucesso] = useState('');
 
-  // Agrupar blocos duplicados pela chave de duplicidade
+  // Agrupar blocos duplicados pela inteligência de correspondência unificada
   const gruposDuplicados = React.useMemo(() => {
-    const mapa = new Map();
+    const grupos = [];
 
-    envelopamentos.forEach(item => {
-      const chave = gerarChaveDuplicidade({
-        numero_bloco: item.numero_bloco,
-        cliente_nome: item.cliente_nome,
-        cliente_cnpj: item.cliente_cnpj,
-        material: item.material,
-        pedreira_id: item.pedreira_id,
-        pedreira_nome: item.pedreira_nome
-      });
-
-      if (!chave) return;
-
-      if (!mapa.has(chave)) {
-        mapa.set(chave, {
-          chave,
+    (Array.isArray(envelopamentos) ? envelopamentos : []).forEach(item => {
+      let grupo = grupos.find(g => saoBlocosCorrespondentes(item, g.itemReferencia));
+      if (!grupo) {
+        grupo = {
+          chave: item.id || Math.random().toString(),
+          itemReferencia: item,
           numero_bloco: item.numero_bloco,
           cliente_nome: item.cliente_nome,
           cliente_cnpj: item.cliente_cnpj,
           material: item.material,
           pedreira_nome: item.pedreira_nome,
           itens: []
-        });
+        };
+        grupos.push(grupo);
       }
 
-      mapa.get(chave).itens.push(item);
+      grupo.itens.push(item);
     });
 
     // Retorna apenas os grupos que têm 2 ou mais ocorrências em ordem decrescente
-    return Array.from(mapa.values())
+    return grupos
       .filter(g => g.itens.length > 1)
       .sort((a, b) => compararNumeroBlocoDecrescente(a.numero_bloco, b.numero_bloco));
   }, [envelopamentos]);
