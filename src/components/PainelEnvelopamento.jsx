@@ -696,7 +696,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             }}
           >
             <Layers size={16} />
-            Gestão de Blocos
+            Controle de Envelopamento
           </button>
 
           <button

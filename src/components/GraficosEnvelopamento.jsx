@@ -417,18 +417,29 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
         </div>
 
         {/* Grade de Controles de Filtros */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
           
           {/* Período */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.74rem', color: 'var(--slate-300)', marginBottom: 6, fontWeight: 700 }}>
-              📅 PERÍODO:
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', color: 'var(--slate-300)', marginBottom: 6, fontWeight: 700 }}>
+              <span>📅</span> PERÍODO:
             </label>
             <select
               className="form-select"
               value={filtroPeriodo}
               onChange={(e) => setFiltroPeriodo(e.target.value)}
-              style={{ fontSize: '0.82rem', height: 38, width: '100%' }}
+              style={{
+                fontSize: '0.84rem',
+                padding: '9px 12px',
+                lineHeight: 1.4,
+                width: '100%',
+                minHeight: 42,
+                borderRadius: 8,
+                background: 'rgba(8, 12, 16, 0.9)',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                boxSizing: 'border-box'
+              }}
             >
               <option value="todos">Todo o Histórico</option>
               <option value="7_dias">Últimos 7 Dias</option>
@@ -441,14 +452,25 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
 
           {/* Pedreira */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.74rem', color: 'var(--slate-300)', marginBottom: 6, fontWeight: 700 }}>
-              🏛️ PEDREIRA:
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', color: 'var(--slate-300)', marginBottom: 6, fontWeight: 700 }}>
+              <span>🏛️</span> PEDREIRA:
             </label>
             <select
               className="form-select"
               value={filtroPedreira}
               onChange={(e) => setFiltroPedreira(e.target.value)}
-              style={{ fontSize: '0.82rem', height: 38, width: '100%' }}
+              style={{
+                fontSize: '0.84rem',
+                padding: '9px 12px',
+                lineHeight: 1.4,
+                width: '100%',
+                minHeight: 42,
+                borderRadius: 8,
+                background: 'rgba(8, 12, 16, 0.9)',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                boxSizing: 'border-box'
+              }}
             >
               <option value="todas">Todas as Pedreiras</option>
               {PEDREIRAS_CEARA.map(p => (
@@ -459,14 +481,25 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
 
           {/* Material */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.74rem', color: 'var(--slate-300)', marginBottom: 6, fontWeight: 700 }}>
-              🪨 MATERIAL / ROCHA:
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', color: 'var(--slate-300)', marginBottom: 6, fontWeight: 700 }}>
+              <span>🪨</span> MATERIAL / ROCHA:
             </label>
             <select
               className="form-select"
               value={filtroMaterial}
               onChange={(e) => setFiltroMaterial(e.target.value)}
-              style={{ fontSize: '0.82rem', height: 38, width: '100%' }}
+              style={{
+                fontSize: '0.84rem',
+                padding: '9px 12px',
+                lineHeight: 1.4,
+                width: '100%',
+                minHeight: 42,
+                borderRadius: 8,
+                background: 'rgba(8, 12, 16, 0.9)',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                boxSizing: 'border-box'
+              }}
             >
               <option value="todos">Todos os Materiais</option>
               {listaMateriaisUnicos.map(mat => (
@@ -477,14 +510,25 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
 
           {/* Cliente */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.74rem', color: 'var(--slate-300)', marginBottom: 6, fontWeight: 700 }}>
-              🏢 CLIENTE COMPRADOR:
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', color: 'var(--slate-300)', marginBottom: 6, fontWeight: 700 }}>
+              <span>🏢</span> CLIENTE COMPRADOR:
             </label>
             <select
               className="form-select"
               value={filtroCliente}
               onChange={(e) => setFiltroCliente(e.target.value)}
-              style={{ fontSize: '0.82rem', height: 38, width: '100%' }}
+              style={{
+                fontSize: '0.84rem',
+                padding: '9px 12px',
+                lineHeight: 1.4,
+                width: '100%',
+                minHeight: 42,
+                borderRadius: 8,
+                background: 'rgba(8, 12, 16, 0.9)',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                boxSizing: 'border-box'
+              }}
             >
               <option value="todos">Todos os Clientes</option>
               {listaClientesUnicos.map(cli => (
@@ -495,14 +539,25 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
 
           {/* Status */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.74rem', color: 'var(--slate-300)', marginBottom: 6, fontWeight: 700 }}>
-              🛡️ STATUS DE ENVELOPAMENTO:
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.74rem', color: 'var(--slate-300)', marginBottom: 6, fontWeight: 700 }}>
+              <span>🛡️</span> STATUS DE ENVELOPAMENTO:
             </label>
             <select
               className="form-select"
               value={filtroStatus}
               onChange={(e) => setFiltroStatus(e.target.value)}
-              style={{ fontSize: '0.82rem', height: 38, width: '100%' }}
+              style={{
+                fontSize: '0.84rem',
+                padding: '9px 12px',
+                lineHeight: 1.4,
+                width: '100%',
+                minHeight: 42,
+                borderRadius: 8,
+                background: 'rgba(8, 12, 16, 0.9)',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                boxSizing: 'border-box'
+              }}
             >
               <option value="todos">Todos os Status</option>
               <option value="envelopado">🟢 Envelopado</option>
@@ -516,23 +571,23 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
         {filtroPeriodo === 'custom' && (
           <div style={{ display: 'flex', gap: 14, marginTop: 14, flexWrap: 'wrap', alignItems: 'center', background: 'rgba(0,0,0,0.25)', padding: '10px 16px', borderRadius: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: '0.76rem', color: 'var(--slate-400)' }}>De:</span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--slate-300)', fontWeight: 600 }}>De:</span>
               <input
                 type="date"
                 className="form-input"
                 value={dataInicioCustom}
                 onChange={(e) => setDataInicioCustom(e.target.value)}
-                style={{ fontSize: '0.82rem', padding: '4px 10px', height: 34 }}
+                style={{ fontSize: '0.84rem', padding: '6px 12px', minHeight: 38, borderRadius: 6, background: 'rgba(8, 12, 16, 0.9)', color: '#fff', border: '1px solid rgba(255, 255, 255, 0.15)' }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: '0.76rem', color: 'var(--slate-400)' }}>Até:</span>
+              <span style={{ fontSize: '0.78rem', color: 'var(--slate-300)', fontWeight: 600 }}>Até:</span>
               <input
                 type="date"
                 className="form-input"
                 value={dataFimCustom}
                 onChange={(e) => setDataFimCustom(e.target.value)}
-                style={{ fontSize: '0.82rem', padding: '4px 10px', height: 34 }}
+                style={{ fontSize: '0.84rem', padding: '6px 12px', minHeight: 38, borderRadius: 6, background: 'rgba(8, 12, 16, 0.9)', color: '#fff', border: '1px solid rgba(255, 255, 255, 0.15)' }}
               />
             </div>
           </div>
