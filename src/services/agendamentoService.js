@@ -2599,29 +2599,31 @@ export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false) {
   str = str.replace(/^[^\w/-]+|[^\w/-]+$/g, '').trim();
 
   // 7. Regra especial de padronização de blocos Vermont:
-  // Se for 3 dígitos numéricos terminando com ano válido (ex: 126 -> 0126 / 01/26)
+  // Se for 3 dígitos numéricos (ex: 126 -> 0126 / 01/26, 127 -> 0127 / 01/27)
   if (/^\d{3}$/.test(str)) {
     const seq = str.slice(0, 1);
     const ano = str.slice(1);
     const anoNum = parseInt(ano, 10);
-    if (anoNum >= 20 && anoNum <= 35) {
-      if (isThorOuArgos) {
-        return `0${seq}/${ano}`;
-      }
-      return `0${seq}${ano}`; // "0126"
+    if (isThorOuArgos) {
+      return `0${seq}/${ano}`;
     }
+    if (anoNum >= 20 && anoNum <= 35) {
+      return `0${seq}${ano}`; // "0126", "0127"
+    }
+    return `0${str}`;
   } else if (/^\d{3}([A-Za-z]{1,5})$/.test(str)) {
     // Se for 3 dígitos + sufixo de letra (ex: 126A -> 0126A / 01/26A)
     const seq = str.slice(0, 1);
     const ano = str.slice(1, 3);
     const sufixo = str.slice(3).toUpperCase();
     const anoNum = parseInt(ano, 10);
-    if (anoNum >= 20 && anoNum <= 35) {
-      if (isThorOuArgos) {
-        return `0${seq}/${ano}${sufixo}`;
-      }
-      return `0${seq}${ano}${sufixo}`; // "0126A"
+    if (isThorOuArgos) {
+      return `0${seq}/${ano}${sufixo}`;
     }
+    if (anoNum >= 20 && anoNum <= 35) {
+      return `0${seq}${ano}${sufixo}`; // "0126A", "0127A"
+    }
+    return `0${str}`;
   } else if (/^\d\/\d{2}$/.test(str)) {
     // Se for formato 1/26 -> padroniza para 01/26
     const partes = str.split('/');

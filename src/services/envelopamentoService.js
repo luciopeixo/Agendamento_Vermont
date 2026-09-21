@@ -260,6 +260,8 @@ export const normalizarNumeroBloco = (bloco = '') => {
     const anoNum = parseInt(ano, 10);
     if (anoNum >= 20 && anoNum <= 35) {
       str = `0${seq}${ano}`;
+    } else {
+      str = `0${str}`;
     }
   } else if (/^\d{3}([A-Za-z]{1,5})$/.test(str)) {
     const seq = str.slice(0, 1);
@@ -268,6 +270,8 @@ export const normalizarNumeroBloco = (bloco = '') => {
     const anoNum = parseInt(ano, 10);
     if (anoNum >= 20 && anoNum <= 35) {
       str = `0${seq}${ano}${sufixo}`;
+    } else {
+      str = `0${str}`;
     }
   } else if (/^\d\/\d{2}$/.test(str)) {
     const partes = str.split('/');
