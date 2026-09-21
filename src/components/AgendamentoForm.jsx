@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Truck, Calendar, Clock, MapPin, AlertTriangle, Send, Info, Mail, FileCheck, Layers, ArrowRight,
-  CheckCircle, UserCheck, Sparkles, Building2, ShieldCheck
+  CheckCircle, UserCheck, Sparkles, Building2, ShieldCheck, X, Edit3
 } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
@@ -119,6 +119,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
   const [carregandoOcupacao, setCarregandoOcupacao] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [mensagemErro, setMensagemErro] = useState('');
+  // Controle de verificação e confirmação ativa do porte de veículo padrão
+  const [tipoVeiculoConfirmado, setTipoVeiculoConfirmado] = useState(false);
+  const [modalConfirmarPorteAberto, setModalConfirmarPorteAberto] = useState(false);
   // Lembretes operacionais de sábado
   const statusTravaSabado = obterStatusTravaSabado(formData.data_agendamento);
   const statusTravaSabado2 = obterStatusTravaSabado(ponto2.data_agendamento);
@@ -744,6 +747,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     if (campo === 'numero_bloco') {
       valorFinal = valor ? valor.toUpperCase() : '';
     }
+    if (campo === 'tipo_veiculo') {
+      setTipoVeiculoConfirmado(true);
+    }
     setFormData(prev => ({ ...prev, [campo]: valorFinal }));
     if (mensagemErro) setMensagemErro('');
   };
@@ -824,16 +830,37 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         cliente_cnpj: prev.cliente_cnpj || formData.cliente_cnpj,
         pedreira: formData.pedreira,
         material: formData.material,
-        data_agendamento: formData.data_agendamento,
-        horario_agendamento: formData.horario_agendamento
       }));
     }
     setMensagemErro('');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleConfirmarPorteEEfetivar = () => {
+    setTipoVeiculoConfirmado(true);
+    setModalConfirmarPorteAberto(false);
+    handleSubmit(null, true);
+  };
+
+  const handleRevisarPorte = () => {
+    setModalConfirmarPorteAberto(false);
+    setTimeout(() => {
+      const elem = document.getElementById('campo-tipo-veiculo-select');
+      if (elem) {
+        elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        elem.focus();
+      }
+    }, 100);
+  };
+
+  const handleSubmit = async (e, confirmarPorteDireto = false) => {
+    if (e && e.preventDefault) e.preventDefault();
     setMensagemErro('');
+
+    // Se o usuário ainda não confirmou nem alterou o porte do veículo padrão, abrir modal de confirmação
+    if (!confirmarPorteDireto && !tipoVeiculoConfirmado && formData.tipo_veiculo === TIPOS_VEICULO[0]) {
+      setModalConfirmarPorteAberto(true);
+      return;
+    }
 
     // Validação de múltiplos blocos no carregamento simples
     if (tipoCarregamento === 'simples') {
@@ -3005,30 +3032,54 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
             {/* Tipo do Veículo */}
             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
                 <label className="form-label form-label-required" style={{ margin: 0 }}>Tipo do Veículo</label>
-                <span style={{
-                  fontSize: '0.74rem',
-                  padding: '2px 8px',
-                  borderRadius: 6,
-                  background: 'rgba(0, 118, 44, 0.15)',
-                  border: '1px solid rgba(0, 118, 44, 0.35)',
-                  color: 'var(--vermont-green-light)',
-                  fontWeight: 600,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4
-                }}>
-                  <Truck size={13} />
-                  Porte Selecionado: {formData.tipo_veiculo}
-                </span>
+                {tipoVeiculoConfirmado ? (
+                  <span style={{
+                    fontSize: '0.74rem',
+                    padding: '3px 10px',
+                    borderRadius: 6,
+                    background: 'rgba(0, 118, 44, 0.15)',
+                    border: '1px solid rgba(0, 118, 44, 0.4)',
+                    color: 'var(--vermont-green-light)',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5
+                  }}>
+                    <CheckCircle size={13} />
+                    Porte Confirmado: {formData.tipo_veiculo}
+                  </span>
+                ) : (
+                  <span style={{
+                    fontSize: '0.74rem',
+                    padding: '3px 10px',
+                    borderRadius: 6,
+                    background: 'var(--warning-bg)',
+                    border: '1px solid var(--warning-border)',
+                    color: 'var(--warning-title)',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5
+                  }}>
+                    <AlertTriangle size={13} color="var(--warning-icon)" />
+                    Porte Padrão Sugerido (Confirme abaixo)
+                  </span>
+                )}
               </div>
               <select
+                id="campo-tipo-veiculo-select"
                 className="form-select"
                 value={formData.tipo_veiculo}
                 onChange={(e) => handleChange('tipo_veiculo', e.target.value)}
                 required
-                style={{ fontSize: '0.96rem', fontWeight: 600 }}
+                style={{ 
+                  fontSize: '0.96rem', 
+                  fontWeight: 600,
+                  borderColor: !tipoVeiculoConfirmado ? 'var(--warning-border)' : undefined,
+                  boxShadow: !tipoVeiculoConfirmado ? '0 0 0 1px var(--warning-border)' : undefined
+                }}
               >
                 {TIPOS_VEICULO.map(tipo => (
                   <option key={tipo} value={tipo}>{tipo}</option>
@@ -3036,30 +3087,73 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               </select>
 
               {/* Alerta de Verificação do Porte do Veículo */}
-              <div style={{
-                marginTop: 8,
-                padding: '10px 14px',
-                borderRadius: 10,
-                background: 'var(--warning-bg)',
-                border: '1px solid var(--warning-border)',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 10
-              }}>
-                <AlertTriangle size={18} color="var(--warning-icon)" style={{ flexShrink: 0, marginTop: 2 }} />
-                <div style={{ fontSize: '0.8rem', lineHeight: 1.45, color: 'var(--warning-text)' }}>
-                  <strong style={{ color: 'var(--warning-title)', display: 'block', marginBottom: 2 }}>
-                    ⚠️ Importante: Certifique-se do porte correto do veículo!
-                  </strong>
+              {!tipoVeiculoConfirmado ? (
+                <div className="animate-fade" style={{
+                  marginTop: 8,
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  background: 'var(--warning-bg)',
+                  border: '1.5px solid var(--warning-border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <AlertTriangle size={20} color="var(--warning-icon)" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ fontSize: '0.82rem', lineHeight: 1.45, color: 'var(--warning-text)' }}>
+                      <strong style={{ color: 'var(--warning-title)', display: 'block', marginBottom: 2 }}>
+                        ⚠️ Atenção: Certifique-se do porte correto do veículo!
+                      </strong>
+                      <span>
+                        O veículo está pré-definido como <strong>Carreta LS (6 Eixos)</strong>. Se o veículo que fará o carregamento for de outro porte <em>(ex: Bitruck, LS 7 Eixos, Bitrem ou Rodotrem)</em>, por favor altere a seleção no campo acima.
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => setTipoVeiculoConfirmado(true)}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        borderRadius: 6,
+                        border: 'none',
+                        background: 'var(--vermont-green-gradient)',
+                        color: '#ffffff',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        boxShadow: '0 2px 8px rgba(0, 118, 44, 0.3)'
+                      }}
+                    >
+                      <CheckCircle size={14} />
+                      Confirmar que o veículo é Carreta LS (6 Eixos)
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="animate-fade" style={{
+                  marginTop: 6,
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  background: 'rgba(0, 118, 44, 0.08)',
+                  border: '1px solid rgba(0, 118, 44, 0.25)',
+                  fontSize: '0.78rem',
+                  color: 'var(--slate-300)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}>
+                  <CheckCircle size={15} color="var(--vermont-green-light)" style={{ flexShrink: 0 }} />
                   <span>
-                    Confirme se o veículo que irá até a pedreira é realmente um <strong>{formData.tipo_veiculo}</strong>. 
-                    {configPlacas.quantidade === 3 && ' Requer 3 placas: Cavalo, 1ª Carreta e 2ª Carreta.'}
-                    {configPlacas.quantidade === 1 && ' Requer 1 placa: Apenas a placa do caminhão (veículo rígido).'}
-                    {configPlacas.quantidade === 2 && ' Requer 2 placas: Placa do Cavalo e Placa da Carreta.'}
-                    {' '}Erros no porte do veículo ou divergência de eixos impedem a autorização e o carregamento na pedreira.
+                    {configPlacas.quantidade === 3 && 'Bitrem / Rodotrem requer 3 placas: Cavalo, 1ª Carreta e 2ª Carreta.'}
+                    {configPlacas.quantidade === 1 && 'Truck / Bitruck requer 1 placa: Placa do Veículo (Caminhão Rígido).'}
+                    {configPlacas.quantidade === 2 && 'Requer 2 placas: Placa do Cavalo e Placa da Carreta.'}
                   </span>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Placa do Cavalo / Veículo */}
@@ -3404,6 +3498,126 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           </button>
         </div>
       </form>
+
+      {/* Modal de Confirmação Preventiva do Porte do Veículo */}
+      {modalConfirmarPorteAberto && (
+        <div 
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: 16
+          }}
+        >
+          <div 
+            className="animate-scale-in"
+            style={{
+              background: 'var(--bg-card-solid, #0e1418)',
+              border: '1.5px solid var(--warning-border)',
+              borderRadius: 16,
+              maxWidth: 500,
+              width: '100%',
+              padding: '24px 26px',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(245, 158, 11, 0.2)',
+              color: 'var(--slate-100)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <div style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: 'var(--warning-bg)',
+                border: '1px solid var(--warning-border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--warning-icon)',
+                flexShrink: 0
+              }}>
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--warning-title)', fontWeight: 800 }}>
+                  Conferência do Porte do Veículo
+                </h3>
+                <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
+                  Aviso Preventivo de Carregamento
+                </span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.88rem', color: 'var(--slate-200)', lineHeight: 1.5, margin: '0 0 14px 0' }}>
+              O agendamento está configurado com o porte padrão: <strong style={{ color: 'var(--warning-title)' }}>Carreta LS (6 Eixos)</strong>.
+            </p>
+
+            <div style={{
+              padding: '12px 14px',
+              borderRadius: 10,
+              background: 'var(--warning-bg)',
+              border: '1px solid var(--warning-border)',
+              fontSize: '0.82rem',
+              color: 'var(--warning-text)',
+              marginBottom: 18,
+              lineHeight: 1.45
+            }}>
+              ⚠️ <strong>Atenção Transportador:</strong> Certifique-se de que o veículo que irá carregar na pedreira é realmente uma <strong>Carreta LS</strong>. O erro no porte <em>(como enviar Bitruck, Bitrem ou Rodotrem cadastrado como Carreta LS)</em> impede o carregamento no pátio da pedreira.
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                type="button"
+                onClick={handleConfirmarPorteEEfetivar}
+                className="btn btn-vermont"
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+              >
+                <CheckCircle size={18} />
+                Sim, é Carreta LS (6 Eixos) - Confirmar e Gravar
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRevisarPorte}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  fontSize: '0.88rem',
+                  fontWeight: 600,
+                  borderRadius: 10,
+                  border: '1px solid var(--border-subtle, rgba(255,255,255,0.15))',
+                  background: 'rgba(255,255,255,0.06)',
+                  color: 'var(--slate-300)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Edit3 size={16} />
+                Não, quero alterar o Porte do Veículo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
