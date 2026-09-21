@@ -310,6 +310,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     }
   }, [
     formData.motorista_cpf, 
+    formData.motorista_nome,
     formData.placa_cavalo, 
     formData.placa_carreta, 
     formData.placa_carreta_2, 
