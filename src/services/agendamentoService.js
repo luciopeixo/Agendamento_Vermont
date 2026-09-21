@@ -2808,8 +2808,25 @@ export async function verificarBlocoDuplicado({
         .neq('status', 'Cancelado')
         .order('data_agendamento', { ascending: false });
 
-      if (!error && Array.isArray(data)) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         listaParaChecar = data;
+      } else {
+        // Se SELECT foi bloqueado por RLS para anon, checa via RPC segura
+        for (const bl of blocosParaVerificar) {
+          try {
+            const { data: ehDuplicado, error: errRpc } = await supabase.rpc('rpc_verificar_bloco_duplicado_publico', {
+              p_numero_bloco: bl,
+              p_cliente: clienteLimpo,
+              p_pedreira: pedreiraLimpa
+            });
+            if (!errRpc && ehDuplicado) {
+              return {
+                duplicado: true,
+                mensagem: `Atenção: O bloco "${bl}" já se encontra cadastrado e agendado para o cliente "${clienteLimpo}". Por favor, revise a numeração.`
+              };
+            }
+          } catch (eRpc) {}
+        }
       }
     } catch (e) {}
   }
