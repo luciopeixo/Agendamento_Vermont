@@ -2093,6 +2093,25 @@ export async function consultarMotoristaPorCPF(cpf = '') {
         };
         salvarMotoristaNaBase({ ...mot, motorista_cpf: cpfLimpo });
         return { valido: true, encontrado: true, origem: 'historico_supabase', motorista: mot };
+      } else {
+        // Se SELECT direto for bloqueado por RLS para anon, consulta via RPC segura
+        try {
+          const { data: dataRpc, error: errRpc } = await supabase.rpc('rpc_consultar_conformidade_motorista_publico', {
+            p_cpf: cpfLimpo
+          });
+          if (!errRpc && dataRpc && dataRpc.encontrado) {
+            const mot = {
+              cpf: cpfLimpo,
+              cnh_validade: dataRpc.cnh_validade || null,
+              crlv_validade_cavalo: dataRpc.crlv_validade_cavalo || null,
+              crlv_validade_carreta: dataRpc.crlv_validade_carreta || null,
+              validade_laudo_rocha: dataRpc.validade_laudo_rocha || null,
+              status_conformidade: dataRpc.status_conformidade || 'REGULAR',
+              observacoes_conformidade: dataRpc.observacoes_conformidade || ''
+            };
+            return { valido: true, encontrado: true, origem: 'rpc_supabase', motorista: mot };
+          }
+        } catch (_eRpc) {}
       }
     } catch (_eSup) {}
   }

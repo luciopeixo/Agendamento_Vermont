@@ -1520,7 +1520,26 @@ export const buscarStatusEnvelopamentoPorBloco = async (
     pedreira: pedreira
   }, todos);
 
-  return info.encontrado ? info.registro : null;
+  if (info.encontrado && info.registro) {
+    return info.registro;
+  }
+
+  // Se não encontrou na lista local (ex: usuário anônimo com RLS ativa), consulta via RPC segura
+  if (isSupabaseConfigurado()) {
+    try {
+      const { data, error } = await supabase.rpc('rpc_consultar_status_envelopamento_bloco', {
+        p_numero_bloco: String(numeroBloco).trim(),
+        p_cliente: String(clienteNome || '').trim(),
+        p_material: String(material || '').trim(),
+        p_pedreira: String(pedreira || '').trim()
+      });
+      if (!error && data && data.encontrado) {
+        return data;
+      }
+    } catch (e) {}
+  }
+
+  return null;
 };
 
 /**
