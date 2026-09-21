@@ -1328,10 +1328,10 @@ export function PainelGestao({
           display: 'flex',
           gap: 10,
           marginBottom: 20,
-          background: 'rgba(0, 0, 0, 0.45)',
+          background: 'var(--bg-mode-selector)',
           padding: '6px',
           borderRadius: 12,
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          border: '1px solid var(--border-subtle)',
           width: 'fit-content',
           flexWrap: 'wrap'
         }}>
@@ -1347,7 +1347,7 @@ export function PainelGestao({
               borderRadius: 8,
               background: abaAtiva === 'tabela' ? 'var(--vermont-green-subtle)' : 'transparent',
               border: abaAtiva === 'tabela' ? '1px solid var(--vermont-green-border)' : '1px solid transparent',
-              color: abaAtiva === 'tabela' ? '#4ade80' : 'var(--slate-400)',
+              color: abaAtiva === 'tabela' ? '#4ade80' : 'var(--text-inactive-tab)',
               boxShadow: abaAtiva === 'tabela' ? '0 0 15px rgba(0, 118, 44, 0.35)' : 'none',
               transition: 'all 0.2s'
             }}
@@ -1368,7 +1368,7 @@ export function PainelGestao({
               borderRadius: 8,
               background: abaAtiva === 'graficos' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
               border: abaAtiva === 'graficos' ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid transparent',
-              color: abaAtiva === 'graficos' ? '#38bdf8' : 'var(--slate-400)',
+              color: abaAtiva === 'graficos' ? '#0284c7' : 'var(--text-inactive-tab)',
               boxShadow: abaAtiva === 'graficos' ? '0 0 15px rgba(56, 189, 248, 0.3)' : 'none',
               transition: 'all 0.2s'
             }}

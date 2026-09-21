@@ -249,7 +249,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
     <div className="animate-fade" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* Barra de Filtros Analíticos Exclusivos do Admin */}
-      <div className="glass-panel" style={{ padding: '20px 24px', background: 'rgba(10, 18, 14, 0.75)', border: '1px solid var(--vermont-green-border)' }}>
+      <div className="glass-panel" style={{ padding: '20px 24px', border: '1px solid var(--vermont-green-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
@@ -266,7 +266,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
               <Filter size={18} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.1rem', margin: 0, color: '#fff' }}>
+              <h2 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--slate-100)' }}>
                 Filtros de Análise & Volume de Blocos
               </h2>
               <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
@@ -395,7 +395,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
                 className="form-input"
                 value={dataInicioCustom}
                 onChange={(e) => setDataInicioCustom(e.target.value)}
-                style={{ width: 170, colorScheme: 'dark', fontSize: '0.84rem' }}
+                style={{ width: 170, fontSize: '0.84rem' }}
               />
             </div>
             <div>
@@ -405,7 +405,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
                 className="form-input"
                 value={dataFimCustom}
                 onChange={(e) => setDataFimCustom(e.target.value)}
-                style={{ width: 170, colorScheme: 'dark', fontSize: '0.84rem' }}
+                style={{ width: 170, fontSize: '0.84rem' }}
               />
             </div>
           </div>
@@ -423,7 +423,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
             </span>
             <Layers size={18} />
           </div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#fff', marginTop: 8 }}>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--slate-100)', marginTop: 8 }}>
             {totalBlocos}
           </div>
           <span style={{ fontSize: '0.75rem', color: 'var(--slate-400)' }}>
@@ -439,10 +439,10 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
             </span>
             <MapPin size={18} />
           </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--slate-100)', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {dadosPorPedreira[0]?.pedreira ? dadosPorPedreira[0].pedreira.split('-')[0].trim() : 'N/A'}
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#38bdf8' }}>
+          <span style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600 }}>
             {dadosPorPedreira[0] ? `${dadosPorPedreira[0].qtd} blocos (${dadosPorPedreira[0].porcentagem}%)` : 'Nenhum carregamento'}
           </span>
         </div>
@@ -455,26 +455,26 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
             </span>
             <Award size={18} />
           </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--slate-100)', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {dadosPorMaterial[0]?.material || 'N/A'}
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#fbbf24' }}>
+          <span style={{ fontSize: '0.75rem', color: '#d97706', fontWeight: 600 }}>
             {dadosPorMaterial[0] ? `${dadosPorMaterial[0].qtd} blocos (${dadosPorMaterial[0].porcentagem}%)` : 'Nenhum carregamento'}
           </span>
         </div>
 
         {/* Cliente Líder */}
         <div className="glass-panel" style={{ padding: '18px 20px', borderLeft: '4px solid #a855f7' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#c084fc' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#a855f7' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Cliente Mais Atendido
             </span>
             <Users size={18} />
           </div>
-          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--slate-100)', marginTop: 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {dadosPorCliente[0]?.cliente || 'N/A'}
           </div>
-          <span style={{ fontSize: '0.75rem', color: '#c084fc' }}>
+          <span style={{ fontSize: '0.75rem', color: '#9333ea', fontWeight: 600 }}>
             {dadosPorCliente[0] ? `${dadosPorCliente[0].qtd} blocos (${dadosPorCliente[0].porcentagem}%)` : 'Nenhum carregamento'}
           </span>
         </div>
@@ -484,7 +484,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
       <div className="glass-panel" style={{ padding: '22px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h3 style={{ fontSize: '1.05rem', margin: '0 0 4px 0', color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h3 style={{ fontSize: '1.05rem', margin: '0 0 4px 0', color: 'var(--slate-100)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <TrendingUp size={18} color="#4ade80" />
               Evolução Diária de Blocos Carregados
             </h3>
@@ -493,7 +493,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: 6, background: 'rgba(0,0,0,0.3)', padding: 4, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', gap: 6, background: 'var(--bg-mode-selector)', padding: 4, borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
             <button
               type="button"
               onClick={() => setTipoGraficoTempo('barras')}
@@ -521,7 +521,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
           <div style={{ overflowX: 'auto', paddingBottom: 10 }}>
             {tipoGraficoTempo === 'barras' ? (
               /* Gráfico de Barras SVG Interativo */
-              <div style={{ minWidth: Math.max(dadosPorData.length * 45, 500), height: 220, display: 'flex', alignItems: 'flex-end', gap: 10, padding: '20px 10px 30px 10px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ minWidth: Math.max(dadosPorData.length * 45, 500), height: 220, display: 'flex', alignItems: 'flex-end', gap: 10, padding: '20px 10px 30px 10px', borderBottom: '1px solid var(--border-subtle)' }}>
                 {dadosPorData.map((d, i) => {
                   const alturaPorc = Math.max(12, (d.qtd / maxQtdData) * 100);
                   return (
@@ -580,9 +580,9 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
                   </defs>
                   
                   {/* Grid Lines */}
-                  <line x1="0" y1="50" x2="800" y2="50" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                  <line x1="0" y1="100" x2="800" y2="100" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                  <line x1="0" y1="150" x2="800" y2="150" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                  <line x1="0" y1="50" x2="800" y2="50" stroke="var(--border-subtle)" strokeDasharray="4 4" />
+                  <line x1="0" y1="100" x2="800" y2="100" stroke="var(--border-subtle)" strokeDasharray="4 4" />
+                  <line x1="0" y1="150" x2="800" y2="150" stroke="var(--border-subtle)" strokeDasharray="4 4" />
 
                   {/* Caminho da Linha & Área */}
                   {(() => {
@@ -603,11 +603,11 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
                         <path d={pathLinha} fill="none" stroke="#4ade80" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                         {pontos.map((p, i) => (
                           <g key={i}>
-                            <circle cx={p.x} cy={p.y} r="5" fill="#0e1412" stroke="#4ade80" strokeWidth="2.5" />
-                            <text x={p.x} y={p.y - 10} fill="#86efac" fontSize="11" fontWeight="bold" textAnchor="middle">
+                            <circle cx={p.x} cy={p.y} r="5" fill="#00762c" stroke="#4ade80" strokeWidth="2.5" />
+                            <text x={p.x} y={p.y - 10} fill="#16a34a" fontSize="11" fontWeight="bold" textAnchor="middle">
                               {p.qtd}
                             </text>
-                            <text x={p.x} y={195} fill="#94a3b8" fontSize="10" textAnchor="middle">
+                            <text x={p.x} y={195} fill="var(--slate-400)" fontSize="10" textAnchor="middle">
                               {p.data.slice(0, 5)}
                             </text>
                           </g>
@@ -627,7 +627,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
         
         {/* Distribuição por Pedreira */}
         <div className="glass-panel" style={{ padding: '22px 24px' }}>
-          <h3 style={{ fontSize: '1.05rem', margin: '0 0 4px 0', color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h3 style={{ fontSize: '1.05rem', margin: '0 0 4px 0', color: 'var(--slate-100)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <MapPin size={18} color="#38bdf8" />
             Distribuição por Pedreira
           </h3>
@@ -640,14 +640,14 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
               <div style={{ color: 'var(--slate-400)', fontSize: '0.85rem' }}>Nenhum registro.</div>
             ) : (
               dadosPorPedreira.map((p, idx) => (
-                <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div key={idx} style={{ background: 'var(--bg-mode-selector)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <strong style={{ fontSize: '0.86rem', color: '#fff' }}>{p.pedreira}</strong>
-                    <span style={{ fontSize: '0.84rem', color: '#38bdf8', fontWeight: 800 }}>
+                    <strong style={{ fontSize: '0.86rem', color: 'var(--slate-100)' }}>{p.pedreira}</strong>
+                    <span style={{ fontSize: '0.84rem', color: '#0284c7', fontWeight: 800 }}>
                       {p.qtd} {p.qtd === 1 ? 'bloco' : 'blocos'} ({p.porcentagem}%)
                     </span>
                   </div>
-                  <div style={{ width: '100%', height: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: 8, background: 'var(--border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{
                       width: `${p.porcentagem}%`,
                       height: '100%',
@@ -663,7 +663,7 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
 
         {/* Distribuição por Material */}
         <div className="glass-panel" style={{ padding: '22px 24px' }}>
-          <h3 style={{ fontSize: '1.05rem', margin: '0 0 4px 0', color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h3 style={{ fontSize: '1.05rem', margin: '0 0 4px 0', color: 'var(--slate-100)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Layers size={18} color="#fbbf24" />
             Ranking por Material
           </h3>
@@ -676,14 +676,14 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
               <div style={{ color: 'var(--slate-400)', fontSize: '0.85rem' }}>Nenhum registro.</div>
             ) : (
               dadosPorMaterial.map((m, idx) => (
-                <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', padding: '10px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div key={idx} style={{ background: 'var(--bg-mode-selector)', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <strong style={{ fontSize: '0.86rem', color: '#fff' }}>{m.material}</strong>
-                    <span style={{ fontSize: '0.84rem', color: '#fbbf24', fontWeight: 800 }}>
+                    <strong style={{ fontSize: '0.86rem', color: 'var(--slate-100)' }}>{m.material}</strong>
+                    <span style={{ fontSize: '0.84rem', color: '#d97706', fontWeight: 800 }}>
                       {m.qtd} {m.qtd === 1 ? 'bloco' : 'blocos'} ({m.porcentagem}%)
                     </span>
                   </div>
-                  <div style={{ width: '100%', height: 8, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: 8, background: 'var(--border-subtle)', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{
                       width: `${m.porcentagem}%`,
                       height: '100%',
@@ -700,8 +700,8 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
 
       {/* Top Clientes Destinatários */}
       <div className="glass-panel" style={{ padding: '22px 24px' }}>
-        <h3 style={{ fontSize: '1.05rem', margin: '0 0 4px 0', color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Users size={18} color="#c084fc" />
+        <h3 style={{ fontSize: '1.05rem', margin: '0 0 4px 0', color: 'var(--slate-100)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Users size={18} color="#a855f7" />
           Volume de Blocos por Cliente Destinatário
         </h3>
         <p style={{ margin: '0 0 16px 0', fontSize: '0.78rem', color: 'var(--slate-400)' }}>
@@ -714,8 +714,8 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
           ) : (
             dadosPorCliente.slice(0, 12).map((c, idx) => (
               <div key={idx} style={{
-                background: 'rgba(168, 85, 247, 0.06)',
-                border: '1px solid rgba(168, 85, 247, 0.25)',
+                background: 'var(--bg-mode-selector)',
+                border: '1px solid var(--border-subtle)',
                 borderRadius: 10,
                 padding: '12px 14px',
                 display: 'flex',
@@ -723,17 +723,17 @@ export function GraficosBlocosAdmin({ agendamentos = [] }) {
                 alignItems: 'center'
               }}>
                 <div style={{ maxWidth: '70%' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--slate-100)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {c.cliente}
                   </div>
-                  <span style={{ fontSize: '0.72rem', color: '#c084fc' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#9333ea', fontWeight: 600 }}>
                     {c.porcentagem}% do volume total
                   </span>
                 </div>
                 <div style={{
-                  background: 'rgba(168, 85, 247, 0.25)',
-                  border: '1px solid #a855f7',
-                  color: '#e9d5ff',
+                  background: 'rgba(168, 85, 247, 0.15)',
+                  border: '1px solid rgba(168, 85, 247, 0.4)',
+                  color: '#9333ea',
                   borderRadius: 8,
                   padding: '4px 10px',
                   fontWeight: 800,

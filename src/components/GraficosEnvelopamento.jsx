@@ -378,21 +378,22 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
   return (
     <div className="animate-fade" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
       
-      {/* 1. Barra Superior de Filtros Analíticos */}
+      {/* 1. Painel de Filtros Avançados */}
       <div className="glass-panel" style={{
         padding: '20px 24px',
-        background: 'rgba(10, 18, 14, 0.75)',
-        border: '1px solid var(--vermont-green-border)',
-        borderRadius: 14
+        border: '1px solid rgba(34, 197, 94, 0.3)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 42,
-              height: 42,
+              width: 40,
+              height: 40,
               borderRadius: 12,
-              background: 'var(--vermont-green-subtle)',
-              border: '1px solid var(--vermont-green-border)',
+              background: 'rgba(34, 197, 94, 0.15)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -401,7 +402,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               <Filter size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', margin: 0, color: '#fff', fontWeight: 800 }}>
+              <h2 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--slate-100)', fontWeight: 800 }}>
                 Filtros Analíticos & Inteligência de Envelopamento
               </h2>
               <span style={{ fontSize: '0.80rem', color: 'var(--slate-400)' }}>
@@ -466,15 +467,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               onChange={(e) => setFiltroPeriodo(e.target.value)}
               style={{
                 fontSize: '0.84rem',
-                padding: '9px 12px',
-                lineHeight: 1.4,
-                width: '100%',
-                minHeight: 42,
-                borderRadius: 8,
-                background: 'rgba(8, 12, 16, 0.9)',
-                color: '#fff',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                boxSizing: 'border-box'
+                width: '100%'
               }}
             >
               <option value="todos">Todo o Histórico</option>
@@ -497,15 +490,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               onChange={(e) => setFiltroPedreira(e.target.value)}
               style={{
                 fontSize: '0.84rem',
-                padding: '9px 12px',
-                lineHeight: 1.4,
-                width: '100%',
-                minHeight: 42,
-                borderRadius: 8,
-                background: 'rgba(8, 12, 16, 0.9)',
-                color: '#fff',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                boxSizing: 'border-box'
+                width: '100%'
               }}
             >
               <option value="todas">Todas as Pedreiras</option>
@@ -526,15 +511,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               onChange={(e) => setFiltroMaterial(e.target.value)}
               style={{
                 fontSize: '0.84rem',
-                padding: '9px 12px',
-                lineHeight: 1.4,
-                width: '100%',
-                minHeight: 42,
-                borderRadius: 8,
-                background: 'rgba(8, 12, 16, 0.9)',
-                color: '#fff',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                boxSizing: 'border-box'
+                width: '100%'
               }}
             >
               <option value="todos">Todos os Materiais</option>
@@ -555,15 +532,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               onChange={(e) => setFiltroCliente(e.target.value)}
               style={{
                 fontSize: '0.84rem',
-                padding: '9px 12px',
-                lineHeight: 1.4,
-                width: '100%',
-                minHeight: 42,
-                borderRadius: 8,
-                background: 'rgba(8, 12, 16, 0.9)',
-                color: '#fff',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                boxSizing: 'border-box'
+                width: '100%'
               }}
             >
               <option value="todos">Todos os Clientes</option>
@@ -584,15 +553,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               onChange={(e) => setFiltroStatus(e.target.value)}
               style={{
                 fontSize: '0.84rem',
-                padding: '9px 12px',
-                lineHeight: 1.4,
-                width: '100%',
-                minHeight: 42,
-                borderRadius: 8,
-                background: 'rgba(8, 12, 16, 0.9)',
-                color: '#fff',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                boxSizing: 'border-box'
+                width: '100%'
               }}
             >
               <option value="todos">Todos os Status</option>
@@ -605,7 +566,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
 
         {/* Campos de Data Personalizada */}
         {filtroPeriodo === 'custom' && (
-          <div style={{ display: 'flex', gap: 14, marginTop: 14, flexWrap: 'wrap', alignItems: 'center', background: 'rgba(0,0,0,0.25)', padding: '10px 16px', borderRadius: 8 }}>
+          <div style={{ display: 'flex', gap: 14, marginTop: 14, flexWrap: 'wrap', alignItems: 'center', background: 'var(--bg-mode-selector)', padding: '10px 16px', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: '0.78rem', color: 'var(--slate-300)', fontWeight: 600 }}>De:</span>
               <input
@@ -613,7 +574,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
                 className="form-input"
                 value={dataInicioCustom}
                 onChange={(e) => setDataInicioCustom(e.target.value)}
-                style={{ fontSize: '0.84rem', padding: '6px 12px', minHeight: 38, borderRadius: 6, background: 'rgba(8, 12, 16, 0.9)', color: '#fff', border: '1px solid rgba(255, 255, 255, 0.15)' }}
+                style={{ fontSize: '0.84rem', padding: '6px 12px' }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -623,7 +584,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
                 className="form-input"
                 value={dataFimCustom}
                 onChange={(e) => setDataFimCustom(e.target.value)}
-                style={{ fontSize: '0.84rem', padding: '6px 12px', minHeight: 38, borderRadius: 6, background: 'rgba(8, 12, 16, 0.9)', color: '#fff', border: '1px solid rgba(255, 255, 255, 0.15)' }}
+                style={{ fontSize: '0.84rem', padding: '6px 12px' }}
               />
             </div>
           </div>
@@ -658,7 +619,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
             <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', fontWeight: 600, display: 'block' }}>
               Total de Blocos
             </span>
-            <strong style={{ fontSize: '1.45rem', color: '#fff' }}>{totalBlocos}</strong>
+            <strong style={{ fontSize: '1.45rem', color: 'var(--slate-100)' }}>{totalBlocos}</strong>
             <span style={{ fontSize: '0.70rem', color: 'var(--slate-400)', display: 'block', marginTop: 1 }}>
               {totalRomaneiosUnicos} Romaneios • {totalClientesNoRecorte} Clientes
             </span>
@@ -691,10 +652,10 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               Envelopados (Concluídos)
             </span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <strong style={{ fontSize: '1.45rem', color: '#4ade80' }}>{qtdEnvelopados}</strong>
-              <span style={{ fontSize: '0.80rem', color: '#86efac', fontWeight: 700 }}>({pctEnvelopados}%)</span>
+              <strong style={{ fontSize: '1.45rem', color: '#16a34a' }}>{qtdEnvelopados}</strong>
+              <span style={{ fontSize: '0.80rem', color: '#16a34a', fontWeight: 700 }}>({pctEnvelopados}%)</span>
             </div>
-            <span style={{ fontSize: '0.70rem', color: '#86efac', display: 'block', marginTop: 1 }}>
+            <span style={{ fontSize: '0.70rem', color: 'var(--slate-400)', display: 'block', marginTop: 1 }}>
               Liberados para transporte
             </span>
           </div>
@@ -726,10 +687,10 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               Sem Envelopamento
             </span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <strong style={{ fontSize: '1.45rem', color: '#38bdf8' }}>{qtdSemEnvelopamento}</strong>
-              <span style={{ fontSize: '0.80rem', color: '#7dd3fc', fontWeight: 700 }}>({pctSemEnvelopamento}%)</span>
+              <strong style={{ fontSize: '1.45rem', color: '#0284c7' }}>{qtdSemEnvelopamento}</strong>
+              <span style={{ fontSize: '0.80rem', color: '#0284c7', fontWeight: 700 }}>({pctSemEnvelopamento}%)</span>
             </div>
-            <span style={{ fontSize: '0.70rem', color: '#7dd3fc', display: 'block', marginTop: 1 }}>
+            <span style={{ fontSize: '0.70rem', color: 'var(--slate-400)', display: 'block', marginTop: 1 }}>
               Sem necessidade de envelopamento
             </span>
           </div>
@@ -761,10 +722,10 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               Pendente no Pátio
             </span>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <strong style={{ fontSize: '1.45rem', color: '#fbbf24' }}>{qtdPendentes}</strong>
-              <span style={{ fontSize: '0.80rem', color: '#fcd34d', fontWeight: 700 }}>({pctPendentes}%)</span>
+              <strong style={{ fontSize: '1.45rem', color: '#d97706' }}>{qtdPendentes}</strong>
+              <span style={{ fontSize: '0.80rem', color: '#d97706', fontWeight: 700 }}>({pctPendentes}%)</span>
             </div>
-            <span style={{ fontSize: '0.70rem', color: '#fcd34d', display: 'block', marginTop: 1 }}>
+            <span style={{ fontSize: '0.70rem', color: 'var(--slate-400)', display: 'block', marginTop: 1 }}>
               Aguardando envelopamento
             </span>
           </div>
@@ -787,7 +748,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#c084fc'
+            color: '#a855f7'
           }}>
             <Scale size={22} />
           </div>
@@ -795,7 +756,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
             <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', fontWeight: 600, display: 'block' }}>
               Volume em Toneladas
             </span>
-            <strong style={{ fontSize: '1.45rem', color: '#c084fc' }}>{pesoTotalToneladas} t</strong>
+            <strong style={{ fontSize: '1.45rem', color: '#9333ea' }}>{pesoTotalToneladas} t</strong>
             <span style={{ fontSize: '0.70rem', color: 'var(--slate-400)', display: 'block', marginTop: 1 }}>
               Média: {Number(pesoMedioKg).toLocaleString('pt-BR')} kg/bloco
             </span>
@@ -809,8 +770,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
         display: 'flex',
         flexDirection: 'column',
         gap: 18,
-        border: '1px solid rgba(34, 197, 94, 0.25)',
-        background: 'rgba(10, 20, 15, 0.65)'
+        border: '1px solid rgba(34, 197, 94, 0.25)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -828,7 +788,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               <TrendingUp size={20} />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.1rem', margin: 0, color: '#fff', fontWeight: 800 }}>
+              <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--slate-100)', fontWeight: 800 }}>
                 Evolução Temporal de Blocos Envelopados
               </h3>
               <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
@@ -845,7 +805,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
               background: 'rgba(34, 197, 94, 0.12)',
               border: '1px solid rgba(34, 197, 94, 0.25)',
               fontSize: '0.78rem',
-              color: '#4ade80',
+              color: '#16a34a',
               fontWeight: 700
             }}>
               Total: <strong>{qtdEnvelopados}</strong> blocos
@@ -853,13 +813,13 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
             <div style={{
               padding: '6px 12px',
               borderRadius: 8,
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: 'var(--bg-mode-selector)',
+              border: '1px solid var(--border-subtle)',
               fontSize: '0.78rem',
-              color: 'var(--slate-300)',
+              color: 'var(--slate-400)',
               fontWeight: 600
             }}>
-              Média: <strong style={{ color: '#fff' }}>{mediaEnvelopadosDia}</strong> / dia ativo
+              Média: <strong style={{ color: 'var(--slate-100)' }}>{mediaEnvelopadosDia}</strong> / dia ativo
             </div>
             {diaPicoEnvelopamento && (
               <div style={{
@@ -868,10 +828,10 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
                 background: 'rgba(245, 158, 11, 0.12)',
                 border: '1px solid rgba(245, 158, 11, 0.25)',
                 fontSize: '0.78rem',
-                color: '#fbbf24',
+                color: '#d97706',
                 fontWeight: 600
               }}>
-                Pico: <strong style={{ color: '#fff' }}>{diaPicoEnvelopamento.totalEnvelopados} blocos</strong> ({diaPicoEnvelopamento.data.split('-').reverse().slice(0, 2).join('/')})
+                Pico: <strong style={{ color: 'var(--slate-100)' }}>{diaPicoEnvelopamento.totalEnvelopados} blocos</strong> ({diaPicoEnvelopamento.data.split('-').reverse().slice(0, 2).join('/')})
               </div>
             )}
           </div>
@@ -884,7 +844,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
             textAlign: 'center',
             color: 'var(--slate-400)',
             fontSize: '0.86rem',
-            background: 'rgba(0,0,0,0.2)',
+            background: 'var(--bg-mode-selector)',
             borderRadius: 10
           }}>
             Nenhum bloco com status "Envelopado" encontrado no período ou filtros selecionados.
@@ -897,9 +857,9 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
             minHeight: 200,
             padding: '24px 12px 12px',
             overflowX: 'auto',
-            background: 'rgba(0, 0, 0, 0.22)',
+            background: 'var(--bg-mode-selector)',
             borderRadius: 10,
-            border: '1px solid rgba(255, 255, 255, 0.05)'
+            border: '1px solid var(--border-subtle)'
           }}>
             {dadosPorDataEnvelopados.map(d => {
               const alturaPct = maxQtdEnvelopadosDia > 0 
@@ -926,9 +886,8 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
                 >
                   <span style={{
                     fontSize: '0.76rem',
-                    color: '#4ade80',
-                    fontWeight: 800,
-                    textShadow: '0 0 8px rgba(74, 222, 128, 0.5)'
+                    color: '#16a34a',
+                    fontWeight: 800
                   }}>
                     {d.totalEnvelopados}
                   </span>
@@ -948,7 +907,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scaleY(1)'; }}
                   />
 
-                  <span style={{ fontSize: '0.70rem', color: 'var(--slate-300)', fontWeight: 600, whiteSpace: 'nowrap', marginTop: 2 }}>
+                  <span style={{ fontSize: '0.70rem', color: 'var(--slate-400)', fontWeight: 600, whiteSpace: 'nowrap', marginTop: 2 }}>
                     {labelData}
                   </span>
                 </div>
@@ -966,7 +925,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <PieChart size={18} color="#4ade80" />
-              <h3 style={{ fontSize: '1.05rem', margin: 0, color: '#fff', fontWeight: 700 }}>
+              <h3 style={{ fontSize: '1.05rem', margin: 0, color: 'var(--slate-100)', fontWeight: 700 }}>
                 Distribuição por Status de Envelopamento
               </h3>
             </div>
@@ -979,11 +938,11 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
           <div style={{
             height: 22,
             width: '100%',
-            background: 'rgba(255,255,255,0.05)',
+            background: 'var(--border-subtle)',
             borderRadius: 8,
             overflow: 'hidden',
             display: 'flex',
-            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.4)'
+            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.15)'
           }}>
             {qtdEnvelopados > 0 && (
               <div 
@@ -1031,10 +990,10 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e' }} />
-                <span style={{ fontSize: '0.84rem', color: '#fff', fontWeight: 600 }}>Envelopado</span>
+                <span style={{ fontSize: '0.84rem', color: 'var(--slate-100)', fontWeight: 600 }}>Envelopado</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: '0.84rem', color: '#4ade80', fontWeight: 800 }}>{qtdEnvelopados} blocos</span>
+                <span style={{ fontSize: '0.84rem', color: '#16a34a', fontWeight: 800 }}>{qtdEnvelopados} blocos</span>
                 <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)', minWidth: 46, textAlign: 'right' }}>{pctEnvelopados}%</span>
               </div>
             </div>
@@ -1051,10 +1010,10 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#38bdf8' }} />
-                <span style={{ fontSize: '0.84rem', color: '#fff', fontWeight: 600 }}>Sem Envelopamento</span>
+                <span style={{ fontSize: '0.84rem', color: 'var(--slate-100)', fontWeight: 600 }}>Sem Envelopamento</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: '0.84rem', color: '#38bdf8', fontWeight: 800 }}>{qtdSemEnvelopamento} blocos</span>
+                <span style={{ fontSize: '0.84rem', color: '#0284c7', fontWeight: 800 }}>{qtdSemEnvelopamento} blocos</span>
                 <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)', minWidth: 46, textAlign: 'right' }}>{pctSemEnvelopamento}%</span>
               </div>
             </div>
@@ -1071,10 +1030,10 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#f59e0b' }} />
-                <span style={{ fontSize: '0.84rem', color: '#fff', fontWeight: 600 }}>Pendente de Envelopamento</span>
+                <span style={{ fontSize: '0.84rem', color: 'var(--slate-100)', fontWeight: 600 }}>Pendente de Envelopamento</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: '0.84rem', color: '#fbbf24', fontWeight: 800 }}>{qtdPendentes} blocos</span>
+                <span style={{ fontSize: '0.84rem', color: '#d97706', fontWeight: 800 }}>{qtdPendentes} blocos</span>
                 <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)', minWidth: 46, textAlign: 'right' }}>{pctPendentes}%</span>
               </div>
             </div>
@@ -1086,7 +1045,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <MapPin size={18} color="#38bdf8" />
-              <h3 style={{ fontSize: '1.05rem', margin: 0, color: '#fff', fontWeight: 700 }}>
+              <h3 style={{ fontSize: '1.05rem', margin: 0, color: 'var(--slate-100)', fontWeight: 700 }}>
                 Demanda de Envelopamento por Pedreira
               </h3>
             </div>
@@ -1108,9 +1067,9 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
                 return (
                   <div key={p.pedreira} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.82rem' }}>
-                      <strong style={{ color: '#fff' }}>{p.pedreira}</strong>
-                      <span style={{ color: 'var(--slate-300)' }}>
-                        <strong>{p.total}</strong> blocos ({(p.pesoKg / 1000).toFixed(1)} t) • <span style={{ color: '#4ade80' }}>{pctEnv}% Envelopados</span>
+                      <strong style={{ color: 'var(--slate-100)' }}>{p.pedreira}</strong>
+                      <span style={{ color: 'var(--slate-400)' }}>
+                        <strong>{p.total}</strong> blocos ({(p.pesoKg / 1000).toFixed(1)} t) • <span style={{ color: '#16a34a', fontWeight: 700 }}>{pctEnv}% Envelopados</span>
                       </span>
                     </div>
 
@@ -1118,7 +1077,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
                     <div style={{
                       height: 14,
                       width: '100%',
-                      background: 'rgba(255,255,255,0.06)',
+                      background: 'var(--border-subtle)',
                       borderRadius: 6,
                       overflow: 'hidden',
                       display: 'flex'
@@ -1161,7 +1120,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Users size={18} color="#a855f7" />
-              <h3 style={{ fontSize: '1.05rem', margin: 0, color: '#fff', fontWeight: 700 }}>
+              <h3 style={{ fontSize: '1.05rem', margin: 0, color: 'var(--slate-100)', fontWeight: 700 }}>
                 Top 10 Clientes por Volume de Blocos
               </h3>
             </div>
@@ -1181,19 +1140,19 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
                 return (
                   <div key={c.cliente} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.80rem' }}>
-                      <span style={{ color: '#fff', fontWeight: 600, maxWidth: '65%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <span style={{ color: 'var(--slate-100)', fontWeight: 600, maxWidth: '65%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         <span style={{ color: 'var(--slate-400)', marginRight: 6 }}>#{idx + 1}</span>
                         {c.cliente}
                       </span>
-                      <span style={{ color: 'var(--slate-300)', fontSize: '0.76rem' }}>
-                        <strong>{c.total}</strong> blocos ({(c.pesoKg / 1000).toFixed(1)} t)
+                      <span style={{ color: 'var(--slate-400)', fontSize: '0.76rem' }}>
+                        <strong style={{ color: 'var(--slate-100)' }}>{c.total}</strong> blocos ({(c.pesoKg / 1000).toFixed(1)} t)
                       </span>
                     </div>
 
                     <div style={{
                       height: 8,
                       width: '100%',
-                      background: 'rgba(255,255,255,0.06)',
+                      background: 'var(--border-subtle)',
                       borderRadius: 4,
                       overflow: 'hidden'
                     }}>
@@ -1216,7 +1175,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Layers size={18} color="#f59e0b" />
-              <h3 style={{ fontSize: '1.05rem', margin: 0, color: '#fff', fontWeight: 700 }}>
+              <h3 style={{ fontSize: '1.05rem', margin: 0, color: 'var(--slate-100)', fontWeight: 700 }}>
                 Distribuição por Tipo de Material / Rocha
               </h3>
             </div>
@@ -1239,19 +1198,19 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     padding: '8px 12px',
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.05)',
+                    background: 'var(--bg-mode-selector)',
+                    border: '1px solid var(--border-subtle)',
                     borderRadius: 8
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#f59e0b' }} />
-                      <strong style={{ fontSize: '0.82rem', color: '#fff' }}>{m.material}</strong>
+                      <strong style={{ fontSize: '0.82rem', color: 'var(--slate-100)' }}>{m.material}</strong>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--slate-300)' }}>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
                         {(m.pesoKg / 1000).toFixed(1)} t
                       </span>
-                      <span style={{ fontSize: '0.80rem', color: '#fbbf24', fontWeight: 800 }}>
+                      <span style={{ fontSize: '0.80rem', color: '#d97706', fontWeight: 800 }}>
                         {m.total} ({pct}%)
                       </span>
                     </div>
@@ -1268,7 +1227,7 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <FileText size={18} color="#38bdf8" />
-            <h3 style={{ fontSize: '1.05rem', margin: 0, color: '#fff', fontWeight: 700 }}>
+            <h3 style={{ fontSize: '1.05rem', margin: 0, color: 'var(--slate-100)', fontWeight: 700 }}>
               Consolidado de Romaneios Recentes
             </h3>
           </div>

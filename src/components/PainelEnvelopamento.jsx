@@ -815,10 +815,18 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         flexWrap: 'wrap',
         gap: 12,
         marginBottom: 20,
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        borderBottom: '1px solid var(--border-subtle)',
         paddingBottom: 12
       }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          flexWrap: 'wrap',
+          background: 'var(--bg-mode-selector)',
+          padding: '4px',
+          borderRadius: 10,
+          border: '1px solid var(--border-subtle)'
+        }}>
           <button
             type="button"
             onClick={() => setAbaSubmodulo('gestao')}
@@ -831,7 +839,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
               borderRadius: 8,
               background: abaSubmodulo === 'gestao' ? 'var(--vermont-green-subtle)' : 'transparent',
               border: abaSubmodulo === 'gestao' ? '1px solid var(--vermont-green-border)' : '1px solid transparent',
-              color: abaSubmodulo === 'gestao' ? '#4ade80' : 'var(--slate-400)',
+              color: abaSubmodulo === 'gestao' ? '#4ade80' : 'var(--text-inactive-tab)',
               boxShadow: abaSubmodulo === 'gestao' ? '0 0 15px rgba(0, 118, 44, 0.35)' : 'none',
               transition: 'all 0.2s'
             }}
@@ -852,7 +860,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
               borderRadius: 8,
               background: abaSubmodulo === 'graficos' ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
               border: abaSubmodulo === 'graficos' ? '1px solid rgba(56, 189, 248, 0.45)' : '1px solid transparent',
-              color: abaSubmodulo === 'graficos' ? '#38bdf8' : 'var(--slate-400)',
+              color: abaSubmodulo === 'graficos' ? '#0284c7' : 'var(--text-inactive-tab)',
               boxShadow: abaSubmodulo === 'graficos' ? '0 0 15px rgba(56, 189, 248, 0.3)' : 'none',
               transition: 'all 0.2s'
             }}
