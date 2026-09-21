@@ -2041,3 +2041,155 @@ export const obterClientesDoBancoDeDados = async () => {
   resultado.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   return resultado;
 };
+
+/**
+ * Cruza um bloco do módulo de Envelopamento com a lista de Agendamentos / Carregamentos.
+ * Retorna o status operacional de expedição:
+ * - 🚚 Carregado (Finalizado / Concluído)
+ * - ⏳ Carregando (Em processo de carregamento na pedreira)
+ * - 📅 Agendado (Agendamento ativo aguardando / liberado)
+ * - 📦 No Pátio (Sem agendamento ativo de transporte)
+ */
+export const verificarStatusCarregamentoBloco = (bloco, listaAgendamentos = []) => {
+  if (!bloco || !bloco.numero_bloco) {
+    return {
+      encontrado: false,
+      isCarregado: false,
+      isAgendado: false,
+      isCarregando: false,
+      isNoPatio: true,
+      status: 'no_patio',
+      label: 'No Pátio',
+      badgeText: '📦 No Pátio',
+      cor: '#64748b',
+      bg: 'rgba(148, 163, 184, 0.12)',
+      border: 'rgba(148, 163, 184, 0.35)',
+      tooltip: 'Bloco em estoque no pátio (sem agendamento de carregamento)',
+      agendamento: null
+    };
+  }
+
+  const numBloco = normalizarNumeroBloco(bloco.numero_bloco);
+  const numBlocoSemBarra = numBloco.replace(/\//g, '');
+  const clienteNome = String(bloco.cliente_nome || '').trim();
+  const clienteCnpj = String(bloco.cliente_cnpj || '').replace(/\D/g, '');
+
+  // Filtra agendamentos que contêm este bloco
+  const agendamentosCandidatos = (Array.isArray(listaAgendamentos) ? listaAgendamentos : []).filter(ag => {
+    if (!ag || !ag.numero_bloco) return false;
+    const numAg = normalizarNumeroBloco(ag.numero_bloco);
+    const numAgSemBarra = numAg.replace(/\//g, '');
+
+    // Verifica se bate exatamente ou se o campo possui múltiplos blocos separados por vírgula/espaço/barra
+    const bateNumero = numAg === numBloco || 
+                       numAgSemBarra === numBlocoSemBarra ||
+                       numAg.split(/[\s,;/]+/).some(part => {
+                         if (!part) return false;
+                         const nPart = normalizarNumeroBloco(part);
+                         return nPart === numBloco || nPart.replace(/\//g, '') === numBlocoSemBarra;
+                       });
+
+    if (!bateNumero) return false;
+
+    // Se o agendamento estiver cancelado, ignorar
+    const st = String(ag.status || '').toLowerCase();
+    if (st.includes('cancelad')) return false;
+
+    return true;
+  });
+
+  if (agendamentosCandidatos.length === 0) {
+    return {
+      encontrado: false,
+      isCarregado: false,
+      isAgendado: false,
+      isCarregando: false,
+      isNoPatio: true,
+      status: 'no_patio',
+      label: 'No Pátio',
+      badgeText: '📦 No Pátio',
+      cor: '#64748b',
+      bg: 'rgba(148, 163, 184, 0.12)',
+      border: 'rgba(148, 163, 184, 0.35)',
+      tooltip: 'Bloco em estoque no pátio da pedreira (aguardando agendamento de transporte)',
+      agendamento: null
+    };
+  }
+
+  // Ordena por prioridade de status: Finalizado/Carregado > Carregando > Liberado/Aguardando
+  const obterPesoStatus = (ag) => {
+    const st = String(ag.status || '').toLowerCase();
+    if (st.includes('finaliz') || st.includes('concluid') || st.includes('carregado')) return 4;
+    if (st.includes('carregando')) return 3;
+    if (st.includes('liberad')) return 2;
+    if (st.includes('aguard')) return 1;
+    return 0;
+  };
+
+  agendamentosCandidatos.sort((a, b) => obterPesoStatus(b) - obterPesoStatus(a));
+  const principalAg = agendamentosCandidatos[0];
+  const st = String(principalAg.status || '').toLowerCase();
+
+  let dataFmt = principalAg.data_agendamento || '';
+  if (dataFmt && dataFmt.includes('-')) {
+    const p = dataFmt.split('-');
+    if (p.length === 3) dataFmt = `${p[2]}/${p[1]}/${p[0]}`;
+  }
+  const motorista = principalAg.motorista_nome ? ` • Motorista: ${principalAg.motorista_nome}` : '';
+  const placa = principalAg.placa_cavalo ? ` • Placa: ${principalAg.placa_cavalo}` : '';
+  const transp = principalAg.transportadora ? ` • Transp: ${principalAg.transportadora}` : '';
+
+  if (st.includes('finaliz') || st.includes('concluid') || st.includes('carregado')) {
+    return {
+      encontrado: true,
+      isCarregado: true,
+      isAgendado: false,
+      isCarregando: false,
+      isNoPatio: false,
+      status: 'carregado',
+      label: 'Carregado',
+      badgeText: '🚚 Carregado',
+      cor: '#16a34a',
+      bg: 'rgba(34, 197, 94, 0.15)',
+      border: '#16a34a',
+      tooltip: `🚚 Bloco Carregado e Expedido em ${dataFmt}${motorista}${placa}${transp}`,
+      agendamento: principalAg
+    };
+  }
+
+  if (st.includes('carregando')) {
+    return {
+      encontrado: true,
+      isCarregado: false,
+      isAgendado: false,
+      isCarregando: true,
+      isNoPatio: false,
+      status: 'carregando',
+      label: 'Carregando',
+      badgeText: '⏳ Carregando',
+      cor: '#f59e0b',
+      bg: 'rgba(245, 158, 11, 0.15)',
+      border: '#f59e0b',
+      tooltip: `⏳ Em Carregamento na Pedreira em ${dataFmt}${motorista}${placa}`,
+      agendamento: principalAg
+    };
+  }
+
+  // Agendado (Aguardando Liberação ou Liberado para Carregar)
+  return {
+    encontrado: true,
+    isCarregado: false,
+    isAgendado: true,
+    isCarregando: false,
+    isNoPatio: false,
+    status: 'agendado',
+    label: 'Agendado',
+    badgeText: `📅 Agendado (${dataFmt})`,
+    cor: '#0284c7',
+    bg: 'rgba(56, 189, 248, 0.15)',
+    border: '#0284c7',
+    tooltip: `📅 Agendado para ${dataFmt} às ${principalAg.horario_agendamento || '-'}${motorista}${placa}${transp}`,
+    agendamento: principalAg
+  };
+};
+

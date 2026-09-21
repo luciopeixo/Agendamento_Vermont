@@ -30,7 +30,8 @@ import {
   History,
   ShieldAlert,
   BarChart3,
-  MessageSquare
+  MessageSquare,
+  Truck
 } from 'lucide-react';
 import { 
   listarEnvelopamentos, 
@@ -44,9 +45,11 @@ import {
   inscreverEnvelopamentosRealtime,
   gerarChaveDuplicidade,
   compararNumeroBlocoDecrescente,
-  normalizarPedreira
+  normalizarPedreira,
+  verificarStatusCarregamentoBloco
 } from '../services/envelopamentoService';
-import { PEDREIRAS_CEARA, formatarDataHoraBR } from '../services/agendamentoService';
+import { PEDREIRAS_CEARA, formatarDataHoraBR, listarAgendamentos } from '../services/agendamentoService';
+import { supabase, isSupabaseConfigurado } from '../lib/supabase';
 import { ModalCadastrarBlocoEnvelopamento } from './ModalCadastrarBlocoEnvelopamento';
 import { ModalGestaoClientes } from './ModalGestaoClientes';
 import { ModalImportarRomaneioPdf } from './ModalImportarRomaneioPdf';
@@ -58,6 +61,7 @@ import { GraficosEnvelopamento } from './GraficosEnvelopamento';
 
 export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [todosEnvelopamentos, setTodosEnvelopamentos] = useState([]);
+  const [todosAgendamentos, setTodosAgendamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [abaSubmodulo, setAbaSubmodulo] = useState('gestao'); // 'gestao' ou 'graficos'
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
@@ -88,6 +92,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [blocoEmEdicao, setBlocoEmEdicao] = useState(null);
   const [filtroPedreira, setFiltroPedreira] = useState(pedreiraOperador || '');
   const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroCarregamento, setFiltroCarregamento] = useState(''); // '', 'carregado', 'agendado', 'no_patio'
   const [buscaTexto, setBuscaTexto] = useState('');
   const [executandoAcaoId, setExecutandoAcaoId] = useState(null);
 
@@ -110,10 +115,14 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const carregarDados = async (silencioso = false) => {
     if (!silencioso) setCarregando(true);
     try {
-      const dados = await listarEnvelopamentos();
+      const [dados, dadosAgs] = await Promise.all([
+        listarEnvelopamentos(),
+        listarAgendamentos({})
+      ]);
       setTodosEnvelopamentos(dados || []);
+      setTodosAgendamentos(dadosAgs || []);
     } catch (err) {
-      console.error('Erro ao carregar envelopamentos:', err);
+      console.error('Erro ao carregar dados do painel de envelopamento:', err);
     } finally {
       if (!silencioso) setCarregando(false);
     }
@@ -126,8 +135,23 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       carregarDados(true);
     });
 
+    let subAgendamentos = null;
+    if (isSupabaseConfigurado()) {
+      try {
+        subAgendamentos = supabase
+          .channel('agendamentos_painel_envelopamento')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'agendamentos_pedreira' }, () => {
+            carregarDados(true);
+          })
+          .subscribe();
+      } catch (e) {}
+    }
+
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
+      if (subAgendamentos && typeof supabase.removeChannel === 'function') {
+        supabase.removeChannel(subAgendamentos);
+      }
     };
   }, []);
 
@@ -142,6 +166,12 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         }
       }
       if (filtroStatus && item.status !== filtroStatus) return false;
+      if (filtroCarregamento) {
+        const infoCarregamento = verificarStatusCarregamentoBloco(item, todosAgendamentos);
+        if (filtroCarregamento === 'carregado' && !infoCarregamento.isCarregado) return false;
+        if (filtroCarregamento === 'agendado' && !infoCarregamento.isAgendado && !infoCarregamento.isCarregando) return false;
+        if (filtroCarregamento === 'no_patio' && !infoCarregamento.isNoPatio) return false;
+      }
       if (buscaTexto) {
         const termo = buscaTexto.toLowerCase().trim();
         const termoSemZeros = termo.replace(/^0+/, '');
@@ -168,9 +198,23 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       }
       return true;
     });
-  }, [todosEnvelopamentos, filtroPedreira, filtroStatus, buscaTexto]);
+  }, [todosEnvelopamentos, todosAgendamentos, filtroPedreira, filtroStatus, filtroCarregamento, buscaTexto]);
 
   const metricas = calcularMetricasEnvelopamento(envelopamentos);
+
+  // Métricas de Carregamento cruzadas com os Agendamentos
+  const metricasCarregamento = useMemo(() => {
+    let carregados = 0;
+    let agendados = 0;
+    let noPatio = 0;
+    (envelopamentos || []).forEach(b => {
+      const info = verificarStatusCarregamentoBloco(b, todosAgendamentos);
+      if (info.isCarregado) carregados++;
+      else if (info.isAgendado || info.isCarregando) agendados++;
+      else noPatio++;
+    });
+    return { carregados, agendados, noPatio };
+  }, [envelopamentos, todosAgendamentos]);
 
   // Mapa de duplicidades em tempo real (mesmo Bloco + Cliente + Material + Pedreira)
   const mapaContagemDuplicados = useMemo(() => {
@@ -254,6 +298,11 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       else if (item.status === 'sem_envelopamento') grupoCliente.metricas.sem_envelopamento++;
       else grupoCliente.metricas.pendente_envelopamento++;
 
+      const infoCarregamento = verificarStatusCarregamentoBloco(item, todosAgendamentos);
+      if (infoCarregamento.isCarregado) {
+        grupoCliente.metricas.carregado = (grupoCliente.metricas.carregado || 0) + 1;
+      }
+
       // Agrupamento por Romaneio
       const chaveRom = `${cliNome}___${numRom}`;
       if (!grupoCliente.romaneiosMap.has(chaveRom)) {
@@ -267,7 +316,8 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             total: 0,
             envelopado: 0,
             sem_envelopamento: 0,
-            pendente_envelopamento: 0
+            pendente_envelopamento: 0,
+            carregado: 0
           }
         });
       }
@@ -281,6 +331,10 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       if (item.status === 'envelopado') grupoRom.metricas.envelopado++;
       else if (item.status === 'sem_envelopamento') grupoRom.metricas.sem_envelopamento++;
       else grupoRom.metricas.pendente_envelopamento++;
+
+      if (infoCarregamento.isCarregado) {
+        grupoRom.metricas.carregado = (grupoRom.metricas.carregado || 0) + 1;
+      }
     });
 
     const parseDataRomaneio = (dataStr) => {
@@ -957,6 +1011,54 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             <strong style={{ fontSize: '1.4rem', color: '#16a34a' }}>{metricas.envelopado}</strong>
           </div>
         </div>
+
+        {/* Carregados / Expedidos */}
+        <div 
+          onClick={() => setFiltroCarregamento(filtroCarregamento === 'carregado' ? '' : 'carregado')}
+          className="glass-panel" 
+          style={{ 
+            padding: '14px 18px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 12, 
+            borderLeft: '4px solid #10b981',
+            cursor: 'pointer',
+            background: filtroCarregamento === 'carregado' ? 'rgba(16, 185, 129, 0.15)' : undefined
+          }}
+          title="Clique para filtrar apenas blocos já carregados e expedidos"
+        >
+          <div style={{ background: 'rgba(16, 185, 129, 0.2)', padding: 10, borderRadius: 10 }}>
+            <Truck size={20} color="#10b981" />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.74rem', color: 'var(--slate-500)', display: 'block', fontWeight: 600 }}>Carregados / Expedidos</span>
+            <strong style={{ fontSize: '1.4rem', color: '#10b981' }}>{metricasCarregamento.carregados}</strong>
+          </div>
+        </div>
+
+        {/* Em Estoque no Pátio */}
+        <div 
+          onClick={() => setFiltroCarregamento(filtroCarregamento === 'no_patio' ? '' : 'no_patio')}
+          className="glass-panel" 
+          style={{ 
+            padding: '14px 18px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 12, 
+            borderLeft: '4px solid #64748b',
+            cursor: 'pointer',
+            background: filtroCarregamento === 'no_patio' ? 'rgba(100, 116, 139, 0.15)' : undefined
+          }}
+          title="Clique para filtrar blocos que estão no pátio aguardando agendamento"
+        >
+          <div style={{ background: 'rgba(100, 116, 139, 0.2)', padding: 10, borderRadius: 10 }}>
+            <Box size={20} color="#94a3b8" />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.74rem', color: 'var(--slate-500)', display: 'block', fontWeight: 600 }}>Em Estoque no Pátio</span>
+            <strong style={{ fontSize: '1.4rem', color: 'inherit' }}>{metricasCarregamento.noPatio}</strong>
+          </div>
+        </div>
       </div>
 
       {/* Barra de Filtros e Busca - Alto Contraste & Rótulos Claros */}
@@ -1038,11 +1140,11 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             </select>
           </div>
 
-          {/* Filtro Status */}
+          {/* Filtro Status Envelopamento */}
           <div>
             <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Filter size={14} color="var(--vermont-green-light)" />
-              STATUS DO ENVELOPAMENTO:
+              STATUS ENVELOPAMENTO:
             </label>
             <select
               className="form-select"
@@ -1055,15 +1157,39 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                 border: '1px solid rgba(255, 255, 255, 0.22)'
               }}
             >
-              <option value="">Todos os Status</option>
+              <option value="">Todos os Status de Envelopamento</option>
               {Object.values(STATUS_ENVELOPAMENTO).map(st => (
                 <option key={st.id} value={st.id}>{st.label}</option>
               ))}
             </select>
           </div>
 
+          {/* Filtro Status Carregamento / Expedição */}
+          <div>
+            <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Truck size={14} color="#10b981" />
+              STATUS CARREGAMENTO:
+            </label>
+            <select
+              className="form-select"
+              value={filtroCarregamento}
+              onChange={(e) => setFiltroCarregamento(e.target.value)}
+              style={{ 
+                height: 42, 
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                border: '1px solid rgba(255, 255, 255, 0.22)'
+              }}
+            >
+              <option value="">Todos os Blocos (Carregados e no Pátio)</option>
+              <option value="carregado">🚚 Apenas Carregados / Expedidos</option>
+              <option value="agendado">📅 Apenas Agendados / Em Carregamento</option>
+              <option value="no_patio">📦 Apenas no Pátio (Sem Agendamento)</option>
+            </select>
+          </div>
+
           {/* Botão Limpar Filtros */}
-          {(buscaTexto || filtroPedreira || filtroStatus) && (
+          {(buscaTexto || filtroPedreira || filtroStatus || filtroCarregamento) && (
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <button
                 type="button"
@@ -1071,6 +1197,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                   setBuscaTexto('');
                   setFiltroPedreira('');
                   setFiltroStatus('');
+                  setFiltroCarregamento('');
                 }}
                 className="btn btn-secondary"
                 style={{ 
@@ -1486,6 +1613,19 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                   {rom.metricas.pendente_envelopamento} Pendente{rom.metricas.pendente_envelopamento > 1 ? 's' : ''}
                                 </span>
                               )}
+                              {rom.metricas.carregado > 0 && (
+                                <span style={{
+                                  fontSize: '0.70rem',
+                                  padding: '2px 7px',
+                                  borderRadius: 12,
+                                  background: 'rgba(16, 185, 129, 0.15)',
+                                  color: '#10b981',
+                                  border: '1px solid #10b981',
+                                  fontWeight: 700
+                                }}>
+                                  🚚 {rom.metricas.carregado} Carregado{rom.metricas.carregado > 1 ? 's' : ''}
+                                </span>
+                              )}
 
                               <span style={{
                                 fontSize: '0.74rem',
@@ -1660,9 +1800,9 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                               : `Selecionar bloco ${b.numero_bloco}`}
                                           />
                                         </td>
-                                        {/* Bloco */}
+                                        {/* Bloco com Flag de Carregamento e Duplicidade */}
                                         <td style={{ padding: '8px 12px' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                             <span style={{
                                               background: 'rgba(255, 255, 255, 0.08)',
                                               color: 'inherit',
@@ -1677,6 +1817,47 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                             }}>
                                               {b.numero_bloco}
                                             </span>
+
+                                            {/* Flag de Status de Carregamento */}
+                                            {(() => {
+                                              const infoC = verificarStatusCarregamentoBloco(b, todosAgendamentos);
+                                              return (
+                                                <span 
+                                                  title={infoC.tooltip}
+                                                  style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 4,
+                                                    background: infoC.bg,
+                                                    border: `1px solid ${infoC.border}`,
+                                                    color: infoC.cor,
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 700,
+                                                    padding: '1px 6px',
+                                                    borderRadius: 4,
+                                                    whiteSpace: 'nowrap',
+                                                    cursor: 'help'
+                                                  }}
+                                                >
+                                                  <span 
+                                                    style={{
+                                                      width: 7,
+                                                      height: 7,
+                                                      borderRadius: '50%',
+                                                      backgroundColor: infoC.cor,
+                                                      boxShadow: infoC.isCarregado 
+                                                        ? '0 0 6px rgba(22, 163, 74, 0.9)' 
+                                                        : infoC.isAgendado 
+                                                          ? '0 0 6px rgba(2, 132, 199, 0.9)' 
+                                                          : 'none',
+                                                      display: 'inline-block'
+                                                    }}
+                                                  />
+                                                  {infoC.label}
+                                                </span>
+                                              );
+                                            })()}
+
                                             {isBlocoDuplicado(b) && (
                                               <span 
                                                 title="Atenção: Existe mais de um registro com este mesmo Bloco, Cliente, Material e Pedreira"
@@ -1980,7 +2161,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                         />
                       </td>
                       <td style={{ padding: '12px 14px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           <span style={{
                             background: 'rgba(255, 255, 255, 0.08)',
                             color: 'inherit',
@@ -1995,6 +2176,47 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                           }}>
                             {b.numero_bloco}
                           </span>
+
+                          {/* Flag de Status de Carregamento */}
+                          {(() => {
+                            const infoC = verificarStatusCarregamentoBloco(b, todosAgendamentos);
+                            return (
+                              <span 
+                                title={infoC.tooltip}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  background: infoC.bg,
+                                  border: `1px solid ${infoC.border}`,
+                                  color: infoC.cor,
+                                  fontSize: '0.68rem',
+                                  fontWeight: 700,
+                                  padding: '1px 6px',
+                                  borderRadius: 4,
+                                  whiteSpace: 'nowrap',
+                                  cursor: 'help'
+                                }}
+                              >
+                                <span 
+                                  style={{
+                                    width: 7,
+                                    height: 7,
+                                    borderRadius: '50%',
+                                    backgroundColor: infoC.cor,
+                                    boxShadow: infoC.isCarregado 
+                                      ? '0 0 6px rgba(22, 163, 74, 0.9)' 
+                                      : infoC.isAgendado 
+                                        ? '0 0 6px rgba(2, 132, 199, 0.9)' 
+                                        : 'none',
+                                    display: 'inline-block'
+                                  }}
+                                />
+                                {infoC.label}
+                              </span>
+                            );
+                          })()}
+
                           {isBlocoDuplicado(b) && (
                             <span 
                               title="Atenção: Existe mais de um registro com este mesmo Bloco, Cliente, Material e Pedreira"
