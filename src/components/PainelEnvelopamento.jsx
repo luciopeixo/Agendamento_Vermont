@@ -66,6 +66,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
   const [modalWhatsAppAberto, setModalWhatsAppAberto] = useState(false);
   const [clienteNotificarWhatsApp, setClienteNotificarWhatsApp] = useState('');
+  const [blocosNotificarWhatsApp, setBlocosNotificarWhatsApp] = useState([]);
   const [historicoFiltroBloco, setHistoricoFiltroBloco] = useState(null);
   const [modalDuplicidadesAberto, setModalDuplicidadesAberto] = useState(false);
   const [modalDataEnvelopamento, setModalDataEnvelopamento] = useState({
@@ -471,6 +472,21 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
   const desmarcarTodosBlocos = () => {
     setBlocosSelecionados(new Set());
+  };
+
+  const handleNotificarWhatsAppSelecionados = () => {
+    if (blocosSelecionados.size === 0) return;
+    const blocosObjs = Array.from(blocosSelecionados)
+      .map(id => todosEnvelopamentos.find(b => b.id === id))
+      .filter(Boolean);
+
+    if (blocosObjs.length === 0) return;
+
+    // Identifica o cliente a partir dos blocos selecionados
+    const primeiroCliente = blocosObjs[0]?.cliente_nome || '';
+    setClienteNotificarWhatsApp(primeiroCliente);
+    setBlocosNotificarWhatsApp(Array.from(blocosSelecionados));
+    setModalWhatsAppAberto(true);
   };
 
   const handleAlterarStatusLote = async (novoStatus) => {
@@ -2311,6 +2327,30 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             >
               <Clock size={13} /> Pendente de Envelopamento
             </button>
+
+            <button
+              type="button"
+              disabled={executandoLote}
+              onClick={handleNotificarWhatsAppSelecionados}
+              className="btn"
+              style={{
+                background: 'linear-gradient(135deg, #16a34a, #15803d)',
+                color: '#ffffff',
+                border: '1px solid #22c55e',
+                boxShadow: '0 2px 8px rgba(34, 197, 94, 0.35)',
+                padding: '6px 12px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                borderRadius: 7,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                cursor: 'pointer'
+              }}
+              title="Notificar cliente via WhatsApp com os blocos selecionados"
+            >
+              <MessageSquare size={13} /> Notificar WhatsApp
+            </button>
           </div>
 
           {/* Separador vertical */}
@@ -2547,9 +2587,13 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       {modalWhatsAppAberto && (
         <ModalNotificarClienteWhatsApp
           aberto={modalWhatsAppAberto}
-          onFechar={() => setModalWhatsAppAberto(false)}
+          onFechar={() => {
+            setModalWhatsAppAberto(false);
+            setBlocosNotificarWhatsApp([]);
+          }}
           envelopamentos={todosEnvelopamentos}
           clienteInicial={clienteNotificarWhatsApp}
+          blocosPreSelecionadosIds={blocosNotificarWhatsApp}
           pedreiraOperador={pedreiraOperador}
         />
       )}

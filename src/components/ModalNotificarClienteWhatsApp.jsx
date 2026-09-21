@@ -20,6 +20,7 @@ export function ModalNotificarClienteWhatsApp({
   onFechar, 
   envelopamentos = [],
   clienteInicial = '',
+  blocosPreSelecionadosIds = null,
   pedreiraOperador = ''
 }) {
   const [clientesDb, setClientesDb] = useState([]);
@@ -38,8 +39,19 @@ export function ModalNotificarClienteWhatsApp({
       obterClientesDoBancoDeDados().then(res => {
         setClientesDb(res || []);
       }).catch(() => {});
+
+      if (clienteInicial) {
+        setClienteSelecionado(clienteInicial);
+      }
+      const hasPre = blocosPreSelecionadosIds && (
+        Array.isArray(blocosPreSelecionadosIds) ? blocosPreSelecionadosIds.length > 0 : blocosPreSelecionadosIds.size > 0
+      );
+      if (hasPre) {
+        setFiltroPeriodo('todos');
+        setBlocosSelecionadosIds(new Set(blocosPreSelecionadosIds));
+      }
     }
-  }, [aberto]);
+  }, [aberto, clienteInicial, blocosPreSelecionadosIds]);
 
   // Função para formatar o peso em kg sem gerar NaN e preservando decimais quando presentes
   const formatarPesoKg = (peso) => {
@@ -135,35 +147,39 @@ export function ModalNotificarClienteWhatsApp({
     return { dataMin, dataMax };
   }, [filtroPeriodo, dataInicioCustom, dataFimCustom]);
 
-  // Lista dinâmica: APENAS clientes que tiveram blocos ENVELOPADOS no período
+  // Lista dinâmica: APENAS clientes que tiveram blocos ENVELOPADOS no período (ou bloco pré-selecionado)
   const clientesDisponiveisNoPeriodo = useMemo(() => {
     const { dataMin, dataMax } = limitesData;
     const mapa = new Map();
+    const preSet = blocosPreSelecionadosIds ? new Set(blocosPreSelecionadosIds) : null;
 
     (envelopamentos || []).forEach(item => {
-      if (item.status !== 'envelopado') return;
+      const isPre = preSet && (preSet.has(item.id) || preSet.has(item.numero_bloco));
+      if (!isPre && item.status !== 'envelopado') return;
 
-      if (filtroPedreira !== 'todas') {
+      if (!isPre && filtroPedreira !== 'todas') {
         const ped = item.pedreira_nome || item.pedreira_id || '';
         if (!saoMesmaPedreira(ped, filtroPedreira)) return;
       }
 
-      const dataStr = item.data_liberacao || item.data_envelopamento || item.data_cadastro || item.data_romaneio || item.created_at;
-      if (dataStr && (dataMin || dataMax)) {
-        try {
-          let dt = null;
-          if (dataStr.includes('-')) {
-            const [y, m, d] = dataStr.slice(0, 10).split('-').map(Number);
-            dt = new Date(y, m - 1, d, 12, 0, 0);
-          } else if (dataStr.includes('/')) {
-            const [d, m, y] = dataStr.split('/').map(Number);
-            dt = new Date(y, m - 1, d, 12, 0, 0);
-          }
-          if (dt) {
-            if (dataMin && dt < dataMin) return;
-            if (dataMax && dt > dataMax) return;
-          }
-        } catch (e) {}
+      if (!isPre) {
+        const dataStr = item.data_liberacao || item.data_envelopamento || item.data_cadastro || item.data_romaneio || item.created_at;
+        if (dataStr && (dataMin || dataMax)) {
+          try {
+            let dt = null;
+            if (dataStr.includes('-')) {
+              const [y, m, d] = dataStr.slice(0, 10).split('-').map(Number);
+              dt = new Date(y, m - 1, d, 12, 0, 0);
+            } else if (dataStr.includes('/')) {
+              const [d, m, y] = dataStr.split('/').map(Number);
+              dt = new Date(y, m - 1, d, 12, 0, 0);
+            }
+            if (dt) {
+              if (dataMin && dt < dataMin) return;
+              if (dataMax && dt > dataMax) return;
+            }
+          } catch (e) {}
+        }
       }
 
       const nome = (item.cliente_nome || '').trim().toUpperCase();
@@ -183,10 +199,14 @@ export function ModalNotificarClienteWhatsApp({
     });
 
     return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [envelopamentos, clientesDb, limitesData, filtroPedreira]);
+  }, [envelopamentos, clientesDb, limitesData, filtroPedreira, blocosPreSelecionadosIds]);
 
   // Sincroniza o cliente selecionado quando o período mudar
   useEffect(() => {
+    if (clienteInicial) {
+      setClienteSelecionado(clienteInicial);
+      return;
+    }
     if (clientesDisponiveisNoPeriodo.length > 0) {
       const aindaExiste = clientesDisponiveisNoPeriodo.some(c => c.nome === clienteSelecionado);
       if (!aindaExiste) {
@@ -195,7 +215,7 @@ export function ModalNotificarClienteWhatsApp({
     } else {
       setClienteSelecionado('');
     }
-  }, [clientesDisponiveisNoPeriodo]);
+  }, [clientesDisponiveisNoPeriodo, clienteInicial]);
 
   // Atualiza telefone automaticamente quando o cliente muda
   useEffect(() => {
@@ -212,49 +232,58 @@ export function ModalNotificarClienteWhatsApp({
   const blocosFiltrados = useMemo(() => {
     if (!clienteSelecionado) return [];
     const { dataMin, dataMax } = limitesData;
+    const preSet = blocosPreSelecionadosIds ? new Set(blocosPreSelecionadosIds) : null;
 
     return (envelopamentos || []).filter(item => {
-      if (item.status !== 'envelopado') return false;
+      const isPre = preSet && (preSet.has(item.id) || preSet.has(item.numero_bloco));
+      if (!isPre && item.status !== 'envelopado') return false;
 
       const cliNome = (item.cliente_nome || '').trim().toUpperCase();
       if (cliNome !== clienteSelecionado.toUpperCase()) return false;
 
-      if (filtroPedreira !== 'todas') {
+      if (!isPre && filtroPedreira !== 'todas') {
         const ped = item.pedreira_nome || item.pedreira_id || '';
         if (!saoMesmaPedreira(ped, filtroPedreira)) return false;
       }
 
-      const dataStr = item.data_liberacao || item.data_envelopamento || item.data_cadastro || item.data_romaneio || item.created_at;
-      if (dataStr && (dataMin || dataMax)) {
-        try {
-          let dt = null;
-          if (dataStr.includes('-')) {
-            const [y, m, d] = dataStr.slice(0, 10).split('-').map(Number);
-            dt = new Date(y, m - 1, d, 12, 0, 0);
-          } else if (dataStr.includes('/')) {
-            const [d, m, y] = dataStr.split('/').map(Number);
-            dt = new Date(y, m - 1, d, 12, 0, 0);
-          }
-          if (dt) {
-            if (dataMin && dt < dataMin) return false;
-            if (dataMax && dt > dataMax) return false;
-          }
-        } catch (e) {}
+      if (!isPre) {
+        const dataStr = item.data_liberacao || item.data_envelopamento || item.data_cadastro || item.data_romaneio || item.created_at;
+        if (dataStr && (dataMin || dataMax)) {
+          try {
+            let dt = null;
+            if (dataStr.includes('-')) {
+              const [y, m, d] = dataStr.slice(0, 10).split('-').map(Number);
+              dt = new Date(y, m - 1, d, 12, 0, 0);
+            } else if (dataStr.includes('/')) {
+              const [d, m, y] = dataStr.split('/').map(Number);
+              dt = new Date(y, m - 1, d, 12, 0, 0);
+            }
+            if (dt) {
+              if (dataMin && dt < dataMin) return false;
+              if (dataMax && dt > dataMax) return false;
+            }
+          } catch (e) {}
+        }
       }
 
       return true;
     });
-  }, [envelopamentos, clienteSelecionado, limitesData, filtroPedreira]);
+  }, [envelopamentos, clienteSelecionado, limitesData, filtroPedreira, blocosPreSelecionadosIds]);
 
-  // Inicializa todos os blocos encontrados como selecionados
+  // Inicializa todos os blocos encontrados como selecionados (ou mantém os pré-selecionados)
   useEffect(() => {
-    if (blocosFiltrados.length > 0) {
+    const hasPre = blocosPreSelecionadosIds && (
+      Array.isArray(blocosPreSelecionadosIds) ? blocosPreSelecionadosIds.length > 0 : blocosPreSelecionadosIds.size > 0
+    );
+    if (hasPre) {
+      setBlocosSelecionadosIds(new Set(blocosPreSelecionadosIds));
+    } else if (blocosFiltrados.length > 0) {
       const novoSet = new Set(blocosFiltrados.map(b => b.id || b.numero_bloco));
       setBlocosSelecionadosIds(novoSet);
     } else {
       setBlocosSelecionadosIds(new Set());
     }
-  }, [blocosFiltrados]);
+  }, [blocosFiltrados, blocosPreSelecionadosIds]);
 
   const toggleBloco = (id) => {
     setBlocosSelecionadosIds(prev => {
