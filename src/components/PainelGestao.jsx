@@ -2369,7 +2369,7 @@ export function PainelGestao({
                         <div style={{ fontWeight: 600, color: 'inherit' }}>{ag.motorista_nome}</div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)', fontFamily: 'monospace' }}>CPF: {ag.motorista_cpf}</div>
                         {ag.motorista_telefone && (
-                          <div style={{ fontSize: '0.74rem', color: 'var(--info)' }}>{ag.motorista_telefone}</div>
+                          <div style={{ fontSize: '0.74rem', color: '#0284c7', fontWeight: 600 }}>{ag.motorista_telefone}</div>
                         )}
 
                         {/* Selo de Conformidade Documental (CNH, CRLVs, Laudo de Rocha) */}
@@ -2393,10 +2393,11 @@ export function PainelGestao({
                                   className="badge"
                                   style={{
                                     cursor: 'pointer',
-                                    background: 'rgba(239, 68, 68, 0.2)',
-                                    color: '#fca5a5',
+                                    background: 'rgba(239, 68, 68, 0.15)',
+                                    color: '#dc2626',
                                     border: '1px solid #ef4444',
                                     fontSize: '0.68rem',
+                                    fontWeight: 700,
                                     padding: '2px 6px',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -2418,10 +2419,11 @@ export function PainelGestao({
                                   className="badge"
                                   style={{
                                     cursor: 'pointer',
-                                    background: 'rgba(245, 158, 11, 0.2)',
-                                    color: '#fde047',
-                                    border: '1px solid #f59e0b',
+                                    background: 'rgba(245, 158, 11, 0.15)',
+                                    color: '#b45309',
+                                    border: '1px solid #d97706',
                                     fontSize: '0.68rem',
+                                    fontWeight: 700,
                                     padding: '2px 6px',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -2444,9 +2446,10 @@ export function PainelGestao({
                                   style={{
                                     cursor: 'pointer',
                                     background: 'rgba(34, 197, 94, 0.15)',
-                                    color: '#86efac',
-                                    border: '1px solid rgba(34, 197, 94, 0.35)',
+                                    color: '#15803d',
+                                    border: '1px solid #16a34a',
                                     fontSize: '0.68rem',
+                                    fontWeight: 700,
                                     padding: '2px 6px',
                                     display: 'inline-flex',
                                     alignItems: 'center',
@@ -2467,10 +2470,11 @@ export function PainelGestao({
                                 className="badge"
                                 style={{
                                   cursor: 'pointer',
-                                  background: 'rgba(148, 163, 184, 0.12)',
-                                  color: '#cbd5e1',
-                                  border: '1px solid rgba(148, 163, 184, 0.25)',
+                                  background: 'rgba(100, 116, 139, 0.15)',
+                                  color: '#475569',
+                                  border: '1px solid #94a3b8',
                                   fontSize: '0.68rem',
+                                  fontWeight: 700,
                                   padding: '2px 6px',
                                   display: 'inline-flex',
                                   alignItems: 'center',
