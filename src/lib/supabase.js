@@ -19,6 +19,19 @@ export const isSupabaseConfigurado = () => {
   );
 };
 
-export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder-anon-key');
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co', 
+  supabaseAnonKey || 'placeholder-anon-key',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      lock: async (_name, _acquireTimeout, fn) => {
+        return await fn();
+      }
+    }
+  }
+);
 
 
