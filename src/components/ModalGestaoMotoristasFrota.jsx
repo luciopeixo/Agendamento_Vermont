@@ -356,7 +356,8 @@ export function ModalGestaoMotoristasFrota({
                 borderRadius: 20,
                 background: filtroStatus === 'regulares' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(34, 197, 94, 0.1)',
                 border: filtroStatus === 'regulares' ? '1px solid #22c55e' : '1px solid rgba(34, 197, 94, 0.2)',
-                color: '#86efac'
+                color: '#16a34a',
+                fontWeight: 700
               }}
             >
               🟢 Regulares ({contadores.regulares})
@@ -371,7 +372,8 @@ export function ModalGestaoMotoristasFrota({
                 borderRadius: 20,
                 background: filtroStatus === 'avencer' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(245, 158, 11, 0.1)',
                 border: filtroStatus === 'avencer' ? '1px solid #f59e0b' : '1px solid rgba(245, 158, 11, 0.2)',
-                color: '#fde047'
+                color: '#d97706',
+                fontWeight: 700
               }}
             >
               🟡 A Vencer ≤ 30d ({contadores.avencer})
@@ -386,7 +388,8 @@ export function ModalGestaoMotoristasFrota({
                 borderRadius: 20,
                 background: filtroStatus === 'vencidos' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.1)',
                 border: filtroStatus === 'vencidos' ? '1px solid #ef4444' : '1px solid rgba(239, 68, 68, 0.2)',
-                color: '#fca5a5'
+                color: '#ef4444',
+                fontWeight: 700
               }}
             >
               🔴 Vencidos ({contadores.vencidos})
@@ -401,7 +404,8 @@ export function ModalGestaoMotoristasFrota({
                 borderRadius: 20,
                 background: filtroStatus === 'pendentes' ? 'rgba(148, 163, 184, 0.25)' : 'rgba(148, 163, 184, 0.1)',
                 border: filtroStatus === 'pendentes' ? '1px solid #94a3b8' : '1px solid rgba(148, 163, 184, 0.2)',
-                color: '#cbd5e1'
+                color: 'var(--slate-400)',
+                fontWeight: 700
               }}
             >
               ⚪ Doc Pendente ({contadores.pendentes})
@@ -415,24 +419,24 @@ export function ModalGestaoMotoristasFrota({
             <div style={{
               padding: '48px 24px',
               textAlign: 'center',
-              color: '#94a3b8'
+              color: 'var(--slate-400)'
             }}>
               <AlertCircle size={40} style={{ margin: '0 auto 12px', color: '#64748b' }} />
               <p style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Nenhum motorista/veículo encontrado</p>
               <p style={{ margin: '4px 0 0', fontSize: '0.84rem' }}>Tente ajustar a busca ou o filtro de status.</p>
             </div>
           ) : (
-            <div className="table-responsive-container" style={{ border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: 12 }}>
+            <div className="table-responsive-container" style={{ border: '1px solid var(--border-subtle)', borderRadius: 12 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
                 <thead>
-                  <tr style={{ background: 'rgba(15, 23, 42, 0.85)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Motorista / CPF</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>CNH & Categoria</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Cavalo (Último Reg. CRLV)</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Carreta (Último Reg. CRLV / CSV)</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#cbd5e1', fontWeight: 700 }}>Transportadora</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center', color: '#cbd5e1', fontWeight: 700 }}>Status</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'center', color: '#cbd5e1', fontWeight: 700 }}>Ações</th>
+                  <tr style={{ background: 'var(--bg-mode-selector)', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', color: 'var(--slate-300)', fontWeight: 700 }}>Motorista / CPF</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', color: 'var(--slate-300)', fontWeight: 700 }}>CNH & Categoria</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', color: 'var(--slate-300)', fontWeight: 700 }}>Cavalo (Último Reg. CRLV)</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', color: 'var(--slate-300)', fontWeight: 700 }}>Carreta (Último Reg. CRLV / CSV)</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', color: 'var(--slate-300)', fontWeight: 700 }}>Transportadora</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--slate-300)', fontWeight: 700 }}>Status</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', color: 'var(--slate-300)', fontWeight: 700 }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -451,12 +455,12 @@ export function ModalGestaoMotoristasFrota({
                       <tr 
                         key={item.cpf || idx}
                         style={{
-                          borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                          background: idx % 2 === 0 ? 'rgba(255, 255, 255, 0.01)' : 'rgba(255, 255, 255, 0.03)'
+                          borderBottom: '1px solid var(--border-subtle)',
+                          background: idx % 2 === 0 ? 'transparent' : 'var(--bg-mode-selector)'
                         }}
                       >
                         {/* Motorista */}
-                        <td style={{ padding: '10px 14px', color: '#f8fafc' }}>
+                        <td style={{ padding: '10px 14px', color: 'var(--slate-100)' }}>
                           <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{item.nome || 'NÃO INFORMADO'}</div>
                           <div style={{ fontSize: '0.76rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             <span>CPF: {formatarCPF(item.cpf)}</span>

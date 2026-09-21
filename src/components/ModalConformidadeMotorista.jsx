@@ -341,17 +341,17 @@ export function ModalConformidadeMotorista({
           maxHeight: '92vh',
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: '#0f172a',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-subtle)',
           borderRadius: 16,
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
           overflow: 'hidden'
         }}
       >
         {/* Cabeçalho do Modal */}
         <div style={{
           padding: '18px 24px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          borderBottom: '1px solid var(--border-subtle)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -371,10 +371,10 @@ export function ModalConformidadeMotorista({
               <ShieldCheck size={24} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#fff', fontWeight: 800 }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--slate-100)', fontWeight: 800 }}>
                 {motoristaInicial ? 'Conformidade de Motorista & Frota' : 'Novo Cadastro de Conformidade'}
               </h3>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: '#94a3b8' }}>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--slate-400)' }}>
                 Controle interno de CNH, CRLVs e Laudos de Inspeção de Rocha / CSV (Exclusivo Pedreiras & Admin)
               </p>
             </div>
@@ -384,9 +384,9 @@ export function ModalConformidadeMotorista({
             onClick={aoFechar} 
             className="btn-icon" 
             style={{ 
-              background: 'rgba(255, 255, 255, 0.05)', 
-              border: 'none', 
-              color: '#94a3b8', 
+              background: 'var(--bg-mode-selector)', 
+              border: '1px solid var(--border-subtle)', 
+              color: 'var(--slate-400)', 
               borderRadius: 8, 
               padding: 8,
               cursor: 'pointer'
@@ -405,7 +405,7 @@ export function ModalConformidadeMotorista({
               borderRadius: 8,
               background: 'rgba(239, 68, 68, 0.15)',
               border: '1px solid #ef4444',
-              color: '#fca5a5',
+              color: '#f87171',
               fontSize: '0.85rem',
               display: 'flex',
               alignItems: 'center',
@@ -423,7 +423,7 @@ export function ModalConformidadeMotorista({
               borderRadius: 8,
               background: 'rgba(34, 197, 94, 0.15)',
               border: '1px solid #22c55e',
-              color: '#86efac',
+              color: '#16a34a',
               fontSize: '0.85rem',
               display: 'flex',
               alignItems: 'center',
@@ -437,8 +437,8 @@ export function ModalConformidadeMotorista({
           {/* SEÇÃO 1: DADOS DO MOTORISTA & CNH */}
           <div style={{
             marginBottom: 20,
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'var(--bg-mode-selector)',
+            border: '1px solid var(--border-subtle)',
             borderRadius: 12,
             padding: '16px'
           }}>
@@ -458,7 +458,7 @@ export function ModalConformidadeMotorista({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               {/* CPF */}
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                   CPF do Motorista *
                 </label>
                 <input
@@ -474,7 +474,7 @@ export function ModalConformidadeMotorista({
 
               {/* NOME COMPLETO */}
               <div style={{ gridColumn: 'span 2' }}>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                   Nome Completo do Motorista *
                 </label>
                 <input
@@ -490,7 +490,7 @@ export function ModalConformidadeMotorista({
 
               {/* TELEFONE */}
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                   Telefone / WhatsApp
                 </label>
                 <input
@@ -505,7 +505,7 @@ export function ModalConformidadeMotorista({
 
               {/* CATEGORIA CNH */}
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                   Categoria da CNH *
                 </label>
                 <select
@@ -526,7 +526,7 @@ export function ModalConformidadeMotorista({
 
               {/* VENCIMENTO CNH */}
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                   Data de Vencimento da CNH *
                 </label>
                 <input
@@ -556,8 +556,8 @@ export function ModalConformidadeMotorista({
           <div style={{
             marginBottom: 16,
             padding: '12px 16px',
-            background: isBitruck ? 'rgba(56, 189, 248, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-            border: isBitruck ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+            background: isBitruck ? 'rgba(56, 189, 248, 0.12)' : 'var(--bg-mode-selector)',
+            border: isBitruck ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid var(--border-subtle)',
             borderRadius: 12,
             display: 'flex',
             alignItems: 'center',
@@ -584,19 +584,19 @@ export function ModalConformidadeMotorista({
                     handleChange('tipo_veiculo', 'Carreta / Bitrem');
                   }
                 }}
-                style={{ width: 18, height: 18, accentColor: '#38bdf8', cursor: 'pointer' }}
+                style={{ width: 18, height: 18, accentColor: '#0284c7', cursor: 'pointer' }}
               />
               <div>
-                <div style={{ fontWeight: 700, color: isBitruck ? '#38bdf8' : '#e2e8f0', fontSize: '0.88rem' }}>
-                  🚛 Veículo é Bitruck / Caminhão Truck (Chassi Rígido - Placa Única com Laudo de Rocha)
+                <div style={{ fontWeight: 700, color: isBitruck ? '#0284c7' : 'var(--slate-100)', fontSize: '0.88rem' }}>
+                  🚛 Veículo é Bitruck / Caminhão Truck (Chassi Rígido – Placa Única com Laudo de Rocha)
                 </div>
-                <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
+                <div style={{ fontSize: '0.74rem', color: 'var(--slate-400)' }}>
                   Habilita o Laudo de Rocha / CSV diretamente na placa única do caminhão (sem necessidade de cadastrar carreta).
                 </div>
               </div>
             </label>
             {isBitruck && (
-              <span style={{ fontSize: '0.74rem', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
+              <span style={{ fontSize: '0.74rem', background: 'rgba(56, 189, 248, 0.2)', color: '#0284c7', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
                 Placa Única Ativa
               </span>
             )}
@@ -605,8 +605,8 @@ export function ModalConformidadeMotorista({
           {/* SEÇÃO 2: CAVALO MECÂNICO OU CAMINHÃO BITRUCK */}
           <div style={{
             marginBottom: 20,
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'var(--bg-mode-selector)',
+            border: '1px solid var(--border-subtle)',
             borderRadius: 12,
             padding: '16px'
           }}>
@@ -615,7 +615,7 @@ export function ModalConformidadeMotorista({
               alignItems: 'center',
               gap: 8,
               marginBottom: 14,
-              color: '#38bdf8',
+              color: '#0284c7',
               fontWeight: 700,
               fontSize: '0.92rem'
             }}>
@@ -627,14 +627,14 @@ export function ModalConformidadeMotorista({
               {/* PLACA & UF */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)', margin: 0 }}>
                     {isBitruck ? 'Placa do Caminhão & Estado (UF)' : 'Placa do Cavalo & Estado (UF)'}
                   </label>
                   {(() => {
                     const info = obterInfoLicenciamentoPorPlaca(formData.placa_cavalo, formData.uf_cavalo);
                     if (!info) return null;
                     return (
-                      <span style={{ fontSize: '0.70rem', color: '#38bdf8', fontWeight: 600 }}>
+                      <span style={{ fontSize: '0.70rem', color: '#0284c7', fontWeight: 600 }}>
                         Final {info.finalDigito} ({info.mesNome})
                       </span>
                     );
@@ -666,7 +666,7 @@ export function ModalConformidadeMotorista({
               {/* DATA DO ÚLTIMO REGISTRO DO CRLV */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)', margin: 0 }}>
                     {isBitruck ? 'Data do Último Registro (CRLV Caminhão) *' : 'Data do Último Registro (CRLV Cavalo) *'}
                   </label>
                   {(() => {
@@ -677,7 +677,7 @@ export function ModalConformidadeMotorista({
                         style={{
                           background: 'rgba(56, 189, 248, 0.15)',
                           border: '1px solid rgba(56, 189, 248, 0.3)',
-                          color: '#38bdf8',
+                          color: '#0284c7',
                           fontSize: '0.68rem',
                           borderRadius: 4,
                           padding: '2px 6px',
@@ -714,7 +714,7 @@ export function ModalConformidadeMotorista({
               {/* SE FOR BITRUCK: LAUDO DE ROCHA / CSV DIRETAMENTE NA PLACA ÚNICA */}
               {isBitruck && (
                 <div>
-                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                     Data de Vencimento do Laudo de Rocha / CSV *
                   </label>
                   <input
@@ -745,7 +745,7 @@ export function ModalConformidadeMotorista({
           {isBitruck ? (
             <div style={{
               marginBottom: 20,
-              background: 'rgba(56, 189, 248, 0.06)',
+              background: 'rgba(56, 189, 248, 0.08)',
               border: '1px dashed rgba(56, 189, 248, 0.3)',
               borderRadius: 12,
               padding: '14px 18px',
@@ -753,17 +753,17 @@ export function ModalConformidadeMotorista({
               alignItems: 'center',
               gap: 12
             }}>
-              <Info size={20} color="#38bdf8" style={{ flexShrink: 0 }} />
-              <div style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.4 }}>
-                <strong style={{ color: '#38bdf8' }}>Modo Bitruck / Truck (Chassi Rígido) Ativo:</strong>
+              <Info size={20} color="#0284c7" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '0.82rem', color: 'var(--slate-300)', lineHeight: 1.4 }}>
+                <strong style={{ color: '#0284c7' }}>Modo Bitruck / Truck (Chassi Rígido) Ativo:</strong>
                 <div>Como este caminhão não utiliza carreta/semirreboque separada, o <strong>Laudo de Inspeção de Rocha / CSV</strong> e o <strong>CRLV</strong> estão vinculados diretamente à placa única do caminhão informada acima.</div>
               </div>
             </div>
           ) : (
             <div style={{
               marginBottom: 20,
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'var(--bg-mode-selector)',
+              border: '1px solid var(--border-subtle)',
               borderRadius: 12,
               padding: '16px'
             }}>
@@ -772,7 +772,7 @@ export function ModalConformidadeMotorista({
                 alignItems: 'center',
                 gap: 8,
                 marginBottom: 14,
-                color: '#a855f7',
+                color: '#9333ea',
                 fontWeight: 700,
                 fontSize: '0.92rem'
               }}>
@@ -784,14 +784,14 @@ export function ModalConformidadeMotorista({
                 {/* PLACA CARRETA & UF */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)', margin: 0 }}>
                       Placa da Carreta 1 & Estado (UF)
                     </label>
                     {(() => {
                       const info = obterInfoLicenciamentoPorPlaca(formData.placa_carreta, formData.uf_carreta);
                       if (!info) return null;
                       return (
-                        <span style={{ fontSize: '0.70rem', color: '#c084fc', fontWeight: 600 }}>
+                        <span style={{ fontSize: '0.70rem', color: '#9333ea', fontWeight: 600 }}>
                           Final {info.finalDigito} ({info.mesNome})
                         </span>
                       );
@@ -823,7 +823,7 @@ export function ModalConformidadeMotorista({
                 {/* DATA DO ÚLTIMO REGISTRO DO CRLV CARRETA 1 */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                    <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)', margin: 0 }}>
                       Data do Último Registro (CRLV Carreta 1) *
                     </label>
                     {(() => {
@@ -834,7 +834,7 @@ export function ModalConformidadeMotorista({
                           style={{
                             background: 'rgba(168, 85, 247, 0.15)',
                             border: '1px solid rgba(168, 85, 247, 0.3)',
-                            color: '#c084fc',
+                            color: '#9333ea',
                             fontSize: '0.68rem',
                             borderRadius: 4,
                             padding: '2px 6px',
@@ -870,7 +870,7 @@ export function ModalConformidadeMotorista({
 
                 {/* DATA DE VENCIMENTO DO LAUDO ROCHA / CSV */}
                 <div>
-                  <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                  <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                     Data de Vencimento do Laudo de Rocha / CSV *
                   </label>
                   <input
@@ -896,8 +896,8 @@ export function ModalConformidadeMotorista({
               </div>
 
               {/* Toggle para Carreta 2 (Bitrem/Rodotrem) */}
-              <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px dashed rgba(255, 255, 255, 0.1)' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.82rem', color: '#cbd5e1' }}>
+              <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px dashed var(--border-subtle)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.82rem', color: 'var(--slate-100)' }}>
                   <input
                     type="checkbox"
                     checked={temCarreta2}
@@ -909,7 +909,7 @@ export function ModalConformidadeMotorista({
                 {temCarreta2 && (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
                     <div>
-                      <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Placa Carreta 2 & Estado (UF)</label>
+                      <label className="form-label" style={{ fontSize: '0.78rem', color: 'var(--slate-300)' }}>Placa Carreta 2 & Estado (UF)</label>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <input
                           type="text"
@@ -934,7 +934,7 @@ export function ModalConformidadeMotorista({
                     </div>
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0 }}>
+                        <label className="form-label" style={{ fontSize: '0.78rem', color: 'var(--slate-300)', margin: 0 }}>
                           Data do Último Registro (CRLV Carreta 2)
                         </label>
                         {(() => {
@@ -945,7 +945,7 @@ export function ModalConformidadeMotorista({
                               style={{
                                 background: 'rgba(168, 85, 247, 0.15)',
                                 border: '1px solid rgba(168, 85, 247, 0.3)',
-                                color: '#c084fc',
+                                color: '#9333ea',
                                 fontSize: '0.65rem',
                                 borderRadius: 4,
                                 padding: '2px 5px',
@@ -978,7 +978,7 @@ export function ModalConformidadeMotorista({
                       )}
                     </div>
                     <div>
-                      <label className="form-label" style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                      <label className="form-label" style={{ fontSize: '0.78rem', color: 'var(--slate-300)' }}>
                         Data de Vencimento do Laudo de Rocha (Carreta 2)
                       </label>
                       <input
@@ -1009,8 +1009,8 @@ export function ModalConformidadeMotorista({
           {/* SEÇÃO 4: TRANSPORTADORA & STATUS GERAL */}
           <div style={{
             marginBottom: 20,
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
+            background: 'var(--bg-mode-selector)',
+            border: '1px solid var(--border-subtle)',
             borderRadius: 12,
             padding: '16px'
           }}>
@@ -1019,7 +1019,7 @@ export function ModalConformidadeMotorista({
               alignItems: 'center',
               gap: 8,
               marginBottom: 14,
-              color: '#fbbf24',
+              color: '#d97706',
               fontWeight: 700,
               fontSize: '0.92rem'
             }}>
@@ -1029,7 +1029,7 @@ export function ModalConformidadeMotorista({
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                   Nome da Transportadora
                 </label>
                 <input
@@ -1043,7 +1043,7 @@ export function ModalConformidadeMotorista({
               </div>
 
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                   CNPJ da Transportadora
                 </label>
                 <input
@@ -1057,7 +1057,7 @@ export function ModalConformidadeMotorista({
               </div>
 
               <div>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                   Status Documental Geral
                 </label>
                 <select
@@ -1074,7 +1074,7 @@ export function ModalConformidadeMotorista({
               </div>
 
               <div style={{ gridColumn: 'span 3' }}>
-                <label className="form-label" style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', color: 'var(--slate-300)' }}>
                   Observações Internas (Exclusivo Pedreira/Admin)
                 </label>
                 <textarea
@@ -1095,7 +1095,7 @@ export function ModalConformidadeMotorista({
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingTop: 12,
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            borderTop: '1px solid var(--border-subtle)',
             flexWrap: 'wrap',
             gap: 10
           }}>
@@ -1112,7 +1112,7 @@ export function ModalConformidadeMotorista({
                     gap: 6,
                     background: 'rgba(56, 189, 248, 0.1)',
                     borderColor: 'rgba(56, 189, 248, 0.3)',
-                    color: '#38bdf8'
+                    color: '#0284c7'
                   }}
                   title="Ver histórico de edições e auditoria de usuários deste motorista"
                 >
