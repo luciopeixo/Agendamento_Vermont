@@ -2043,12 +2043,12 @@ export const obterClientesDoBancoDeDados = async () => {
 };
 
 /**
- * Cruza um bloco do módulo de Envelopamento com a lista de Agendamentos / Carregamentos.
- * Retorna o status operacional de expedição:
- * - 🚚 Carregado (Finalizado / Concluído)
- * - ⏳ Carregando (Em processo de carregamento na pedreira)
+ * Cruzamento entre Blocos Envelopados e Agendamentos de Carregamento
+ * Retorna o status de carregamento do bloco:
+ * - 🚚 Carregado (Agendamento Finalizado / Carregado)
+ * - ⏳ Carregando (Caminhão em carregamento no pátio)
  * - 📅 Agendado (Agendamento ativo aguardando / liberado)
- * - 📦 No Pátio (Sem agendamento ativo de transporte)
+ * - 📦 No Pátio (Sem agendamento ativo ou agendamento cancelado)
  */
 export const verificarStatusCarregamentoBloco = (bloco, listaAgendamentos = []) => {
   if (!bloco || !bloco.numero_bloco) {
@@ -2073,31 +2073,94 @@ export const verificarStatusCarregamentoBloco = (bloco, listaAgendamentos = []) 
   const numBlocoSemBarra = numBloco.replace(/\//g, '');
   const clienteNome = String(bloco.cliente_nome || '').trim();
   const clienteCnpj = String(bloco.cliente_cnpj || '').replace(/\D/g, '');
+  const pedreiraBloco = normalizarPedreira(bloco.pedreira_id, bloco.pedreira_nome);
 
-  // Filtra agendamentos que contêm este bloco
+  // Helper de correspondência de cliente
+  const matchCliente = (ag) => {
+    const agCnpj = String(ag.cliente_cnpj || '').replace(/\D/g, '');
+    const agNome = String(ag.cliente || ag.cliente_nome || '').trim();
+
+    if (clienteCnpj.length === 14 && agCnpj.length === 14) {
+      return clienteCnpj === agCnpj;
+    }
+
+    if (clienteNome && agNome) {
+      const c1 = normalizarCliente(clienteNome, clienteCnpj);
+      const c2 = normalizarCliente(agNome, agCnpj);
+      if (c1 === c2) return true;
+
+      const n1 = clienteNome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      const n2 = agNome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      if (n1.length >= 3 && n2.length >= 3 && (n1.includes(n2) || n2.includes(n1))) {
+        return true;
+      }
+    }
+
+    if (!clienteNome && !clienteCnpj && !agNome && !agCnpj) {
+      return true;
+    }
+
+    // Se ambos tiverem nomes informados porém totalmente diferentes
+    if (clienteNome && agNome) {
+      return false;
+    }
+
+    return true;
+  };
+
+  // Helper de correspondência de pedreira
+  const matchPedreira = (ag) => {
+    const agPed = normalizarPedreira(ag.pedreira, ag.pedreira_id || ag.pedreira_nome);
+    if (!pedreiraBloco || !agPed) return true;
+    if (pedreiraBloco === agPed) return true;
+    if (pedreiraBloco.startsWith('massape') && agPed.startsWith('massape')) return true;
+    return false;
+  };
+
+  // Filtra agendamentos candidatos que contêm este bloco
   const agendamentosCandidatos = (Array.isArray(listaAgendamentos) ? listaAgendamentos : []).filter(ag => {
     if (!ag || !ag.numero_bloco) return false;
+
+    // 1. REGRA CRÍTICA: Se o status estiver cancelado ou rejeitado, NUNCA considerar ativo/carregado
+    const st = String(ag.status || '').toLowerCase().trim();
+    if (
+      st.includes('cancelad') ||
+      st.includes('rejeit') ||
+      st === 'inativo' ||
+      st === 'excluido' ||
+      st === 'excluído'
+    ) {
+      return false;
+    }
+
+    // 2. Validação de Cliente e Pedreira
+    if (!matchCliente(ag)) return false;
+    if (!matchPedreira(ag)) return false;
+
+    // 3. Verificação precisa do número do bloco (sem quebrar 03/26 na barra)
     const numAg = normalizarNumeroBloco(ag.numero_bloco);
     const numAgSemBarra = numAg.replace(/\//g, '');
 
-    // Verifica se bate exatamente ou se o campo possui múltiplos blocos separados por vírgula/espaço/barra
-    const bateNumero = numAg === numBloco || 
-                       numAgSemBarra === numBlocoSemBarra ||
-                       numAg.split(/[\s,;/]+/).some(part => {
-                         if (!part) return false;
-                         const nPart = normalizarNumeroBloco(part);
-                         return nPart === numBloco || nPart.replace(/\//g, '') === numBlocoSemBarra;
-                       });
+    if (numAg === numBloco || numAgSemBarra === numBlocoSemBarra) {
+      return true;
+    }
 
-    if (!bateNumero) return false;
+    // Se houver múltiplos blocos no campo do agendamento (separados por vírgula, ponto-e-vírgula, "e", "&", etc.)
+    const partesSeparadas = String(ag.numero_bloco)
+      .split(/[,;\n]+|\s+(?:e|E|&|\+|-)\s+/)
+      .map(p => normalizarNumeroBloco(p.trim()))
+      .filter(Boolean);
 
-    // Se o agendamento estiver cancelado, ignorar
-    const st = String(ag.status || '').toLowerCase();
-    if (st.includes('cancelad')) return false;
+    if (partesSeparadas.length > 1) {
+      return partesSeparadas.some(part => {
+        return part === numBloco || part.replace(/\//g, '') === numBlocoSemBarra;
+      });
+    }
 
-    return true;
+    return false;
   });
 
+  // Se não houver nenhum agendamento ativo válido (ou se o único que existia estava cancelado)
   if (agendamentosCandidatos.length === 0) {
     return {
       encontrado: false,
@@ -2111,7 +2174,7 @@ export const verificarStatusCarregamentoBloco = (bloco, listaAgendamentos = []) 
       cor: '#64748b',
       bg: 'rgba(148, 163, 184, 0.12)',
       border: 'rgba(148, 163, 184, 0.35)',
-      tooltip: 'Bloco em estoque no pátio da pedreira (aguardando agendamento de transporte)',
+      tooltip: 'Bloco em estoque no pátio da pedreira (sem agendamento ativo de transporte)',
       agendamento: null
     };
   }
@@ -2126,7 +2189,12 @@ export const verificarStatusCarregamentoBloco = (bloco, listaAgendamentos = []) 
     return 0;
   };
 
-  agendamentosCandidatos.sort((a, b) => obterPesoStatus(b) - obterPesoStatus(a));
+  agendamentosCandidatos.sort((a, b) => {
+    const pesoDiff = obterPesoStatus(b) - obterPesoStatus(a);
+    if (pesoDiff !== 0) return pesoDiff;
+    return (new Date(b.data_agendamento || b.created_at || 0)) - (new Date(a.data_agendamento || a.created_at || 0));
+  });
+
   const principalAg = agendamentosCandidatos[0];
   const st = String(principalAg.status || '').toLowerCase();
 
