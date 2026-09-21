@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, Edit3, Truck, Calendar, Clock, MapPin, AlertCircle, CheckCircle2, History, User, ArrowRight, Building2 } from 'lucide-react';
+import { X, Save, Edit3, Truck, Calendar, Clock, MapPin, AlertCircle, AlertTriangle, CheckCircle2, History, User, ArrowRight, Building2 } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
   TIPOS_VEICULO, 
@@ -833,17 +833,52 @@ export function ModalEditarAgendamento({
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Tipo de Veículo</label>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <label className="form-label" style={{ margin: 0 }}>Tipo de Veículo</label>
+                  <span style={{
+                    fontSize: '0.72rem',
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    background: 'rgba(0, 118, 44, 0.15)',
+                    border: '1px solid rgba(0, 118, 44, 0.35)',
+                    color: 'var(--vermont-green-light)',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}>
+                    <Truck size={12} />
+                    Porte: {formData.tipo_veiculo}
+                  </span>
+                </div>
                 <select
                   className="form-select"
                   value={formData.tipo_veiculo}
                   onChange={(e) => handleChange('tipo_veiculo', e.target.value)}
+                  style={{ fontWeight: 600 }}
                 >
                   {TIPOS_VEICULO.map(t => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
+                <div style={{
+                  marginTop: 6,
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  background: 'var(--warning-bg)',
+                  border: '1px solid var(--warning-border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: '0.78rem',
+                  color: 'var(--warning-text)'
+                }}>
+                  <AlertTriangle size={15} color="var(--warning-icon)" style={{ flexShrink: 0 }} />
+                  <span>
+                    <strong style={{ color: 'var(--warning-title)' }}>Atenção ao Porte:</strong> Certifique-se de que o tipo selecionado ({formData.tipo_veiculo}) é o veículo correto que comparecerá à pedreira.
+                  </span>
+                </div>
               </div>
 
               <div className="form-group">

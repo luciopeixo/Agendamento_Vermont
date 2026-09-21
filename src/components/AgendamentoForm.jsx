@@ -3005,22 +3005,61 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
             {/* Tipo do Veículo */}
             <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label form-label-required">Tipo do Veículo</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <label className="form-label form-label-required" style={{ margin: 0 }}>Tipo do Veículo</label>
+                <span style={{
+                  fontSize: '0.74rem',
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                  background: 'rgba(0, 118, 44, 0.15)',
+                  border: '1px solid rgba(0, 118, 44, 0.35)',
+                  color: 'var(--vermont-green-light)',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4
+                }}>
+                  <Truck size={13} />
+                  Porte Selecionado: {formData.tipo_veiculo}
+                </span>
+              </div>
               <select
                 className="form-select"
                 value={formData.tipo_veiculo}
                 onChange={(e) => handleChange('tipo_veiculo', e.target.value)}
                 required
+                style={{ fontSize: '0.96rem', fontWeight: 600 }}
               >
                 {TIPOS_VEICULO.map(tipo => (
                   <option key={tipo} value={tipo}>{tipo}</option>
                 ))}
               </select>
-              <span style={{ fontSize: '0.76rem', color: '#86efac', marginTop: 2 }}>
-                {configPlacas.quantidade === 3 && 'ℹ️ Bitrem / Rodotrem requer 3 placas: Cavalo, 1ª Carreta e 2ª Carreta.'}
-                {configPlacas.quantidade === 1 && 'ℹ️ Truck / Bitruck requer apenas 1 placa (Veículo).'}
-                {configPlacas.quantidade === 2 && 'ℹ️ Requer 2 placas: Placa do Cavalo e Placa da Carreta.'}
-              </span>
+
+              {/* Alerta de Verificação do Porte do Veículo */}
+              <div style={{
+                marginTop: 8,
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: 'var(--warning-bg)',
+                border: '1px solid var(--warning-border)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10
+              }}>
+                <AlertTriangle size={18} color="var(--warning-icon)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <div style={{ fontSize: '0.8rem', lineHeight: 1.45, color: 'var(--warning-text)' }}>
+                  <strong style={{ color: 'var(--warning-title)', display: 'block', marginBottom: 2 }}>
+                    ⚠️ Importante: Certifique-se do porte correto do veículo!
+                  </strong>
+                  <span>
+                    Confirme se o veículo que irá até a pedreira é realmente um <strong>{formData.tipo_veiculo}</strong>. 
+                    {configPlacas.quantidade === 3 && ' Requer 3 placas: Cavalo, 1ª Carreta e 2ª Carreta.'}
+                    {configPlacas.quantidade === 1 && ' Requer 1 placa: Apenas a placa do caminhão (veículo rígido).'}
+                    {configPlacas.quantidade === 2 && ' Requer 2 placas: Placa do Cavalo e Placa da Carreta.'}
+                    {' '}Erros no porte do veículo ou divergência de eixos impedem a autorização e o carregamento na pedreira.
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Placa do Cavalo / Veículo */}
