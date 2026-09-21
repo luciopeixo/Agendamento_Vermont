@@ -1313,7 +1313,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             <Truck size={24} />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.4rem', margin: 0, color: '#fff' }}>
+            <h1 style={{ fontSize: '1.4rem', margin: 0, color: 'var(--slate-100)' }}>
               Portal de Agendamento de Carregamento
             </h1>
             <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: 'var(--slate-400)' }}>
@@ -1334,7 +1334,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         display: 'flex',
         gap: 10,
         marginBottom: tipoCarregamento === 'combinado' ? 12 : 20,
-        background: 'rgba(20, 28, 24, 0.7)',
+        background: 'var(--bg-mode-selector)',
         padding: 6,
         borderRadius: 14,
         border: '1px solid var(--vermont-green-border)',
@@ -1351,8 +1351,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             padding: '12px 16px',
             borderRadius: 10,
             border: 'none',
-            background: tipoCarregamento === 'simples' ? 'var(--vermont-green-light)' : 'transparent',
-            color: tipoCarregamento === 'simples' ? '#000' : 'var(--slate-300)',
+            background: tipoCarregamento === 'simples' ? 'var(--vermont-green-gradient)' : 'transparent',
+            color: tipoCarregamento === 'simples' ? '#ffffff' : 'var(--text-inactive-tab)',
             fontWeight: 700,
             cursor: 'pointer',
             display: 'flex',
@@ -1361,7 +1361,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             gap: 8,
             fontSize: '0.94rem',
             transition: 'all 0.2s',
-            boxShadow: tipoCarregamento === 'simples' ? '0 4px 14px rgba(74, 222, 128, 0.3)' : 'none'
+            boxShadow: tipoCarregamento === 'simples' ? '0 4px 14px rgba(0, 118, 44, 0.35)' : 'none'
           }}
         >
           <Truck size={19} />
@@ -1379,8 +1379,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             padding: '12px 16px',
             borderRadius: 10,
             border: 'none',
-            background: tipoCarregamento === 'combinado' ? 'var(--vermont-green-light)' : 'transparent',
-            color: tipoCarregamento === 'combinado' ? '#000' : 'var(--slate-300)',
+            background: tipoCarregamento === 'combinado' ? 'var(--vermont-green-gradient)' : 'transparent',
+            color: tipoCarregamento === 'combinado' ? '#ffffff' : 'var(--text-inactive-tab)',
             fontWeight: 700,
             cursor: 'pointer',
             display: 'flex',
@@ -1389,7 +1389,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             gap: 8,
             fontSize: '0.94rem',
             transition: 'all 0.2s',
-            boxShadow: tipoCarregamento === 'combinado' ? '0 4px 14px rgba(74, 222, 128, 0.3)' : 'none'
+            boxShadow: tipoCarregamento === 'combinado' ? '0 4px 14px rgba(0, 118, 44, 0.35)' : 'none'
           }}
         >
           <Layers size={19} />
@@ -1411,7 +1411,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           flexWrap: 'wrap',
           gap: 12
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#38bdf8', fontSize: '0.9rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#0284c7', fontSize: '0.9rem' }}>
             <Layers size={18} />
             <span><strong>Quantidade de Blocos no Carregamento:</strong></span>
           </div>
@@ -1423,9 +1423,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 padding: '7px 18px',
                 borderRadius: 8,
                 border: '1px solid',
-                borderColor: qtdBlocosCombinados === 2 ? '#38bdf8' : 'rgba(255, 255, 255, 0.15)',
+                borderColor: qtdBlocosCombinados === 2 ? '#38bdf8' : 'var(--border-subtle)',
                 background: qtdBlocosCombinados === 2 ? 'rgba(56, 189, 248, 0.25)' : 'transparent',
-                color: qtdBlocosCombinados === 2 ? '#38bdf8' : 'var(--slate-300)',
+                color: qtdBlocosCombinados === 2 ? '#0284c7' : 'var(--text-inactive-tab)',
                 fontWeight: 700,
                 cursor: 'pointer',
                 fontSize: '0.86rem',
@@ -1441,9 +1441,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 padding: '7px 18px',
                 borderRadius: 8,
                 border: '1px solid',
-                borderColor: qtdBlocosCombinados === 3 ? '#f59e0b' : 'rgba(255, 255, 255, 0.15)',
+                borderColor: qtdBlocosCombinados === 3 ? '#f59e0b' : 'var(--border-subtle)',
                 background: qtdBlocosCombinados === 3 ? 'rgba(245, 158, 11, 0.25)' : 'transparent',
-                color: qtdBlocosCombinados === 3 ? '#fbbf24' : 'var(--slate-300)',
+                color: qtdBlocosCombinados === 3 ? '#d97706' : 'var(--text-inactive-tab)',
                 fontWeight: 700,
                 cursor: 'pointer',
                 fontSize: '0.86rem',
@@ -1745,10 +1745,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     required
                     readOnly={Boolean(statusCNPJCliente.encontrado && formData.cliente)}
                     style={{
-                      backgroundColor: statusCNPJCliente.encontrado && formData.cliente ? 'rgba(16, 185, 129, 0.08)' : undefined,
-                      borderColor: statusCNPJCliente.encontrado && formData.cliente ? '#10b981' : undefined,
+                      backgroundColor: statusCNPJCliente.encontrado && formData.cliente ? 'var(--vermont-green-subtle)' : undefined,
+                      borderColor: statusCNPJCliente.encontrado && formData.cliente ? 'var(--vermont-green)' : undefined,
                       cursor: statusCNPJCliente.encontrado && formData.cliente ? 'not-allowed' : undefined,
-                      color: statusCNPJCliente.encontrado && formData.cliente ? '#e2e8f0' : undefined
+                      color: statusCNPJCliente.encontrado && formData.cliente ? 'inherit' : undefined,
+                      fontWeight: statusCNPJCliente.encontrado && formData.cliente ? 600 : undefined
                     }}
                   />
                 </div>
@@ -1854,17 +1855,17 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       {/* Recado / Aviso Operacional sobre limite de sexta às 14h */}
                       <div style={{ 
                         fontSize: '0.80rem', 
-                        color: '#fef3c7', 
+                        color: 'var(--warning-text)', 
                         marginTop: 10, 
                         padding: '8px 12px',
-                        background: 'rgba(245, 158, 11, 0.12)',
-                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        background: 'var(--warning-bg)',
+                        border: '1px solid var(--warning-border)',
                         borderRadius: 8,
                         display: 'flex', 
                         alignItems: 'center', 
                         gap: 8 
                       }}>
-                        <Clock size={15} color="#fbbf24" style={{ flexShrink: 0 }} />
+                        <Clock size={15} color="var(--warning-icon)" style={{ flexShrink: 0 }} />
                         <span><strong>Lembrete Operacional:</strong> Temos um limite de horário para agendamento dos sábados até <strong>sexta-feira às 14:00</strong>.</span>
                       </div>
                     </div>
@@ -1879,7 +1880,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     border: '1px solid var(--warning-border)',
                     borderRadius: 12,
                     padding: 14,
-                    color: '#fef3c7'
+                    color: 'var(--warning-text)'
                   }}>
                     A operação aos sábados é <strong>exclusiva para a pedreira de Uruoca - CE (Taj Mahal)</strong> com limite de até 12 veículos. Demais pedreiras operam de segunda a sexta-feira.
                   </div>
@@ -2079,10 +2080,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     required
                     readOnly={Boolean(statusCNPJCliente.encontrado && formData.cliente)}
                     style={{
-                      backgroundColor: statusCNPJCliente.encontrado && formData.cliente ? 'rgba(16, 185, 129, 0.08)' : undefined,
-                      borderColor: statusCNPJCliente.encontrado && formData.cliente ? '#10b981' : undefined,
+                      backgroundColor: statusCNPJCliente.encontrado && formData.cliente ? 'var(--vermont-green-subtle)' : undefined,
+                      borderColor: statusCNPJCliente.encontrado && formData.cliente ? 'var(--vermont-green)' : undefined,
                       cursor: statusCNPJCliente.encontrado && formData.cliente ? 'not-allowed' : undefined,
-                      color: statusCNPJCliente.encontrado && formData.cliente ? '#e2e8f0' : undefined
+                      color: statusCNPJCliente.encontrado && formData.cliente ? 'inherit' : undefined,
+                      fontWeight: statusCNPJCliente.encontrado && formData.cliente ? 600 : undefined
                     }}
                   />
                 </div>
@@ -2316,10 +2318,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     required
                     readOnly={Boolean(statusCNPJCliente2.encontrado && ponto2.cliente)}
                     style={{
-                      backgroundColor: statusCNPJCliente2.encontrado && ponto2.cliente ? 'rgba(16, 185, 129, 0.08)' : undefined,
-                      borderColor: statusCNPJCliente2.encontrado && ponto2.cliente ? '#10b981' : undefined,
+                      backgroundColor: statusCNPJCliente2.encontrado && ponto2.cliente ? 'var(--vermont-green-subtle)' : undefined,
+                      borderColor: statusCNPJCliente2.encontrado && ponto2.cliente ? 'var(--vermont-green)' : undefined,
                       cursor: statusCNPJCliente2.encontrado && ponto2.cliente ? 'not-allowed' : undefined,
-                      color: statusCNPJCliente2.encontrado && ponto2.cliente ? '#e2e8f0' : undefined
+                      color: statusCNPJCliente2.encontrado && ponto2.cliente ? 'inherit' : undefined,
+                      fontWeight: statusCNPJCliente2.encontrado && ponto2.cliente ? 600 : undefined
                     }}
                   />
                 </div>
@@ -2397,17 +2400,17 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       {/* Recado / Aviso Operacional */}
                       <div style={{ 
                         fontSize: '0.78rem', 
-                        color: '#fef3c7', 
+                        color: 'var(--warning-text)', 
                         marginTop: 8, 
                         padding: '6px 10px',
-                        background: 'rgba(245, 158, 11, 0.12)',
-                        border: '1px solid rgba(245, 158, 11, 0.35)',
+                        background: 'var(--warning-bg)',
+                        border: '1px solid var(--warning-border)',
                         borderRadius: 6,
                         display: 'flex', 
                         alignItems: 'center', 
                         gap: 6 
                       }}>
-                        <Clock size={14} color="#fbbf24" style={{ flexShrink: 0 }} />
+                        <Clock size={14} color="var(--warning-icon)" style={{ flexShrink: 0 }} />
                         <span><strong>Lembrete:</strong> Limite de agendamento de sábado até sexta-feira às 14:00.</span>
                       </div>
                     </div>
@@ -2422,7 +2425,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     border: '1px solid var(--warning-border)',
                     borderRadius: 12,
                     padding: 12,
-                    color: '#fef3c7',
+                    color: 'var(--warning-text)',
                     fontSize: '0.82rem'
                   }}>
                     A operação aos sábados é <strong>exclusiva para a pedreira de Uruoca - CE (Taj Mahal)</strong>.
@@ -2663,10 +2666,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       required
                       readOnly={Boolean(statusCNPJCliente3.encontrado && ponto3.cliente)}
                       style={{
-                        backgroundColor: statusCNPJCliente3.encontrado && ponto3.cliente ? 'rgba(16, 185, 129, 0.08)' : undefined,
-                        borderColor: statusCNPJCliente3.encontrado && ponto3.cliente ? '#10b981' : undefined,
+                        backgroundColor: statusCNPJCliente3.encontrado && ponto3.cliente ? 'var(--vermont-green-subtle)' : undefined,
+                        borderColor: statusCNPJCliente3.encontrado && ponto3.cliente ? 'var(--vermont-green)' : undefined,
                         cursor: statusCNPJCliente3.encontrado && ponto3.cliente ? 'not-allowed' : undefined,
-                        color: statusCNPJCliente3.encontrado && ponto3.cliente ? '#e2e8f0' : undefined
+                        color: statusCNPJCliente3.encontrado && ponto3.cliente ? 'inherit' : undefined,
+                        fontWeight: statusCNPJCliente3.encontrado && ponto3.cliente ? 600 : undefined
                       }}
                     />
                   </div>
@@ -2744,17 +2748,17 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                         {/* Recado / Aviso Operacional */}
                         <div style={{ 
                           fontSize: '0.78rem', 
-                          color: '#fef3c7', 
+                          color: 'var(--warning-text)', 
                           marginTop: 8, 
                           padding: '6px 10px',
-                          background: 'rgba(245, 158, 11, 0.12)',
-                          border: '1px solid rgba(245, 158, 11, 0.35)',
+                          background: 'var(--warning-bg)',
+                          border: '1px solid var(--warning-border)',
                           borderRadius: 6,
                           display: 'flex', 
                           alignItems: 'center', 
                           gap: 6 
                         }}>
-                          <Clock size={14} color="#fbbf24" style={{ flexShrink: 0 }} />
+                          <Clock size={14} color="var(--warning-icon)" style={{ flexShrink: 0 }} />
                           <span><strong>Lembrete:</strong> Limite de agendamento de sábado até sexta-feira às 14:00.</span>
                         </div>
                       </div>
@@ -2769,7 +2773,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       border: '1px solid var(--warning-border)',
                       borderRadius: 12,
                       padding: 12,
-                      color: '#fef3c7',
+                      color: 'var(--warning-text)',
                       fontSize: '0.82rem'
                     }}>
                       A operação aos sábados é <strong>exclusiva para a pedreira de Uruoca - CE (Taj Mahal)</strong>.
@@ -2889,10 +2893,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 required
                 readOnly={Boolean(statusCNPJ.encontrado && formData.transportadora)}
                 style={{
-                  backgroundColor: statusCNPJ.encontrado && formData.transportadora ? 'rgba(16, 185, 129, 0.08)' : undefined,
-                  borderColor: statusCNPJ.encontrado && formData.transportadora ? '#10b981' : undefined,
+                  backgroundColor: statusCNPJ.encontrado && formData.transportadora ? 'var(--vermont-green-subtle)' : undefined,
+                  borderColor: statusCNPJ.encontrado && formData.transportadora ? 'var(--vermont-green)' : undefined,
                   cursor: statusCNPJ.encontrado && formData.transportadora ? 'not-allowed' : undefined,
-                  color: statusCNPJ.encontrado && formData.transportadora ? '#e2e8f0' : undefined
+                  color: statusCNPJ.encontrado && formData.transportadora ? 'inherit' : undefined,
+                  fontWeight: statusCNPJ.encontrado && formData.transportadora ? 600 : undefined
                 }}
               />
             </div>
@@ -3131,21 +3136,21 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 marginTop: 12,
                 padding: '16px 18px',
                 borderRadius: 12,
-                background: 'rgba(239, 68, 68, 0.12)',
-                border: '1.5px solid #ef4444',
+                background: 'var(--danger-bg)',
+                border: '1.5px solid var(--danger-border)',
                 boxShadow: '0 4px 20px rgba(239, 68, 68, 0.15)',
-                color: '#fff'
+                color: 'var(--danger-text)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                   <AlertTriangle size={22} color="#ef4444" style={{ flexShrink: 0 }} />
-                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#fca5a5' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: 'var(--danger-title)' }}>
                     Aviso Importante: Documentação Desatualizada
                   </h4>
                 </div>
-                <p style={{ margin: '0 0 10px 0', fontSize: '0.84rem', color: '#e2e8f0', lineHeight: 1.4 }}>
+                <p style={{ margin: '0 0 10px 0', fontSize: '0.84rem', color: 'var(--danger-text)', lineHeight: 1.4 }}>
                   Constatamos que este motorista/veículo possui documento(s) <strong>vencido(s) ou desatualizado(s)</strong> em relação à data do carregamento:
                 </p>
-                <ul style={{ margin: '0 0 12px 18px', padding: 0, fontSize: '0.82rem', color: '#fecaca' }}>
+                <ul style={{ margin: '0 0 12px 18px', padding: 0, fontSize: '0.82rem', color: 'var(--danger-subtext)' }}>
                   {statusConformidade.itensVencidos.map((item, idx) => (
                     <li key={idx} style={{ marginBottom: 4 }}>
                       <strong>{item.titulo}:</strong> Vencido em <strong>{item.labelData}</strong> (há {item.diasVencido} dias)
@@ -3155,14 +3160,14 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <div style={{
                   padding: '8px 12px',
                   borderRadius: 8,
-                  background: 'rgba(0, 0, 0, 0.35)',
+                  background: 'var(--danger-box-bg)',
                   fontSize: '0.78rem',
-                  color: '#cbd5e1',
+                  color: 'var(--danger-box-text)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6
                 }}>
-                  <Info size={14} color="#38bdf8" style={{ flexShrink: 0 }} />
+                  <Info size={14} color="var(--info)" style={{ flexShrink: 0 }} />
                   <span>
                     <strong>Orientação:</strong> O agendamento poderá ser concluído, mas o motorista deverá apresentar a documentação renovada e regularizada na portaria da pedreira Vermont para autorização do carregamento.
                   </span>
@@ -3191,16 +3196,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             marginTop: 18,
             padding: '12px 16px',
             borderRadius: 10,
-            background: 'rgba(0, 118, 44, 0.12)',
+            background: 'var(--vermont-green-subtle)',
             border: '1px solid var(--vermont-green-border)',
             display: 'flex',
             alignItems: 'center',
             gap: 10,
             fontSize: '0.84rem'
           }}>
-            <Mail size={18} color="#4ade80" style={{ flexShrink: 0 }} />
+            <Mail size={18} color="var(--vermont-green-light)" style={{ flexShrink: 0 }} />
             <span style={{ color: 'var(--slate-200)' }}>
-              Confirmação despachada para <strong style={{ color: '#4ade80' }}>o e-mail da logística</strong>
+              Confirmação despachada para <strong style={{ color: 'var(--vermont-green)' }}>o e-mail da logística</strong>
             </span>
           </div>
 
@@ -3208,20 +3213,20 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
           <div style={{
             marginTop: 18,
             padding: '16px 18px',
-            background: 'rgba(15, 23, 42, 0.75)',
-            border: '1px solid rgba(0, 118, 44, 0.35)',
+            background: 'var(--bg-notice-card)',
+            border: '1px solid var(--border-notice-card)',
             borderRadius: 12
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <FileCheck size={20} color="#4ade80" />
-              <strong style={{ color: '#fff', fontSize: '0.94rem' }}>
+              <FileCheck size={20} color="var(--vermont-green-light)" />
+              <strong style={{ color: 'var(--slate-100)', fontSize: '0.94rem' }}>
                 Documentação Obrigatória para Apresentação na Pedreira
               </strong>
             </div>
             <p style={{ margin: '0 0 8px 0', fontSize: '0.8rem', color: 'var(--slate-400)' }}>
               O motorista deverá portar e apresentar obrigatoriamente na portaria de cada pedreira:
             </p>
-            <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.84rem', color: '#e2e8f0', lineHeight: '1.6' }}>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: '0.84rem', color: 'var(--slate-200)', lineHeight: '1.6' }}>
               <li><strong>Obrigatório apresentação de CRLVs do cavalo e carreta atualizados;</strong></li>
               <li><strong>CNH compatível com o veículo;</strong></li>
               <li><strong>Motorista deve possuir o curso de cargas indivisíveis;</strong></li>
@@ -3232,22 +3237,22 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             <div style={{
               marginTop: 14,
               padding: '12px 14px',
-              background: 'rgba(245, 158, 11, 0.12)',
-              border: '1px solid rgba(245, 158, 11, 0.45)',
+              background: 'var(--warning-bg)',
+              border: '1px solid var(--warning-border)',
               borderRadius: 10,
               display: 'flex',
               alignItems: 'center',
               gap: 12
             }}>
-              <AlertTriangle size={20} color="#fbbf24" style={{ flexShrink: 0 }} />
-              <div style={{ fontSize: '0.84rem', color: '#fef3c7', lineHeight: '1.5' }}>
-                <strong style={{ color: '#fde047', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'block', marginBottom: 4 }}>
+              <AlertTriangle size={20} color="var(--warning-icon)" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '0.84rem', color: 'var(--warning-text)', lineHeight: '1.5' }}>
+                <strong style={{ color: 'var(--warning-title)', textTransform: 'uppercase', letterSpacing: '0.02em', display: 'block', marginBottom: 4 }}>
                   Aviso Importante ao Transportador:
                 </strong>
-                <p style={{ margin: '0 0 6px 0' }}>
+                <p style={{ margin: '0 0 6px 0', color: 'var(--warning-text)' }}>
                   O transportador deverá sempre confirmar com o cliente, antes de realizar o carregamento, se os blocos estão devidamente envelopados e se encontram finalizados e liberados para transporte.
                 </p>
-                <p style={{ margin: 0, color: '#fde68a', fontSize: '0.81rem', fontWeight: 500 }}>
+                <p style={{ margin: 0, color: 'var(--warning-subtext)', fontSize: '0.81rem', fontWeight: 600 }}>
                   Essa confirmação é fundamental para evitar imprevistos, atrasos ou problemas durante o carregamento e o transporte.
                 </p>
               </div>
@@ -3256,16 +3261,16 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             <div style={{
               marginTop: 14,
               padding: '12px 16px',
-              background: 'rgba(15, 23, 42, 0.65)',
-              border: '1px solid rgba(148, 163, 184, 0.2)',
+              background: 'var(--bg-lgpd-card)',
+              border: '1px solid var(--border-subtle)',
               borderRadius: 10,
               display: 'flex',
               alignItems: 'center',
               gap: 12
             }}>
-              <ShieldCheck size={20} color="#4ade80" style={{ flexShrink: 0 }} />
-              <div style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: '1.4' }}>
-                <strong style={{ color: '#cbd5e1' }}>Privacidade & Sigilo Corporativo (LGPD):</strong> Os dados cadastrais informados (CNPJs, CPFs e dados de transporte) são utilizados estritamente para conferência fiscal, emissão de romaneio de expedição e controle de segurança e acesso às pedreiras da Vermont Mineração.
+              <ShieldCheck size={20} color="var(--vermont-green-light)" style={{ flexShrink: 0 }} />
+              <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)', lineHeight: '1.4' }}>
+                <strong style={{ color: 'var(--slate-200)' }}>Privacidade & Sigilo Corporativo (LGPD):</strong> Os dados cadastrais informados (CNPJs, CPFs e dados de transporte) são utilizados estritamente para conferência fiscal, emissão de romaneio de expedição e controle de segurança e acesso às pedreiras da Vermont Mineração.
               </div>
             </div>
           </div>
@@ -3275,8 +3280,8 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
         {((tipoDia === 'sabado') || (tipoCarregamento === 'combinado' && tipoDia2 === 'sabado') || (tipoCarregamento === 'combinado' && qtdBlocosCombinados === 3 && tipoDia3 === 'sabado')) && (
           <div className="animate-fade" style={{
             padding: '14px 18px',
-            background: 'rgba(245, 158, 11, 0.12)',
-            border: '1px solid rgba(245, 158, 11, 0.4)',
+            background: 'var(--warning-bg)',
+            border: '1px solid var(--warning-border)',
             borderRadius: 12,
             display: 'flex',
             alignItems: 'center',
@@ -3286,9 +3291,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               width: 38,
               height: 38,
               borderRadius: 8,
-              background: 'rgba(245, 158, 11, 0.2)',
-              border: '1px solid rgba(245, 158, 11, 0.5)',
-              color: '#fbbf24',
+              background: 'var(--warning-bg)',
+              border: '1px solid var(--warning-border)',
+              color: 'var(--warning-icon)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -3297,10 +3302,10 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
               <AlertTriangle size={20} />
             </div>
             <div>
-              <strong style={{ color: '#fde047', fontSize: '0.92rem', display: 'block', marginBottom: 2 }}>
+              <strong style={{ color: 'var(--warning-title)', fontSize: '0.92rem', display: 'block', marginBottom: 2 }}>
                 Lembrete Operacional - Agendamentos de Sábado:
               </strong>
-              <p style={{ margin: 0, color: '#fef3c7', fontSize: '0.84rem', lineHeight: '1.4' }}>
+              <p style={{ margin: 0, color: 'var(--warning-text)', fontSize: '0.84rem', lineHeight: '1.4' }}>
                 Temos um limite de horário para agendamento dos sábados até <strong>sexta-feira às 14:00</strong>. A operação no sábado é exclusiva da pedreira de Uruoca com capacidade de até 12 veículos no dia.
               </p>
             </div>

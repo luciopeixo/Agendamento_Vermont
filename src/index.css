@@ -37,10 +37,27 @@
   --danger: #ef4444;
   --danger-bg: rgba(239, 68, 68, 0.12);
   --danger-border: rgba(239, 68, 68, 0.3);
+  --danger-title: #fca5a5;
+  --danger-text: #fee2e2;
+  --danger-subtext: #fecaca;
+  --danger-box-bg: rgba(0, 0, 0, 0.35);
+  --danger-box-text: #cbd5e1;
 
   --info: #38bdf8;
   --info-bg: rgba(56, 189, 248, 0.12);
   --info-border: rgba(56, 189, 248, 0.3);
+
+  /* Form & Component Theme Variables */
+  --bg-mode-selector: rgba(20, 28, 24, 0.7);
+  --text-inactive-tab: #94a3b8;
+  --bg-notice-card: rgba(15, 23, 42, 0.75);
+  --border-notice-card: rgba(0, 118, 44, 0.35);
+  --bg-lgpd-card: rgba(15, 23, 42, 0.65);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --warning-title: #fde047;
+  --warning-text: #fef3c7;
+  --warning-subtext: #fde68a;
+  --warning-icon: #fbbf24;
 
   --font-heading: 'Outfit', sans-serif;
   --font-body: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -109,11 +126,38 @@ body.fundo-tajmahal {
   --slate-700: #cbd5e1;
   --slate-800: #e2e8f0;
   --slate-900: #f8fafc;
+  
+  --bg-mode-selector: #f1f5f9;
+  --text-inactive-tab: #475569;
+  --bg-notice-card: #f8fafc;
+  --border-notice-card: #cbd5e1;
+  --bg-lgpd-card: #f1f5f9;
+  --border-subtle: #e2e8f0;
+  --warning-title: #b45309;
+  --warning-text: #78350f;
+  --warning-subtext: #92400e;
+  --warning-icon: #d97706;
+
+  --danger-title: #b91c1c;
+  --danger-text: #7f1d1d;
+  --danger-subtext: #991b1b;
+  --danger-box-bg: #fee2e2;
+  --danger-box-text: #7f1d1d;
+
   background-color: #f1f5f9;
   background-image: 
     radial-gradient(ellipse 90% 50% at 50% 0%, rgba(0, 168, 62, 0.08) 0%, transparent 60%),
     linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   color: #1e293b;
+}
+
+body.fundo-tajmahal input[type="date"] {
+  color-scheme: light !important;
+}
+
+body.fundo-negresco input[type="date"],
+body.fundo-grafite input[type="date"] {
+  color-scheme: dark !important;
 }
 
 body.fundo-tajmahal h1,
