@@ -407,7 +407,7 @@ export function ModalNotificarClienteWhatsApp({
         width: '100%',
         maxWidth: 860,
         maxHeight: '92vh',
-        background: '#09110d',
+        background: 'var(--bg-card-solid, #09110d)',
         border: '1px solid var(--vermont-green-border)',
         borderRadius: 16,
         display: 'flex',
@@ -419,11 +419,11 @@ export function ModalNotificarClienteWhatsApp({
         {/* Cabeçalho */}
         <div style={{
           padding: '16px 22px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          borderBottom: '1px solid var(--slate-700, rgba(255, 255, 255, 0.1))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'rgba(22, 163, 74, 0.1)'
+          background: 'rgba(22, 163, 74, 0.12)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
@@ -435,12 +435,12 @@ export function ModalNotificarClienteWhatsApp({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#4ade80'
+              color: '#16a34a'
             }}>
               <MessageSquare size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.15rem', margin: 0, color: '#fff', fontWeight: 800 }}>
+              <h2 style={{ fontSize: '1.15rem', margin: 0, color: 'inherit', fontWeight: 800 }}>
                 Notificar Cliente via WhatsApp
               </h2>
               <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)' }}>
@@ -464,13 +464,13 @@ export function ModalNotificarClienteWhatsApp({
           
           {/* PASSO 1: SELEÇÃO DE PERÍODO (ACIMA DO CLIENTE) */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.03)',
+            background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.03))',
             padding: 14,
             borderRadius: 12,
-            border: '1px solid rgba(255, 255, 255, 0.07)'
+            border: '1px solid var(--slate-700, rgba(255, 255, 255, 0.07))'
           }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 8 }}>
-              <Calendar size={14} color="#fbbf24" /> 1. PERÍODO / DATAS DOS BLOCOS:
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-400)', fontWeight: 700, marginBottom: 8 }}>
+              <Calendar size={14} color="#f59e0b" /> 1. PERÍODO / DATAS DOS BLOCOS:
             </label>
 
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -494,9 +494,9 @@ export function ModalNotificarClienteWhatsApp({
                       fontSize: '0.80rem',
                       fontWeight: 700,
                       cursor: 'pointer',
-                      border: ativo ? '1px solid #4ade80' : '1px solid rgba(255, 255, 255, 0.12)',
-                      background: ativo ? 'rgba(34, 197, 94, 0.25)' : 'rgba(255, 255, 255, 0.04)',
-                      color: ativo ? '#4ade80' : 'var(--slate-300)',
+                      border: ativo ? '1px solid #16a34a' : '1px solid var(--slate-700, rgba(255, 255, 255, 0.12))',
+                      background: ativo ? 'rgba(34, 197, 94, 0.2)' : 'var(--bg-card-solid, rgba(255, 255, 255, 0.04))',
+                      color: ativo ? '#16a34a' : 'inherit',
                       transition: 'all 0.15s'
                     }}
                   >
@@ -508,25 +508,25 @@ export function ModalNotificarClienteWhatsApp({
 
             {/* Inputs de Data Customizada */}
             {filtroPeriodo === 'custom' && (
-              <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 8 }}>
+              <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap', alignItems: 'center', background: 'var(--bg-card-hover, rgba(0,0,0,0.3))', padding: 10, borderRadius: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--slate-300)', fontWeight: 600 }}>De:</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)', fontWeight: 600 }}>De:</span>
                   <input
                     type="date"
                     className="form-input"
                     value={dataInicioCustom}
                     onChange={(e) => setDataInicioCustom(e.target.value)}
-                    style={{ fontSize: '0.82rem', padding: '6px 10px', background: 'rgba(8,12,16,0.95)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6 }}
+                    style={{ fontSize: '0.82rem', padding: '6px 10px', borderRadius: 6 }}
                   />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--slate-300)', fontWeight: 600 }}>Até:</span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)', fontWeight: 600 }}>Até:</span>
                   <input
                     type="date"
                     className="form-input"
                     value={dataFimCustom}
                     onChange={(e) => setDataFimCustom(e.target.value)}
-                    style={{ fontSize: '0.82rem', padding: '6px 10px', background: 'rgba(8,12,16,0.95)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6 }}
+                    style={{ fontSize: '0.82rem', padding: '6px 10px', borderRadius: 6 }}
                   />
                 </div>
               </div>
@@ -538,15 +538,15 @@ export function ModalNotificarClienteWhatsApp({
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
             gap: 14,
-            background: 'rgba(255, 255, 255, 0.03)',
+            background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.03))',
             padding: 14,
             borderRadius: 12,
-            border: '1px solid rgba(255, 255, 255, 0.07)'
+            border: '1px solid var(--slate-700, rgba(255, 255, 255, 0.07))'
           }}>
             {/* Cliente */}
             <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 6 }}>
-                <Building2 size={14} color="#38bdf8" /> 2. CLIENTE COMPRADOR:
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-400)', fontWeight: 700, marginBottom: 6 }}>
+                <Building2 size={14} color="#0284c7" /> 2. CLIENTE COMPRADOR:
               </label>
               
               {clientesDisponiveisNoPeriodo.length === 0 ? (
@@ -556,7 +556,7 @@ export function ModalNotificarClienteWhatsApp({
                   border: '1px solid rgba(245, 158, 11, 0.3)',
                   borderRadius: 8,
                   fontSize: '0.80rem',
-                  color: '#fbbf24'
+                  color: '#d97706'
                 }}>
                   Nenhum cliente teve blocos envelopados neste período.
                 </div>
@@ -570,9 +570,7 @@ export function ModalNotificarClienteWhatsApp({
                     padding: '9px 12px',
                     minHeight: 42,
                     borderRadius: 8,
-                    background: 'rgba(8, 12, 16, 0.95)',
-                    color: '#fff',
-                    border: '1px solid rgba(34, 197, 94, 0.5)',
+                    border: '1px solid #16a34a',
                     fontSize: '0.86rem',
                     fontWeight: 700
                   }}
@@ -588,8 +586,8 @@ export function ModalNotificarClienteWhatsApp({
 
             {/* WhatsApp de Destino */}
             <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, marginBottom: 6 }}>
-                <Phone size={14} color="#4ade80" /> WHATSAPP DE DESTINO:
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.76rem', color: 'var(--slate-400)', fontWeight: 700, marginBottom: 6 }}>
+                <Phone size={14} color="#16a34a" /> WHATSAPP DE DESTINO:
               </label>
               <input
                 type="text"
@@ -602,9 +600,7 @@ export function ModalNotificarClienteWhatsApp({
                   padding: '9px 12px',
                   minHeight: 42,
                   borderRadius: 8,
-                  background: 'rgba(8, 12, 16, 0.95)',
-                  color: '#4ade80',
-                  border: '1px solid rgba(34, 197, 94, 0.4)',
+                  border: '1px solid rgba(34, 197, 94, 0.5)',
                   fontSize: '0.86rem',
                   fontWeight: 700
                 }}
@@ -618,19 +614,19 @@ export function ModalNotificarClienteWhatsApp({
           {/* PASSO 3: BLOCOS ENVELOPADOS ENCONTRADOS */}
           {clienteSelecionado && (
             <div style={{
-              background: 'rgba(255, 255, 255, 0.03)',
+              background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.03))',
               padding: 14,
               borderRadius: 12,
-              border: '1px solid rgba(255, 255, 255, 0.07)'
+              border: '1px solid var(--slate-700, rgba(255, 255, 255, 0.07))'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Box size={16} color="#4ade80" />
-                  <span style={{ fontSize: '0.84rem', color: '#fff', fontWeight: 700 }}>
+                  <Box size={16} color="#16a34a" />
+                  <span style={{ fontSize: '0.84rem', color: 'inherit', fontWeight: 800 }}>
                     Blocos Envelopados Encontrados ({blocosFiltrados.length})
                   </span>
                   {blocosParaEnvio.length > 0 && (
-                    <span style={{ fontSize: '0.76rem', color: '#4ade80', background: 'rgba(34,197,94,0.15)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                    <span style={{ fontSize: '0.76rem', color: '#16a34a', background: 'rgba(34,197,94,0.15)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
                       {blocosParaEnvio.length} selecionado{blocosParaEnvio.length > 1 ? 's' : ''} • {pesoTotalToneladas} t
                     </span>
                   )}
@@ -640,13 +636,12 @@ export function ModalNotificarClienteWhatsApp({
                   <button
                     type="button"
                     onClick={toggleTodos}
+                    className="btn btn-secondary"
                     style={{
                       fontSize: '0.74rem',
                       padding: '4px 10px',
                       borderRadius: 6,
-                      background: 'rgba(255, 255, 255, 0.06)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      color: 'var(--slate-300)',
+                      fontWeight: 600,
                       cursor: 'pointer'
                     }}
                   >
@@ -680,8 +675,8 @@ export function ModalNotificarClienteWhatsApp({
                         justifyContent: 'space-between',
                         padding: '8px 12px',
                         borderRadius: 8,
-                        background: selecionado ? 'rgba(34, 197, 94, 0.12)' : 'rgba(0,0,0,0.25)',
-                        border: selecionado ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(255, 255, 255, 0.05)',
+                        background: selecionado ? 'rgba(34, 197, 94, 0.15)' : 'var(--bg-card-solid, rgba(0,0,0,0.25))',
+                        border: selecionado ? '1px solid #16a34a' : '1px solid var(--slate-700, rgba(255, 255, 255, 0.05))',
                         cursor: 'pointer',
                         transition: 'all 0.15s'
                       }}
@@ -691,14 +686,14 @@ export function ModalNotificarClienteWhatsApp({
                           type="checkbox"
                           checked={selecionado}
                           onChange={() => {}}
-                          style={{ cursor: 'pointer', accentColor: '#22c55e', width: 16, height: 16 }}
+                          style={{ cursor: 'pointer', accentColor: '#16a34a', width: 16, height: 16 }}
                         />
                         <div>
-                          <strong style={{ color: '#fff', fontSize: '0.84rem' }}>
+                          <strong style={{ color: 'inherit', fontSize: '0.84rem' }}>
                             Bloco {b.numero_bloco}
                           </strong>
                           {b.material && (
-                            <span style={{ fontSize: '0.74rem', color: '#38bdf8', marginLeft: 8 }}>
+                            <span style={{ fontSize: '0.74rem', color: '#0284c7', marginLeft: 8, fontWeight: 600 }}>
                               • {b.material}
                             </span>
                           )}
@@ -712,8 +707,8 @@ export function ModalNotificarClienteWhatsApp({
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.76rem', color: 'var(--slate-400)' }}>
                         <span>{pedFormatada}</span>
-                        <strong style={{ color: '#fbbf24' }}>{pesoFmt}</strong>
-                        {dtFmt && <span style={{ color: 'var(--slate-500)' }}>{dtFmt}</span>}
+                        <strong style={{ color: '#d97706' }}>{pesoFmt}</strong>
+                        {dtFmt && <span>{dtFmt}</span>}
                       </div>
                     </div>
                   );
@@ -726,12 +721,13 @@ export function ModalNotificarClienteWhatsApp({
           {mensagemWhatsApp && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <label style={{ fontSize: '0.76rem', color: 'var(--slate-300)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Sparkles size={14} color="#4ade80" /> PRÉVIA DA MENSAGEM:
+                <label style={{ fontSize: '0.76rem', color: 'var(--slate-400)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Sparkles size={14} color="#16a34a" /> PRÉVIA DA MENSAGEM:
                 </label>
                 <button
                   type="button"
                   onClick={handleCopiarMensagem}
+                  className="btn btn-secondary"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -739,9 +735,8 @@ export function ModalNotificarClienteWhatsApp({
                     fontSize: '0.74rem',
                     padding: '4px 10px',
                     borderRadius: 6,
-                    background: copiado ? 'rgba(34, 197, 94, 0.2)' : 'rgba(255, 255, 255, 0.06)',
-                    border: copiado ? '1px solid #4ade80' : '1px solid rgba(255, 255, 255, 0.15)',
-                    color: copiado ? '#4ade80' : 'var(--slate-300)',
+                    color: copiado ? '#16a34a' : 'inherit',
+                    borderColor: copiado ? '#16a34a' : undefined,
                     cursor: 'pointer'
                   }}
                 >
@@ -751,12 +746,12 @@ export function ModalNotificarClienteWhatsApp({
               </div>
 
               <div style={{
-                background: '#0b1f16',
-                border: '1px solid rgba(34, 197, 94, 0.3)',
+                background: '#07130e',
+                border: '1px solid rgba(34, 197, 94, 0.35)',
                 borderRadius: 12,
                 padding: '14px 18px',
                 fontSize: '0.82rem',
-                color: '#e2e8f0',
+                color: '#86efac',
                 lineHeight: 1.5,
                 whiteSpace: 'pre-wrap',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -774,11 +769,11 @@ export function ModalNotificarClienteWhatsApp({
         {/* Rodapé com Ações */}
         <div style={{
           padding: '16px 22px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          borderTop: '1px solid var(--slate-700, rgba(255, 255, 255, 0.1))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'rgba(0, 0, 0, 0.35)',
+          background: 'var(--bg-card-hover, rgba(0, 0, 0, 0.35))',
           flexWrap: 'wrap',
           gap: 12
         }}>
