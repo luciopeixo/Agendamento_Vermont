@@ -704,11 +704,13 @@ export const processarRomaneioPdfTexto = async (textoCompleto) => {
     const matchDimensoes = linha.match(/^(.+?)\s+(\d+(?:[,.]\d+)?\s*[xX*]\s*\d+(?:[,.]\d+)?\s*[xX*]\s*.*)$/i);
     
     if (matchDimensoes) {
-      let parteAnterior = matchDimensoes[1].trim().replace(/^(?:\d{1,3}[.)\s-]+)\s*/, '');
+      let parteAnterior = matchDimensoes[1].trim();
+      // Só remove numeração de item (ex: "1. 126" ou "1 - 126" ou "1) 126") se houver outro número de bloco em seguida
+      parteAnterior = parteAnterior.replace(/^(?:Item\s+)?\d{1,2}[.)-]\s+(?=\d|VT-)/i, '');
       const restanteLinha = matchDimensoes[2].trim();
 
       // Expressão para localizar onde se inicia o nome do material ou tipo de rocha
-      const regexInicioMaterial = /\b(QUARTZITO|GRANITO|BASALTO|MARMORE|MÁRMORE|PEGMATITO|ROCHA|TAJ\s*MAHAL|NEGRESCO|DEL\s*MARE|NAURIKA|ZITAN|CRISTALLO|RAFFINATO|GUINESS|NOUVEAU|SCENARIO|CHATEAU\s*BLANC|BRECCIA|INFINITY|ROMA\s*IMPERIALE|BLUE\s*DEEP|BLUE\s*MARE|BLUE\s*ROMA|TELLUS|ATLANTIC|BROWN\s*STRINGS|JJ\s*BROWN|PANETTONE|EVORA|KOUROS|BROWNIE|ILLUSION|VERDE\s*ESPIRAL|PERLA\s*VENATA|SERROTE|JAIBARAS|BEBERIBE)\b/i;
+      const regexInicioMaterial = /\b(QUARTZITO|GRANITO|BASALTO|MARMORE|MÁRMORE|PEGMATITO|DOLOMITO|CALCITO|ROCHA|TAJ\s*MAHAL|NEGRESCO|DEL\s*MARE|NAURIKA|ZITAN|CRISTALLO|RAFFINATO|GUINESS|NOUVEAU|SCENARIO|CHATEAU\s*BLANC|BRECCIA\s*VIOLA|BRECCIA\s*IMPERIALE|BRECCIA|INFINITY\s*BROWN|INFINITY\s*BLACK|INFINITY|ROMA\s*IMPERIALE|BLUE\s*DEEP|BLUE\s*MARE|BLUE\s*ROMA|TELLUS\s*BLUE|ATLANTIC\s*BLUE|BROWN\s*STRINGS|JJ\s*BROWN|PANETTONE|EVORA|KOUROS|BROWNIE|TELLUS|ILLUSION|VERDE\s*ESPIRAL|PERLA\s*VENATA|SERROTE|JAIBARAS|BEBERIBE)\b/i;
 
       let numeroBlocoBruto = '';
       let materialBruto = '';
