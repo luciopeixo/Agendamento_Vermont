@@ -261,9 +261,22 @@ export const normalizarNumeroBloco = (bloco = '') => {
     if (anoNum >= 20 && anoNum <= 35) {
       str = `0${seq}${ano}`;
     }
+  } else if (/^\d{3}([A-Za-z]{1,5})$/.test(str)) {
+    const seq = str.slice(0, 1);
+    const ano = str.slice(1, 3);
+    const sufixo = str.slice(3).toUpperCase();
+    const anoNum = parseInt(ano, 10);
+    if (anoNum >= 20 && anoNum <= 35) {
+      str = `0${seq}${ano}${sufixo}`;
+    }
   } else if (/^\d\/\d{2}$/.test(str)) {
     const partes = str.split('/');
     str = `0${partes[0]}/${partes[1]}`;
+  } else if (/^\d\/\d{2}([A-Za-z]{1,5})$/.test(str)) {
+    const m = str.match(/^(\d)\/(\d{2})([A-Za-z]{1,5})$/);
+    if (m) {
+      str = `0${m[1]}/${m[2]}${m[3].toUpperCase()}`;
+    }
   }
 
   return str.replace(/[.\s]+$/, '');
