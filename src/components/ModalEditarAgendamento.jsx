@@ -387,9 +387,9 @@ export function ModalEditarAgendamento({
           maxHeight: '94vh',
           overflowY: 'auto',
           padding: '24px 28px',
-          background: '#0d1310',
+          background: 'var(--bg-card-solid, #0d1310)',
           border: '1px solid var(--vermont-green-border)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.85), var(--vermont-green-glow)',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), var(--vermont-green-glow)',
           position: 'relative',
           borderRadius: 16
         }}
@@ -400,7 +400,7 @@ export function ModalEditarAgendamento({
           alignItems: 'center',
           justifyContent: 'space-between',
           paddingBottom: 16,
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          borderBottom: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
           marginBottom: 20
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -413,15 +413,15 @@ export function ModalEditarAgendamento({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#4ade80'
+              color: 'var(--vermont-green-light)'
             }}>
               <Edit3 size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.25rem', margin: 0, color: '#fff' }}>
+              <h2 style={{ fontSize: '1.25rem', margin: 0, color: 'var(--slate-100)' }}>
                 Editar Informações do Carregamento
               </h2>
-              <span style={{ fontSize: '0.8rem', color: '#86efac', fontFamily: 'monospace' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--vermont-green-light)', fontFamily: 'monospace', fontWeight: 600 }}>
                 Protocolo: #{agendamento.id ? String(agendamento.id).substring(0, 8).toUpperCase() : 'N/A'}
               </span>
             </div>
@@ -431,7 +431,7 @@ export function ModalEditarAgendamento({
             type="button"
             onClick={onFechar}
             style={{
-              background: 'rgba(255, 255, 255, 0.05)',
+              background: 'transparent',
               border: 'none',
               color: 'var(--slate-400)',
               cursor: 'pointer',
@@ -465,12 +465,12 @@ export function ModalEditarAgendamento({
           
           {/* Seção 1: Dados do Bloco & Pedreira */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
+            background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.02))',
+            border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
             borderRadius: 10,
             padding: '16px 18px'
           }}>
-            <strong style={{ color: '#4ade80', fontSize: '0.88rem', display: 'block', marginBottom: 12 }}>
+            <strong style={{ color: 'var(--vermont-green-light)', fontSize: '0.88rem', display: 'block', marginBottom: 12 }}>
               🪨 Informações do Bloco & Pedreira
             </strong>
 
@@ -638,12 +638,12 @@ export function ModalEditarAgendamento({
 
           {/* Seção 2: Cliente Destinatário */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
+            background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.02))',
+            border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
             borderRadius: 10,
             padding: '16px 18px'
           }}>
-            <strong style={{ color: '#4ade80', fontSize: '0.88rem', display: 'block', marginBottom: 12 }}>
+            <strong style={{ color: 'var(--vermont-green-light)', fontSize: '0.88rem', display: 'block', marginBottom: 12 }}>
               🏢 Cliente Destinatário
             </strong>
 
@@ -695,12 +695,12 @@ export function ModalEditarAgendamento({
 
           {/* Seção 3: Data e Horário */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
+            background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.02))',
+            border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
             borderRadius: 10,
             padding: '16px 18px'
           }}>
-            <strong style={{ color: '#4ade80', fontSize: '0.88rem', display: 'block', marginBottom: 12 }}>
+            <strong style={{ color: 'var(--vermont-green-light)', fontSize: '0.88rem', display: 'block', marginBottom: 12 }}>
               📅 Data & Horário do Carregamento
             </strong>
 
@@ -732,12 +732,12 @@ export function ModalEditarAgendamento({
 
           {/* Seção 4: Transporte, Motorista e Placas */}
           <div style={{
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
+            background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.02))',
+            border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
             borderRadius: 10,
             padding: '16px 18px'
           }}>
-            <strong style={{ color: '#4ade80', fontSize: '0.88rem', display: 'block', marginBottom: 12 }}>
+            <strong style={{ color: 'var(--vermont-green-light)', fontSize: '0.88rem', display: 'block', marginBottom: 12 }}>
               🚛 Transporte, Motorista & Placas
             </strong>
 
@@ -941,12 +941,12 @@ export function ModalEditarAgendamento({
 
           {/* Seção 4: Campo de Observações / Ocorrências */}
           <div style={{
-            background: 'rgba(0, 118, 44, 0.08)',
+            background: 'var(--vermont-green-subtle)',
             border: '1px solid var(--vermont-green-border)',
             borderRadius: 10,
             padding: '16px 18px'
           }}>
-            <label className="form-label" style={{ color: '#4ade80', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <label className="form-label" style={{ color: 'var(--vermont-green-light)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
               📝 Observações Operacionais, Ocorrências & Balança
             </label>
             <p style={{ margin: '0 0 8px 0', fontSize: '0.76rem', color: 'var(--slate-400)' }}>
@@ -965,12 +965,12 @@ export function ModalEditarAgendamento({
           {/* Seção 5: Registro de Auditoria / Histórico de Alterações */}
           {normalizarHistoricoStatus(agendamento.historico_status).length > 0 && (
             <div style={{
-              background: 'rgba(15, 23, 42, 0.65)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'var(--bg-card-hover, rgba(15, 23, 42, 0.65))',
+              border: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
               borderRadius: 10,
               padding: '14px 18px'
             }}>
-              <label className="form-label" style={{ color: '#38bdf8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <label className="form-label" style={{ color: '#0284c7', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                 <History size={15} /> Histórico de Alterações ({normalizarHistoricoStatus(agendamento.historico_status).length})
               </label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
@@ -980,8 +980,8 @@ export function ModalEditarAgendamento({
                   return (
                     <div key={h.id || i} style={{
                       fontSize: '0.74rem',
-                      background: isEdicao ? 'rgba(56, 189, 248, 0.05)' : 'rgba(255, 255, 255, 0.03)',
-                      border: isEdicao ? '1px solid rgba(56, 189, 248, 0.2)' : '1px solid rgba(255, 255, 255, 0.05)',
+                      background: isEdicao ? 'var(--info-bg)' : 'var(--bg-card, rgba(255, 255, 255, 0.03))',
+                      border: isEdicao ? '1px solid var(--info-border)' : '1px solid var(--border-subtle)',
                       padding: '6px 10px',
                       borderRadius: 6,
                       display: 'flex',
@@ -993,18 +993,18 @@ export function ModalEditarAgendamento({
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         {isEdicao ? (
                           <>
-                            <span style={{ color: '#38bdf8', fontWeight: 600 }}>✏️ {h.descricao || 'Alteração Cadastral'}</span>
+                            <span style={{ color: '#0284c7', fontWeight: 600 }}>✏️ {h.descricao || 'Alteração Cadastral'}</span>
                           </>
                         ) : (
                           <>
                             <span style={{ color: 'var(--slate-400)' }}>{h.status_anterior}</span>
-                            <ArrowRight size={11} color="var(--slate-500)" />
-                            <span style={{ color: '#4ade80', fontWeight: 600 }}>{h.status_novo}</span>
+                            <ArrowRight size={11} color="var(--slate-400)" />
+                            <span style={{ color: 'var(--vermont-green)', fontWeight: 600 }}>{h.status_novo}</span>
                           </>
                         )}
                       </div>
                       <div style={{ color: 'var(--slate-400)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span><strong>{h.usuario_nome}</strong> ({h.usuario_role})</span>
+                        <span><strong style={{ color: 'var(--slate-200)' }}>{h.usuario_nome}</strong> ({h.usuario_role})</span>
                         <span>•</span>
                         <span>{h.data_hora ? new Date(h.data_hora).toLocaleString('pt-BR') : ''}</span>
                       </div>

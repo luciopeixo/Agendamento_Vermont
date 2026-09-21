@@ -24,19 +24,19 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
   const getCorStatus = (status) => {
     switch (status) {
       case 'Aguardando Liberação':
-        return { bg: 'rgba(245, 158, 11, 0.18)', border: 'rgba(245, 158, 11, 0.45)', text: '#fbbf24', dot: '#f59e0b' };
+        return { bg: 'var(--warning-bg)', border: 'var(--warning-border)', text: 'var(--warning-title)', dot: '#f59e0b' };
       case 'Liberado para Carregar':
       case 'Confirmado':
-        return { bg: 'rgba(168, 85, 247, 0.18)', border: 'rgba(192, 132, 252, 0.45)', text: '#c084fc', dot: '#a855f7' };
+        return { bg: 'rgba(168, 85, 247, 0.15)', border: 'rgba(192, 132, 252, 0.45)', text: '#9333ea', dot: '#a855f7' };
       case 'Carregando':
-        return { bg: 'rgba(56, 189, 248, 0.18)', border: 'rgba(56, 189, 248, 0.45)', text: '#38bdf8', dot: '#0284c7' };
+        return { bg: 'var(--info-bg)', border: 'var(--info-border)', text: '#0284c7', dot: '#0284c7' };
       case 'Finalizado':
       case 'Carregado':
-        return { bg: 'rgba(16, 185, 129, 0.18)', border: 'rgba(16, 185, 129, 0.45)', text: '#34d399', dot: '#10b981' };
+        return { bg: 'var(--success-bg)', border: 'var(--success-border)', text: 'var(--vermont-green)', dot: '#10b981' };
       case 'Cancelado':
-        return { bg: 'rgba(239, 68, 68, 0.18)', border: 'rgba(239, 68, 68, 0.45)', text: '#f87171', dot: '#ef4444' };
+        return { bg: 'var(--danger-bg)', border: 'var(--danger-border)', text: 'var(--danger-title)', dot: '#ef4444' };
       default:
-        return { bg: 'rgba(255, 255, 255, 0.08)', border: 'rgba(255, 255, 255, 0.15)', text: '#e2e8f0', dot: '#94a3b8' };
+        return { bg: 'var(--bg-card-hover)', border: 'var(--border-subtle)', text: 'var(--slate-200)', dot: '#94a3b8' };
     }
   };
 
@@ -63,9 +63,9 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
-          background: '#0d1311',
+          background: 'var(--bg-card-solid, #0d1311)',
           border: '1px solid var(--vermont-green-border)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.9), var(--vermont-green-glow)',
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), var(--vermont-green-glow)',
           borderRadius: 16,
           overflow: 'hidden'
         }}
@@ -73,8 +73,8 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
         {/* Cabeçalho */}
         <div style={{
           padding: '18px 24px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          background: 'rgba(0, 118, 44, 0.12)',
+          borderBottom: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
+          background: 'var(--vermont-green-subtle)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
@@ -84,9 +84,9 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
               width: 40,
               height: 40,
               borderRadius: 10,
-              background: 'rgba(0, 118, 44, 0.25)',
-              border: '1px solid #009e3b',
-              color: '#4ade80',
+              background: 'var(--vermont-green-subtle)',
+              border: '1px solid var(--vermont-green-border)',
+              color: 'var(--vermont-green-light)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -94,7 +94,7 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
               <History size={22} />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', margin: 0, color: '#fff' }}>
+              <h2 style={{ fontSize: '1.2rem', margin: 0, color: 'var(--slate-100)' }}>
                 Histórico de Alterações de Status
               </h2>
               <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--slate-400)' }}>
@@ -106,7 +106,7 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
           <button
             onClick={onFechar}
             style={{
-              background: 'rgba(255, 255, 255, 0.05)',
+              background: 'transparent',
               border: 'none',
               color: 'var(--slate-400)',
               cursor: 'pointer',
@@ -121,17 +121,17 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
         {/* Resumo do Agendamento */}
         <div style={{
           padding: '14px 24px',
-          background: 'rgba(255, 255, 255, 0.02)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+          background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.02))',
+          borderBottom: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.06))',
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           gap: 10,
           fontSize: '0.84rem'
         }}>
-          <div><span style={{ color: 'var(--slate-400)' }}>Bloco:</span> <strong style={{ color: '#fff' }}>{agendamento.numero_bloco}</strong></div>
-          <div><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: '#fff' }}>{agendamento.pedreira}</strong></div>
-          <div><span style={{ color: 'var(--slate-400)' }}>Material:</span> <strong style={{ color: '#86efac' }}>{agendamento.material}</strong></div>
-          <div><span style={{ color: 'var(--slate-400)' }}>Motorista:</span> <strong style={{ color: '#fff' }}>{agendamento.motorista_nome}</strong></div>
+          <div><span style={{ color: 'var(--slate-400)' }}>Bloco:</span> <strong style={{ color: 'var(--slate-100)' }}>{agendamento.numero_bloco}</strong></div>
+          <div><span style={{ color: 'var(--slate-400)' }}>Pedreira:</span> <strong style={{ color: 'var(--slate-100)' }}>{agendamento.pedreira}</strong></div>
+          <div><span style={{ color: 'var(--slate-400)' }}>Material:</span> <strong style={{ color: 'var(--vermont-green-light)' }}>{agendamento.material}</strong></div>
+          <div><span style={{ color: 'var(--slate-400)' }}>Motorista:</span> <strong style={{ color: 'var(--slate-100)' }}>{agendamento.motorista_nome}</strong></div>
           <div>
             <span style={{ color: 'var(--slate-400)' }}>Status Atual:</span>{' '}
             <strong style={{ color: getCorStatus(agendamento.status).text }}>
@@ -156,9 +156,9 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
               color: 'var(--slate-400)',
               fontSize: '0.88rem'
             }}>
-              <AlertCircle size={32} color="var(--slate-500)" style={{ margin: '0 auto 10px auto', display: 'block' }} />
+              <AlertCircle size={32} color="var(--slate-400)" style={{ margin: '0 auto 10px auto', display: 'block' }} />
               Nenhuma alteração de status registrada após a criação inicial.
-              <div style={{ marginTop: 8, fontSize: '0.78rem', color: '#86efac' }}>
+              <div style={{ marginTop: 8, fontSize: '0.78rem', color: 'var(--vermont-green-light)' }}>
                 Status inicial: <strong>{agendamento.status || 'Aguardando Liberação'}</strong> criado em{' '}
                 {formatarDataHoraCompleta(agendamento.created_at)}
               </div>
@@ -172,7 +172,7 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                 bottom: 8,
                 left: 7,
                 width: 2,
-                background: 'rgba(0, 118, 44, 0.4)'
+                background: 'var(--vermont-green-border, rgba(0, 118, 44, 0.4))'
               }} />
 
               {historico.map((item, index) => {
@@ -195,21 +195,21 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                       height: 16,
                       borderRadius: '50%',
                       background: dotColor,
-                      border: '3px solid #0d1311',
+                      border: '3px solid var(--bg-card-solid, #0d1311)',
                       boxShadow: `0 0 10px ${dotColor}`
                     }} />
 
                     {/* Card do Evento */}
                     <div style={{
-                      background: isEdicaoCampos ? 'rgba(56, 189, 248, 0.04)' : 'rgba(255, 255, 255, 0.03)',
-                      border: isEdicaoCampos ? '1px solid rgba(56, 189, 248, 0.25)' : '1px solid rgba(255, 255, 255, 0.08)',
+                      background: isEdicaoCampos ? 'var(--info-bg)' : 'var(--bg-card-hover, rgba(255, 255, 255, 0.03))',
+                      border: isEdicaoCampos ? '1px solid var(--info-border)' : '1px solid var(--border-subtle)',
                       borderRadius: 10,
                       padding: '12px 16px'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <User size={15} color={isEdicaoCampos ? "#38bdf8" : "#4ade80"} />
-                          <strong style={{ color: '#fff', fontSize: '0.88rem' }}>
+                          <User size={15} color={isEdicaoCampos ? "#0284c7" : "var(--vermont-green-light)"} />
+                          <strong style={{ color: 'var(--slate-100)', fontSize: '0.88rem' }}>
                             {item.usuario_nome || 'Usuário'}
                           </strong>
                           {item.usuario_role && (
@@ -222,9 +222,9 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                             padding: '1px 7px',
                             borderRadius: 4,
                             fontWeight: 600,
-                            background: isEdicaoCampos ? 'rgba(56, 189, 248, 0.15)' : 'rgba(74, 222, 128, 0.15)',
-                            border: isEdicaoCampos ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid rgba(74, 222, 128, 0.4)',
-                            color: isEdicaoCampos ? '#38bdf8' : '#4ade80'
+                            background: isEdicaoCampos ? 'var(--info-bg)' : 'var(--vermont-green-subtle)',
+                            border: isEdicaoCampos ? '1px solid var(--info-border)' : '1px solid var(--vermont-green-border)',
+                            color: isEdicaoCampos ? '#0284c7' : 'var(--vermont-green-light)'
                           }}>
                             {isEdicaoCampos ? '✏️ Alteração Cadastral' : '🔄 Mudança de Status'}
                           </span>
@@ -247,12 +247,12 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                           display: 'flex',
                           flexDirection: 'column',
                           gap: 6,
-                          background: 'rgba(0, 0, 0, 0.35)',
-                          border: '1px solid rgba(56, 189, 248, 0.15)',
+                          background: 'var(--bg-card-hover, rgba(0, 0, 0, 0.35))',
+                          border: '1px solid var(--info-border)',
                           borderRadius: 8,
                           padding: '10px 12px'
                         }}>
-                          <div style={{ fontSize: '0.75rem', color: '#7dd3fc', fontWeight: 600, marginBottom: 2 }}>
+                          <div style={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 700, marginBottom: 2 }}>
                             Campos alterados nesta edição:
                           </div>
                           {item.alteracoes.map((alt, idx) => (
@@ -262,27 +262,28 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                               gap: 8,
                               fontSize: '0.8rem',
                               flexWrap: 'wrap',
-                              borderBottom: idx === item.alteracoes.length - 1 ? 'none' : '1px dashed rgba(255, 255, 255, 0.06)',
+                              borderBottom: idx === item.alteracoes.length - 1 ? 'none' : '1px dashed var(--border-subtle)',
                               paddingBottom: idx === item.alteracoes.length - 1 ? 0 : 4
                             }}>
-                              <strong style={{ color: '#cbd5e1', minWidth: 140 }}>
+                              <strong style={{ color: 'var(--slate-200)', minWidth: 140 }}>
                                 • {alt.label || alt.campo}:
                               </strong>
                               <span style={{
-                                color: '#fca5a5',
+                                color: 'var(--danger-title)',
                                 textDecoration: 'line-through',
-                                background: 'rgba(239, 68, 68, 0.12)',
+                                background: 'var(--danger-bg)',
                                 padding: '1px 6px',
                                 borderRadius: 4,
-                                fontSize: '0.76rem'
+                                fontSize: '0.76rem',
+                                fontWeight: 600
                               }}>
                                 {alt.de}
                               </span>
                               <ArrowRight size={13} color="var(--slate-400)" />
                               <span style={{
-                                color: '#86efac',
+                                color: 'var(--vermont-green)',
                                 fontWeight: 700,
-                                background: 'rgba(34, 197, 94, 0.15)',
+                                background: 'var(--vermont-green-subtle)',
                                 padding: '1px 6px',
                                 borderRadius: 4,
                                 fontSize: '0.76rem'
@@ -300,8 +301,8 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                           display: 'flex',
                           alignItems: 'center',
                           gap: 8,
-                          background: 'rgba(0, 0, 0, 0.35)',
-                          border: '1px solid rgba(255, 255, 255, 0.05)',
+                          background: 'var(--bg-card-hover, rgba(0, 0, 0, 0.35))',
+                          border: '1px solid var(--border-subtle)',
                           borderRadius: 6,
                           padding: '6px 10px',
                           fontSize: '0.8rem',
@@ -320,7 +321,7 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                             {item.status_anterior}
                           </span>
 
-                          <ArrowRight size={14} color="var(--slate-500)" />
+                          <ArrowRight size={14} color="var(--slate-400)" />
 
                           <span style={{ color: 'var(--slate-400)', fontSize: '0.75rem' }}>Para:</span>
                           <span style={{
@@ -353,12 +354,12 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
                   width: 16,
                   height: 16,
                   borderRadius: '50%',
-                  background: '#64748b',
-                  border: '3px solid #0d1311'
+                  background: 'var(--slate-400)',
+                  border: '3px solid var(--bg-card-solid, #0d1311)'
                 }} />
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.02))',
+                  border: '1px solid var(--border-subtle)',
                   borderRadius: 10,
                   padding: '10px 14px',
                   fontSize: '0.8rem',
@@ -377,8 +378,8 @@ export function ModalHistoricoStatus({ agendamento, onFechar }) {
         {/* Rodapé */}
         <div style={{
           padding: '14px 24px',
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-          background: 'rgba(0, 0, 0, 0.2)',
+          borderTop: '1px solid var(--border-subtle, rgba(255, 255, 255, 0.08))',
+          background: 'var(--bg-card-hover, rgba(0, 0, 0, 0.2))',
           display: 'flex',
           justifyContent: 'flex-end'
         }}>
