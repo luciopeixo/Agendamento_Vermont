@@ -945,9 +945,9 @@ export function PainelGestao({
               width: 42,
               height: 42,
               borderRadius: 10,
-              background: 'rgba(245, 158, 11, 0.25)',
-              border: '1px solid rgba(245, 158, 11, 0.5)',
-              color: '#fbbf24',
+              background: 'rgba(245, 158, 11, 0.2)',
+              border: '1px solid rgba(217, 119, 6, 0.4)',
+              color: '#d97706',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -956,14 +956,14 @@ export function PainelGestao({
               <AlertTriangle size={24} />
             </div>
             <div>
-              <div style={{ fontSize: '0.98rem', fontWeight: 800, color: 'inherit', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: '0.98rem', fontWeight: 800, color: 'var(--slate-100)', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span>
                   {pendenciasAnteriores.length === 1
                     ? '1 veículo de data anterior ainda não foi finalizado'
                     : `${pendenciasAnteriores.length} veículos de datas anteriores ainda não foram finalizados`}
                 </span>
                 <span className="badge" style={{
-                  background: 'rgba(245, 158, 11, 0.25)',
+                  background: 'rgba(245, 158, 11, 0.18)',
                   border: '1px solid #d97706',
                   color: '#b45309',
                   fontSize: '0.72rem',
@@ -1431,63 +1431,67 @@ export function PainelGestao({
         {/* Card de Alerta de Pendências de Dias Anteriores */}
         <div 
           className="glass-panel" 
-          onClick={() => setExibindoPendenciasAnteriores(prev => !prev)}
+          onClick={() => {
+            if (pendenciasAnteriores.length > 0) {
+              setExibindoPendenciasAnteriores(!exibindoPendenciasAnteriores);
+            }
+          }}
           style={{ 
             padding: '14px 16px', 
             borderLeft: '4px solid #f59e0b',
-            cursor: 'pointer',
-            background: exibindoPendenciasAnteriores ? 'rgba(245, 158, 11, 0.18)' : undefined,
+            cursor: pendenciasAnteriores.length > 0 ? 'pointer' : 'default',
+            background: exibindoPendenciasAnteriores ? 'rgba(245, 158, 11, 0.15)' : undefined,
             boxShadow: exibindoPendenciasAnteriores ? '0 0 15px rgba(245, 158, 11, 0.3)' : undefined,
             transition: 'all 0.2s'
           }}
           title="Clique para alternar entre ver a lista normal ou as pendências de datas anteriores"
         >
-          <span style={{ fontSize: '0.74rem', color: '#fbbf24', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: '0.74rem', color: '#d97706', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
             <AlertTriangle size={13} /> Pendentes Anteriores
           </span>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: pendenciasAnteriores.length > 0 ? '#fbbf24' : '#94a3b8', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: pendenciasAnteriores.length > 0 ? '#d97706' : 'var(--slate-400)', marginTop: 4 }}>
             {pendenciasAnteriores.length}
           </div>
-          <span style={{ fontSize: '0.72rem', color: exibindoPendenciasAnteriores ? '#fbbf24' : 'var(--slate-400)', fontWeight: exibindoPendenciasAnteriores ? 700 : 400 }}>
+          <span style={{ fontSize: '0.72rem', color: exibindoPendenciasAnteriores ? '#b45309' : 'var(--slate-400)', fontWeight: exibindoPendenciasAnteriores ? 700 : 400 }}>
             {exibindoPendenciasAnteriores ? 'Visualizando agora 👁️' : 'Não finalizados de ontem/antes'}
           </span>
         </div>
 
         <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
-          <span style={{ fontSize: '0.74rem', color: '#fbbf24', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: '0.74rem', color: '#d97706', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
             <Clock size={13} /> Aguardando Liberação
           </span>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706', marginTop: 4 }}>
             {agendamentos.filter(a => a.status === 'Aguardando Liberação').length}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Aguardando aval</span>
         </div>
 
         <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #a855f7' }}>
-          <span style={{ fontSize: '0.74rem', color: '#c084fc', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: '0.74rem', color: '#9333ea', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
             <CheckCircle2 size={13} /> Liberados p/ Carregar
           </span>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#c084fc', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#9333ea', marginTop: 4 }}>
             {agendamentos.filter(a => a.status === 'Liberado para Carregar' || a.status === 'Confirmado').length}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Aprovados p/ pátio</span>
         </div>
 
         <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #38bdf8' }}>
-          <span style={{ fontSize: '0.74rem', color: '#38bdf8', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: '0.74rem', color: '#0284c7', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
             <PlayCircle size={13} /> Carregando
           </span>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38bdf8', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0284c7', marginTop: 4 }}>
             {agendamentos.filter(a => a.status === 'Carregando').length}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Em operação na pedreira</span>
         </div>
 
         <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #10b981' }}>
-          <span style={{ fontSize: '0.74rem', color: '#34d399', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: '0.74rem', color: '#16a34a', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
             <CheckCheck size={13} /> Finalizados
           </span>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#34d399', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a', marginTop: 4 }}>
             {agendamentos.filter(a => a.status === 'Finalizado' || a.status === 'Carregado').length}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Pesagem & NFE ok</span>
@@ -1500,7 +1504,7 @@ export function PainelGestao({
           marginBottom: 20,
           padding: '14px 18px',
           background: 'rgba(245, 158, 11, 0.12)',
-          border: '1px solid rgba(245, 158, 11, 0.45)',
+          border: '1px solid rgba(217, 119, 6, 0.4)',
           borderRadius: 12,
           display: 'flex',
           alignItems: 'center',
@@ -1510,8 +1514,8 @@ export function PainelGestao({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              background: '#f59e0b',
-              color: '#000',
+              background: '#d97706',
+              color: '#fff',
               borderRadius: '50%',
               width: 32,
               height: 32,
@@ -1522,13 +1526,13 @@ export function PainelGestao({
               fontSize: '1rem',
               flexShrink: 0
             }}>
-              <AlertTriangle size={18} color="#000" />
+              <AlertTriangle size={18} color="#fff" />
             </div>
             <div>
-              <strong style={{ color: '#fbbf24', fontSize: '0.95rem', display: 'block' }}>
+              <strong style={{ color: '#b45309', fontSize: '0.95rem', display: 'block', fontWeight: 800 }}>
                 Atenção Admin: {finalizadosSemNF.length} agendamento{finalizadosSemNF.length > 1 ? 's' : ''} com status "Finalizado" sem confirmação de Nota Fiscal (NF)
               </strong>
-              <span style={{ color: '#fef3c7', fontSize: '0.82rem' }}>
+              <span style={{ color: 'var(--slate-400)', fontSize: '0.82rem' }}>
                 Existem blocos carregados e finalizados que ainda estão sem o check de NF emitida. Fique atento e faça a conferência para manter o controle fiscal em dia.
               </span>
             </div>
@@ -1542,8 +1546,8 @@ export function PainelGestao({
             }}
             className="btn"
             style={{
-              background: exibindoApenasSemNF ? '#22c55e' : '#f59e0b',
-              color: exibindoApenasSemNF ? '#fff' : '#000',
+              background: exibindoApenasSemNF ? '#16a34a' : '#d97706',
+              color: '#fff',
               fontWeight: 700,
               fontSize: '0.80rem',
               padding: '7px 14px',
@@ -1553,7 +1557,7 @@ export function PainelGestao({
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
+              boxShadow: '0 2px 8px rgba(217, 119, 6, 0.3)'
             }}
           >
             <FileCheck size={14} />
@@ -1861,9 +1865,9 @@ export function PainelGestao({
                 padding: '9px 14px',
                 fontSize: '0.8rem',
                 whiteSpace: 'nowrap',
-                background: exibindoPendenciasAnteriores ? '#f59e0b' : 'rgba(245, 158, 11, 0.18)',
-                color: exibindoPendenciasAnteriores ? '#111827' : '#fbbf24',
-                border: '1px solid #f59e0b',
+                background: exibindoPendenciasAnteriores ? '#d97706' : 'rgba(245, 158, 11, 0.15)',
+                color: exibindoPendenciasAnteriores ? '#fff' : '#b45309',
+                border: '1px solid #d97706',
                 fontWeight: 700,
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1888,9 +1892,9 @@ export function PainelGestao({
                 padding: '9px 14px',
                 fontSize: '0.8rem',
                 whiteSpace: 'nowrap',
-                background: exibindoApenasSemNF ? '#f59e0b' : 'rgba(245, 158, 11, 0.18)',
-                color: exibindoApenasSemNF ? '#111827' : '#fbbf24',
-                border: '1px solid #f59e0b',
+                background: exibindoApenasSemNF ? '#d97706' : 'rgba(245, 158, 11, 0.15)',
+                color: exibindoApenasSemNF ? '#fff' : '#b45309',
+                border: '1px solid #d97706',
                 fontWeight: 700,
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1909,8 +1913,8 @@ export function PainelGestao({
       <div className="glass-panel no-print" style={{
         padding: '10px 18px',
         marginBottom: 16,
-        background: 'rgba(0, 0, 0, 0.35)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
+        background: 'var(--bg-mode-selector)',
+        border: '1px solid var(--border-subtle)',
         borderRadius: 12,
         display: 'flex',
         alignItems: 'center',
@@ -2508,60 +2512,60 @@ export function PainelGestao({
                       <td style={{ padding: '12px 14px', minWidth: 175 }}>
                         {ag.status === 'Aguardando Liberação' && (
                           <span className="badge" style={{
-                            background: 'rgba(245, 158, 11, 0.18)',
-                            color: '#fbbf24',
-                            border: '1px solid rgba(245, 158, 11, 0.45)',
+                            background: 'rgba(245, 158, 11, 0.15)',
+                            color: '#b45309',
+                            border: '1px solid rgba(217, 119, 6, 0.45)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 5,
                             padding: '4px 8px',
                             fontSize: '0.76rem',
-                            fontWeight: 700
+                            fontWeight: 800
                           }}>
                             <Clock size={12} /> Aguardando Liberação
                           </span>
                         )}
                         {(ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
                           <span className="badge" style={{
-                            background: 'rgba(168, 85, 247, 0.18)',
-                            color: '#c084fc',
-                            border: '1px solid rgba(192, 132, 252, 0.45)',
+                            background: 'rgba(168, 85, 247, 0.15)',
+                            color: '#9333ea',
+                            border: '1px solid rgba(147, 51, 234, 0.45)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 5,
                             padding: '4px 8px',
                             fontSize: '0.76rem',
-                            fontWeight: 700
+                            fontWeight: 800
                           }}>
                             <CheckCircle2 size={12} /> Liberado p/ Carregar
                           </span>
                         )}
                         {ag.status === 'Carregando' && (
                           <span className="badge" style={{
-                            background: 'rgba(56, 189, 248, 0.18)',
-                            color: '#38bdf8',
-                            border: '1px solid rgba(56, 189, 248, 0.45)',
+                            background: 'rgba(56, 189, 248, 0.15)',
+                            color: '#0284c7',
+                            border: '1px solid rgba(2, 132, 199, 0.45)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 5,
                             padding: '4px 8px',
                             fontSize: '0.76rem',
-                            fontWeight: 700
+                            fontWeight: 800
                           }}>
                             <PlayCircle size={12} /> Carregando
                           </span>
                         )}
                         {(ag.status === 'Finalizado' || ag.status === 'Carregado') && (
                           <span className="badge" style={{
-                            background: 'rgba(16, 185, 129, 0.18)',
-                            color: '#34d399',
-                            border: '1px solid rgba(16, 185, 129, 0.45)',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            color: '#16a34a',
+                            border: '1px solid rgba(22, 163, 74, 0.45)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: 5,
                             padding: '4px 8px',
                             fontSize: '0.76rem',
-                            fontWeight: 700
+                            fontWeight: 800
                           }}>
                             <CheckCheck size={12} /> Finalizado
                           </span>
