@@ -264,19 +264,22 @@ body.fundo-tajmahal .btn-vermont {
 }
 
 /* Tabelas no Tema Claro */
-body.fundo-tajmahal .table th {
+body.fundo-tajmahal .table th,
+body.fundo-tajmahal .table-responsive-container th {
   color: #334155 !important;
   background: #f8fafc !important;
   border-bottom: 2px solid #cbd5e1 !important;
   font-weight: 700 !important;
 }
 
-body.fundo-tajmahal .table td {
+body.fundo-tajmahal .table td,
+body.fundo-tajmahal .table-responsive-container td {
   color: #1e293b !important;
   border-bottom: 1px solid #e2e8f0 !important;
 }
 
-body.fundo-tajmahal .table tr:hover {
+body.fundo-tajmahal .table tr:hover,
+body.fundo-tajmahal .table-responsive-container tr:hover {
   background: #f8fafc !important;
 }
 

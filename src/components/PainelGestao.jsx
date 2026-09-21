@@ -956,23 +956,23 @@ export function PainelGestao({
               <AlertTriangle size={24} />
             </div>
             <div>
-              <div style={{ fontSize: '0.98rem', fontWeight: 800, color: '#fef3c7', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: '0.98rem', fontWeight: 800, color: 'inherit', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span>
                   {pendenciasAnteriores.length === 1
                     ? '1 veículo de data anterior ainda não foi finalizado'
                     : `${pendenciasAnteriores.length} veículos de datas anteriores ainda não foram finalizados`}
                 </span>
                 <span className="badge" style={{
-                  background: 'rgba(245, 158, 11, 0.3)',
-                  border: '1px solid #f59e0b',
-                  color: '#fbbf24',
+                  background: 'rgba(245, 158, 11, 0.25)',
+                  border: '1px solid #d97706',
+                  color: '#b45309',
                   fontSize: '0.72rem',
                   fontWeight: 800
                 }}>
                   Atenção Operacional
                 </span>
               </div>
-              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: '#fde68a' }}>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', color: 'var(--slate-400)' }}>
                 Existem agendamentos de dias anteriores a hoje ({formatarDataBR(hojeStr)}) pendentes de carregamento ou liberação.
               </p>
             </div>
@@ -984,9 +984,9 @@ export function PainelGestao({
               onClick={() => setExibindoPendenciasAnteriores(!exibindoPendenciasAnteriores)}
               className="btn"
               style={{
-                background: exibindoPendenciasAnteriores ? '#f59e0b' : 'rgba(245, 158, 11, 0.25)',
-                color: exibindoPendenciasAnteriores ? '#111827' : '#fbbf24',
-                border: '1px solid #f59e0b',
+                background: exibindoPendenciasAnteriores ? '#d97706' : 'rgba(245, 158, 11, 0.20)',
+                color: exibindoPendenciasAnteriores ? '#ffffff' : '#b45309',
+                border: '1px solid #d97706',
                 fontWeight: 700,
                 fontSize: '0.82rem',
                 padding: '8px 16px',
@@ -1016,7 +1016,7 @@ export function PainelGestao({
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h1 style={{ fontSize: '1.4rem', margin: 0, color: '#fff' }}>
+            <h1 style={{ fontSize: '1.4rem', margin: 0, color: 'inherit' }}>
               Controle de Carregamento
             </h1>
             {isAdmin ? (
@@ -1391,17 +1391,17 @@ export function PainelGestao({
               <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', textTransform: 'uppercase', fontWeight: 600 }}>
                 Total Registrado
               </span>
-              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', marginTop: 4 }}>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'inherit', marginTop: 4 }}>
                 {agendamentos.length}
               </div>
               <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Carregamentos no Sistema</span>
             </div>
 
-        <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #4ade80' }}>
-          <span style={{ fontSize: '0.74rem', color: '#4ade80', textTransform: 'uppercase', fontWeight: 700 }}>
+        <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #16a34a' }}>
+          <span style={{ fontSize: '0.74rem', color: '#16a34a', textTransform: 'uppercase', fontWeight: 700 }}>
             Carregamentos Hoje
           </span>
-          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#4ade80', marginTop: 4 }}>
+          <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#16a34a', marginTop: 4 }}>
             {agendamentosHoje.length}
           </div>
           <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Previstos para hoje</span>
@@ -2054,14 +2054,14 @@ export function PainelGestao({
         }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#fff', letterSpacing: 0.5 }}>
+              <span style={{ fontWeight: 800, fontSize: '1.05rem', color: 'inherit', letterSpacing: 0.5 }}>
                 VERMONT MINERAÇÃO LTDA.
               </span>
               <span className="badge badge-vermont" style={{ fontSize: '0.72rem' }}>
                 CONTROLE DE CARREGAMENTOS & ROMANEIO
               </span>
             </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--slate-300)', marginTop: 2 }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--slate-400)', marginTop: 2 }}>
               Unidade: <strong>{filtroPedreira === 'todas' ? 'Todas as Pedreiras (Ceará & Goiás)' : filtroPedreira}</strong> | 
               Data de Emissão: <strong>{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date())}</strong>
               {filtroData && <> | Filtrado para a data: <strong>{formatarDataBR(filtroData)}</strong></>}
@@ -2069,7 +2069,7 @@ export function PainelGestao({
             </div>
           </div>
 
-          <div style={{ fontSize: '0.82rem', color: '#4ade80', fontWeight: 700 }}>
+          <div style={{ fontSize: '0.82rem', color: '#16a34a', fontWeight: 700 }}>
             Total de Veículos Listados: {agendamentosFiltrados.length}
           </div>
         </div>
@@ -2205,10 +2205,10 @@ export function PainelGestao({
                     >
                       {/* Data / Horário */}
                       <td style={{ padding: '12px 14px' }}>
-                        <div style={{ fontWeight: 700, color: '#fff' }}>{formatarDataBR(ag.data_agendamento)}</div>
+                        <div style={{ fontWeight: 700, color: 'inherit' }}>{formatarDataBR(ag.data_agendamento)}</div>
                         <div style={{ 
                           fontSize: '0.8rem', 
-                          color: isSabado ? '#fbbf24' : isOutros ? '#f59e0b' : '#86efac', 
+                          color: isSabado ? '#d97706' : isOutros ? '#d97706' : '#16a34a', 
                           display: 'flex', 
                           alignItems: 'center', 
                           gap: 4, 
@@ -2218,7 +2218,7 @@ export function PainelGestao({
                           {isOutros ? 'Outros (Especial)' : ag.horario_agendamento}
                         </div>
                         {isOutros && ag.justificativa_outros && (
-                          <div style={{ fontSize: '0.72rem', color: '#fde68a', marginTop: 3, lineHeight: '1.2' }} title={ag.justificativa_outros}>
+                          <div style={{ fontSize: '0.72rem', color: '#d97706', marginTop: 3, lineHeight: '1.2' }} title={ag.justificativa_outros}>
                             📌 {ag.justificativa_outros}
                           </div>
                         )}
@@ -2229,7 +2229,7 @@ export function PainelGestao({
                             gap: 3,
                             background: 'rgba(245, 158, 11, 0.2)',
                             border: '1px solid rgba(245, 158, 11, 0.5)',
-                            color: '#fbbf24',
+                            color: '#b45309',
                             fontSize: '0.66rem',
                             fontWeight: 700,
                             padding: '1px 5px',
@@ -2250,7 +2250,7 @@ export function PainelGestao({
                       {/* Pedreira / Material */}
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <strong style={{ color: '#fff' }}>{ag.pedreira}</strong>
+                          <strong style={{ color: 'inherit' }}>{ag.pedreira}</strong>
                           {(ag.is_combinado || ag.observacoes?.includes('[Carga Combinada') || ag.observacoes?.includes('[Carga Mista')) && (
                             <span 
                               title="Carregamento Misto / Carga Combinada (múltiplos blocos no mesmo veículo)"
@@ -2260,7 +2260,7 @@ export function PainelGestao({
                                 gap: 3,
                                 background: 'rgba(56, 189, 248, 0.18)',
                                 border: '1px solid rgba(56, 189, 248, 0.5)',
-                                color: '#38bdf8',
+                                color: '#0284c7',
                                 fontSize: '0.72rem',
                                 fontWeight: 700,
                                 padding: '1px 6px',
@@ -2272,7 +2272,7 @@ export function PainelGestao({
                             </span>
                           )}
                         </div>
-                        <div style={{ fontSize: '0.82rem', color: '#86efac', fontWeight: 500 }}>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--slate-400)', fontWeight: 600 }}>
                           Material: {ag.material}
                         </div>
                       </td>
@@ -2280,7 +2280,7 @@ export function PainelGestao({
                       {/* Bloco / Cliente com Sincronização Visual de Envelopamento */}
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.94rem' }}>
+                          <span style={{ fontWeight: 700, color: 'inherit', fontSize: '0.94rem' }}>
                             Bloco: {ag.numero_bloco}
                           </span>
                           {(() => {
@@ -2302,7 +2302,7 @@ export function PainelGestao({
                                       borderRadius: '50%',
                                       background: 'rgba(56, 189, 248, 0.15)',
                                       border: '1px solid rgba(56, 189, 248, 0.45)',
-                                      color: '#38bdf8',
+                                      color: '#0284c7',
                                       fontSize: '0.68rem',
                                       fontWeight: 800,
                                       cursor: 'help',
@@ -2352,12 +2352,12 @@ export function PainelGestao({
                           })()}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)', marginTop: '2px' }}>
-                          Cliente: <strong style={{ color: 'var(--slate-200)' }}>{limparNomeEmpresa(ag.cliente)}</strong>
+                          Cliente: <strong style={{ color: 'inherit' }}>{limparNomeEmpresa(ag.cliente)}</strong>
                         </div>
                         <div style={{ fontSize: '0.74rem', color: 'var(--slate-400)', marginTop: '2px' }}>
-                          Transp: <strong style={{ color: 'var(--slate-200)' }}>{limparNomeEmpresa(ag.transportadora)}</strong>
+                          Transp: <strong style={{ color: 'inherit' }}>{limparNomeEmpresa(ag.transportadora)}</strong>
                           {(ag.transportadora_cnpj || resolverCnpjTransportadora(ag)) ? (
-                            <span style={{ fontSize: '0.70rem', color: '#60a5fa', fontFamily: 'monospace', fontWeight: 600, marginLeft: '4px' }}>
+                            <span style={{ fontSize: '0.70rem', color: '#0284c7', fontFamily: 'monospace', fontWeight: 600, marginLeft: '4px' }}>
                               (CNPJ: {formatarCNPJ(ag.transportadora_cnpj || resolverCnpjTransportadora(ag))})
                             </span>
                           ) : null}
@@ -2366,7 +2366,7 @@ export function PainelGestao({
 
                       {/* Motorista / CPF & Conformidade */}
                       <td style={{ padding: '12px 14px' }}>
-                        <div style={{ fontWeight: 600, color: '#fff' }}>{ag.motorista_nome}</div>
+                        <div style={{ fontWeight: 600, color: 'inherit' }}>{ag.motorista_nome}</div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--slate-400)', fontFamily: 'monospace' }}>CPF: {ag.motorista_cpf}</div>
                         {ag.motorista_telefone && (
                           <div style={{ fontSize: '0.74rem', color: 'var(--info)' }}>{ag.motorista_telefone}</div>
@@ -2487,14 +2487,14 @@ export function PainelGestao({
 
                       {/* Veículo / Placas Dinâmicas */}
                       <td style={{ padding: '12px 14px' }}>
-                        <div style={{ fontSize: '0.76rem', color: '#86efac', fontWeight: 600 }}>
+                        <div style={{ fontSize: '0.76rem', color: 'var(--slate-400)', fontWeight: 600 }}>
                           {ag.tipo_veiculo}
                         </div>
                         <div style={{ fontSize: '0.78rem', marginTop: 2 }}>
                           {listaPlacasTabela.map((p, idx) => (
-                            <div key={idx} style={{ color: 'var(--slate-300)' }}>
-                              <span style={{ color: 'var(--slate-400)' }}>{p.label}:</span>{' '}
-                              <strong style={{ fontFamily: 'monospace', color: '#fff' }}>{p.placa}</strong>
+                            <div key={idx} style={{ color: 'var(--slate-400)' }}>
+                              <span>{p.label}:</span>{' '}
+                              <strong style={{ fontFamily: 'monospace', color: 'inherit' }}>{p.placa}</strong>
                             </div>
                           ))}
                         </div>
@@ -2693,12 +2693,12 @@ export function PainelGestao({
                       {/* Observações Operacionais */}
                       <td style={{ padding: '12px 14px', maxWidth: 240 }}>
                         {ag.justificativa_outros && (!ag.observacoes || !ag.observacoes.includes(ag.justificativa_outros)) && (
-                          <div style={{ fontSize: '0.76rem', color: '#fde68a', marginBottom: 4, fontWeight: 600 }}>
+                          <div style={{ fontSize: '0.76rem', color: '#d97706', marginBottom: 4, fontWeight: 600 }}>
                             📌 Horário Solicitado: {ag.justificativa_outros}
                           </div>
                         )}
                         {ag.observacoes ? (
-                          <div style={{ fontSize: '0.78rem', color: '#e2e8f0', lineHeight: '1.3' }}>
+                          <div style={{ fontSize: '0.78rem', color: 'inherit', lineHeight: '1.3' }}>
                             {limparTagsInternasObservacoes(ag.observacoes)}
                           </div>
                         ) : !ag.justificativa_outros ? (
