@@ -975,9 +975,9 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
     status: statusNormalizado,
     responsavel_envelopamento: dados.responsavel_envelopamento || (statusNormalizado === 'em_andamento' ? usuarioNome : null),
     responsavel_liberacao: dados.responsavel_liberacao || (statusNormalizado === 'envelopado' || statusNormalizado === 'sem_envelopamento' ? usuarioNome : null),
-    data_cadastro: dados.data_cadastro || agora,
-    data_envelopamento: dados.data_envelopamento || (statusNormalizado === 'em_andamento' ? agora : null),
-    data_liberacao: dados.data_liberacao || (statusNormalizado === 'envelopado' || statusNormalizado === 'sem_envelopamento' ? agora : null),
+    data_cadastro: dados.data_cadastro ? converterDataParaIsoComHoraAtual(dados.data_cadastro) : agora,
+    data_envelopamento: dados.data_envelopamento ? converterDataParaIsoComHoraAtual(dados.data_envelopamento) : (statusNormalizado === 'em_andamento' || statusNormalizado === 'envelopado' ? agora : null),
+    data_liberacao: dados.data_liberacao ? converterDataParaIsoComHoraAtual(dados.data_liberacao) : (statusNormalizado === 'envelopado' || statusNormalizado === 'sem_envelopamento' ? (dados.data_envelopamento ? converterDataParaIsoComHoraAtual(dados.data_envelopamento) : agora) : null),
     observacoes: dados.observacoes || '',
     agendamento_id: dados.agendamento_id || null,
     created_at: dados.created_at || agora,
@@ -1050,14 +1050,38 @@ export const salvarEnvelopamento = async (dados, usuarioNome = 'Equipe Vermont')
 };
 
 /**
+ * Converte string de data (ex: '2026-09-21' ou ISO) para ISO string preservando a hora atual se aplicável
+ */
+export const converterDataParaIsoComHoraAtual = (dataStr) => {
+  if (!dataStr) return new Date().toISOString();
+  if (typeof dataStr === 'string' && dataStr.includes('T')) return dataStr;
+  try {
+    const agora = new Date();
+    if (typeof dataStr === 'string' && dataStr.includes('-')) {
+      const partes = dataStr.slice(0, 10).split('-').map(Number);
+      if (partes.length === 3) {
+        const [y, m, d] = partes;
+        const dt = new Date(y, m - 1, d, agora.getHours(), agora.getMinutes(), agora.getSeconds());
+        return dt.toISOString();
+      }
+    }
+    const dObj = new Date(dataStr);
+    return isNaN(dObj.getTime()) ? agora.toISOString() : dObj.toISOString();
+  } catch (e) {
+    return new Date().toISOString();
+  }
+};
+
+/**
  * Atualiza o status de um envelopamento rapidamente
  */
-export const atualizarStatusEnvelopamento = async (id, novoStatus, usuarioNome = 'Equipe Vermont') => {
+export const atualizarStatusEnvelopamento = async (id, novoStatus, usuarioNome = 'Equipe Vermont', dataPersonalizada = null) => {
   const locais = carregarEnvelopamentosLocais();
   const index = locais.findIndex(item => item.id === id);
   if (index < 0) return null;
 
   const agora = new Date().toISOString();
+  const dataEvento = dataPersonalizada ? converterDataParaIsoComHoraAtual(dataPersonalizada) : agora;
   const itemAtual = locais[index];
 
   const atualizacoes = {
@@ -1067,10 +1091,16 @@ export const atualizarStatusEnvelopamento = async (id, novoStatus, usuarioNome =
 
   if (novoStatus === 'em_andamento') {
     atualizacoes.responsavel_envelopamento = usuarioNome;
-    atualizacoes.data_envelopamento = agora;
+    atualizacoes.data_envelopamento = dataEvento;
   } else if (novoStatus === 'envelopado' || novoStatus === 'sem_envelopamento') {
     atualizacoes.responsavel_liberacao = usuarioNome;
-    atualizacoes.data_liberacao = agora;
+    atualizacoes.data_liberacao = dataEvento;
+    if (novoStatus === 'envelopado') {
+      atualizacoes.data_envelopamento = dataEvento;
+    }
+  } else if (novoStatus === 'pendente_envelopamento') {
+    atualizacoes.responsavel_liberacao = null;
+    atualizacoes.data_liberacao = null;
   }
 
   return await salvarEnvelopamento({ ...itemAtual, ...atualizacoes }, usuarioNome);
@@ -1079,12 +1109,13 @@ export const atualizarStatusEnvelopamento = async (id, novoStatus, usuarioNome =
 /**
  * Atualiza o status de múltiplos registros de envelopamento em lote
  */
-export const atualizarStatusEnvelopamentosEmLote = async (ids = [], novoStatus, usuarioNome = 'Equipe Vermont') => {
+export const atualizarStatusEnvelopamentosEmLote = async (ids = [], novoStatus, usuarioNome = 'Equipe Vermont', dataPersonalizada = null) => {
   if (!Array.isArray(ids) || ids.length === 0 || !novoStatus) return true;
 
   const setIds = new Set(ids);
   const locais = carregarEnvelopamentosLocais();
   const agora = new Date().toISOString();
+  const dataEvento = dataPersonalizada ? converterDataParaIsoComHoraAtual(dataPersonalizada) : agora;
 
   const itensAtualizados = [];
 
@@ -1098,10 +1129,16 @@ export const atualizarStatusEnvelopamentosEmLote = async (ids = [], novoStatus, 
 
     if (novoStatus === 'em_andamento') {
       atualizacoes.responsavel_envelopamento = usuarioNome;
-      atualizacoes.data_envelopamento = agora;
+      atualizacoes.data_envelopamento = dataEvento;
     } else if (novoStatus === 'envelopado' || novoStatus === 'sem_envelopamento') {
       atualizacoes.responsavel_liberacao = usuarioNome;
-      atualizacoes.data_liberacao = agora;
+      atualizacoes.data_liberacao = dataEvento;
+      if (novoStatus === 'envelopado') {
+        atualizacoes.data_envelopamento = dataEvento;
+      }
+    } else if (novoStatus === 'pendente_envelopamento') {
+      atualizacoes.responsavel_liberacao = null;
+      atualizacoes.data_liberacao = null;
     }
 
     const atualizado = { ...item, ...atualizacoes };

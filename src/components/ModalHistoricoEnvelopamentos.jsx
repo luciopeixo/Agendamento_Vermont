@@ -19,17 +19,33 @@ import {
   inscreverHistoricoRealtime,
   STATUS_ENVELOPAMENTO
 } from '../services/envelopamentoService';
-import { formatarDataHoraBR } from '../services/agendamentoService';
+import { formatarDataHoraBR, saoMesmaPedreira } from '../services/agendamentoService';
 
-export function ModalHistoricoEnvelopamentos({ onFechar, filtroBlocoInicial = '' }) {
+export function ModalHistoricoEnvelopamentos({ onFechar, filtroBlocoInicial = null }) {
   const [historico, setHistorico] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [busca, setBusca] = useState(filtroBlocoInicial || '');
+
+  // Contexto de bloco específico (objeto com { numero_bloco, cliente_nome, material, pedreira_nome, numero_romaneio })
+  const [contextoBloco, setContextoBloco] = useState(() => {
+    if (typeof filtroBlocoInicial === 'object' && filtroBlocoInicial !== null) {
+      return filtroBlocoInicial;
+    }
+    return null;
+  });
+
+  const [busca, setBusca] = useState(() => {
+    if (typeof filtroBlocoInicial === 'string') return filtroBlocoInicial;
+    return '';
+  });
   const [filtroAcao, setFiltroAcao] = useState('todos');
 
   useEffect(() => {
-    if (filtroBlocoInicial) {
+    if (typeof filtroBlocoInicial === 'object' && filtroBlocoInicial !== null) {
+      setContextoBloco(filtroBlocoInicial);
+      setBusca('');
+    } else if (typeof filtroBlocoInicial === 'string') {
       setBusca(filtroBlocoInicial);
+      setContextoBloco(null);
     }
   }, [filtroBlocoInicial]);
 
@@ -64,18 +80,80 @@ export function ModalHistoricoEnvelopamentos({ onFechar, filtroBlocoInicial = ''
 
   const itensFiltrados = historico.filter(item => {
     if (filtroAcao !== 'todos' && item.tipo_acao !== filtroAcao) return false;
+
+    // 1. Se estiver filtrado por contexto de um bloco específico
+    if (contextoBloco && contextoBloco.numero_bloco) {
+      const targetBloco = String(contextoBloco.numero_bloco).trim().toLowerCase();
+      const itemBloco = String(item.numero_bloco || '').trim().toLowerCase();
+
+      // Comparação exata de número de bloco (evita que '2226' encontre '212226' ou '72226')
+      let blocoBate = (itemBloco === targetBloco);
+      if (!blocoBate && item.detalhes) {
+        const regexBloco = new RegExp(`\\b${targetBloco}\\b`, 'i');
+        if (regexBloco.test(item.detalhes)) {
+          blocoBate = true;
+        }
+      }
+      if (!blocoBate) return false;
+
+      // Se o registro tiver cliente_nome e o contexto também tiver, comparar
+      if (contextoBloco.cliente_nome && item.cliente_nome) {
+        const c1 = contextoBloco.cliente_nome.toLowerCase().trim();
+        const c2 = item.cliente_nome.toLowerCase().trim();
+        if (!c1.includes(c2) && !c2.includes(c1)) {
+          return false;
+        }
+      }
+
+      // Se o registro tiver material e o contexto também tiver, comparar
+      if (contextoBloco.material && item.material) {
+        const m1 = contextoBloco.material.toLowerCase().trim();
+        const m2 = item.material.toLowerCase().trim();
+        if (m1 !== m2 && !m1.includes(m2) && !m2.includes(m1)) {
+          return false;
+        }
+      }
+
+      // Se o registro tiver pedreira e o contexto também tiver, comparar
+      const pedCtx = contextoBloco.pedreira_nome || contextoBloco.pedreira;
+      if (pedCtx && item.pedreira_nome) {
+        const p1 = pedCtx.toLowerCase().replace(/\s*-\s*ce/gi, '').trim();
+        const p2 = item.pedreira_nome.toLowerCase().replace(/\s*-\s*ce/gi, '').trim();
+        if (!p1.includes(p2) && !p2.includes(p1) && !saoMesmaPedreira(p1, p2)) {
+          return false;
+        }
+      }
+
+      // Se o registro tiver romaneio e o contexto também tiver, comparar
+      if (contextoBloco.numero_romaneio && item.numero_romaneio) {
+        const r1 = String(contextoBloco.numero_romaneio).replace(/^0+/, '').trim();
+        const r2 = String(item.numero_romaneio).replace(/^0+/, '').trim();
+        if (r1 && r2 && r1 !== r2) {
+          return false;
+        }
+      }
+    }
+
+    // 2. Busca textual digitada
     if (busca) {
       const t = busca.toLowerCase().trim();
       const bloco = String(item.numero_bloco || '').toLowerCase();
       const cli = String(item.cliente_nome || '').toLowerCase();
       const mat = String(item.material || '').toLowerCase();
+      const ped = String(item.pedreira_nome || '').toLowerCase();
       const user = String(item.usuario_nome || '').toLowerCase();
       const rom = String(item.numero_romaneio || '').toLowerCase();
       const det = String(item.detalhes || '').toLowerCase();
-      if (!bloco.includes(t) && !cli.includes(t) && !mat.includes(t) && !user.includes(t) && !rom.includes(t) && !det.includes(t)) {
+
+      // Se for número puro, faz correspondência exata de bloco OU busca textual nos outros campos
+      const isNumPuro = /^\d+$/.test(t);
+      const bateBloco = isNumPuro ? bloco === t : bloco.includes(t);
+
+      if (!bateBloco && !cli.includes(t) && !mat.includes(t) && !ped.includes(t) && !user.includes(t) && !rom.includes(t) && !det.includes(t)) {
         return false;
       }
     }
+
     return true;
   });
 
@@ -236,8 +314,50 @@ export function ModalHistoricoEnvelopamentos({ onFechar, filtroBlocoInicial = ''
           </div>
         </div>
 
-        {/* Indicador de Filtro Ativo por Bloco */}
-        {busca && (
+        {/* Indicador de Filtro Ativo por Bloco / Contexto */}
+        {contextoBloco ? (
+          <div style={{
+            padding: '10px 24px',
+            background: 'rgba(56, 189, 248, 0.12)',
+            borderBottom: '1px solid rgba(56, 189, 248, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.78rem',
+            flexWrap: 'wrap',
+            gap: 8
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                <Box size={15} /> Histórico do Bloco:
+              </span>
+              <strong style={{ color: '#fff', background: 'rgba(56,189,248,0.25)', padding: '2px 8px', borderRadius: 6, fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                {contextoBloco.numero_bloco}
+              </strong>
+              {contextoBloco.material && (
+                <span style={{ color: 'var(--slate-200)', fontWeight: 600 }}>• {contextoBloco.material}</span>
+              )}
+              {(contextoBloco.pedreira_nome || contextoBloco.pedreira) && (
+                <span style={{ color: 'var(--slate-300)' }}>({contextoBloco.pedreira_nome || contextoBloco.pedreira})</span>
+              )}
+              {contextoBloco.cliente_nome && (
+                <span style={{ color: '#4ade80', fontWeight: 600 }}>• {contextoBloco.cliente_nome}</span>
+              )}
+              {contextoBloco.numero_romaneio && (
+                <span style={{ color: '#38bdf8', fontFamily: 'monospace' }}>• Rom. {contextoBloco.numero_romaneio}</span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setContextoBloco(null)}
+              className="btn btn-secondary"
+              style={{ padding: '4px 10px', fontSize: '0.74rem', gap: 5, color: '#38bdf8', borderColor: 'rgba(56,189,248,0.4)' }}
+            >
+              <X size={13} /> Ver Histórico de Todos os Blocos
+            </button>
+          </div>
+        ) : busca ? (
           <div style={{
             padding: '8px 24px',
             background: 'rgba(56, 189, 248, 0.10)',
@@ -259,7 +379,7 @@ export function ModalHistoricoEnvelopamentos({ onFechar, filtroBlocoInicial = ''
               <X size={12} /> Ver Histórico Completo
             </button>
           </div>
-        )}
+        ) : null}
 
         {/* Lista de Registros da Linha do Tempo */}
         <div style={{

@@ -41,11 +41,11 @@ export function ModalNotificarClienteWhatsApp({
     }
   }, [aberto]);
 
-  // Função para formatar o peso em kg sem gerar NaN
+  // Função para formatar o peso em kg sem gerar NaN e preservando decimais quando presentes
   const formatarPesoKg = (peso) => {
-    if (peso === undefined || peso === null || peso === '') return '10.000 kg';
+    if (peso === undefined || peso === null || peso === '') return '';
     let str = String(peso).trim();
-    if (str.toLowerCase().includes('nan')) return '10.000 kg';
+    if (str.toLowerCase().includes('nan')) return '';
     
     // Tratamento de pontos e vírgulas brasileiros
     if (str.includes('.') && str.includes(',')) {
@@ -60,7 +60,12 @@ export function ModalNotificarClienteWhatsApp({
     if (isNaN(num) || num <= 0) {
       return String(peso).endsWith('kg') ? String(peso) : `${peso} kg`;
     }
-    return `${Math.round(num).toLocaleString('pt-BR')} kg`;
+    const temDecimal = num % 1 !== 0;
+    const formatado = num.toLocaleString('pt-BR', {
+      minimumFractionDigits: temDecimal ? 1 : 0,
+      maximumFractionDigits: 2
+    });
+    return `${formatado} kg`;
   };
 
   // Formatação segura de data sem bugs de ISO string
@@ -82,7 +87,7 @@ export function ModalNotificarClienteWhatsApp({
     }
   };
 
-  // Formatar nome da pedreira de forma amigável: "Massapê - Del Mare"
+  // Formatar nome da pedreira de forma amigável: "São Gonçalo do Amarante - Serrote"
   const formatarNomePedreira = (pedNome = '') => {
     if (!pedNome) return 'Pedreira Vermont';
     let nomeLimpo = String(pedNome).replace(/\s*-\s*CE\s*/i, ' - ').trim();
@@ -289,22 +294,35 @@ export function ModalNotificarClienteWhatsApp({
 
     let texto = `*COMUNICADO DE BLOCOS ENVELOPADOS & LIBERADOS*\n\n`;
     texto += `*Cliente:* ${clienteSelecionado}\n\n`;
-    texto += `Informamos que os blocos abaixo foram *ENVELOPADOS* e encontram-se *LIBERADOS PARA CARREGAMENTO* :\n`;
+    texto += `Informamos que os blocos abaixo foram *ENVELOPADOS* e encontram-se *LIBERADOS PARA CARREGAMENTO* :\n\n`;
 
     blocosParaEnvio.forEach((b, idx) => {
       const mat = b.material ? `*${b.material}*` : '';
       const peso = formatarPesoKg(b.peso_kg);
       const ped = formatarNomePedreira(b.pedreira_nome || b.pedreira_id);
-      const numRom = b.numero_romaneio ? ` | Rom: *${b.numero_romaneio}*` : '';
+      const numRom = b.numero_romaneio ? `Rom: *${b.numero_romaneio}*` : '';
 
-      let linhaBloco = `${idx + 1}. Bloco nº *${b.numero_bloco}*`;
-      if (mat) linhaBloco += ` | ${mat}`;
-      if (peso) linhaBloco += ` | ${peso}`;
-      if (ped) linhaBloco += ` (${ped})`;
-      if (numRom) linhaBloco += `${numRom}`;
+      let partes = [];
+      partes.push(`Bloco *${b.numero_bloco}*`);
+      if (mat) partes.push(mat);
 
+      let infoPesoPed = '';
+      if (peso && ped) {
+        infoPesoPed = `${peso} (${ped})`;
+      } else if (peso) {
+        infoPesoPed = peso;
+      } else if (ped) {
+        infoPesoPed = `(${ped})`;
+      }
+      if (infoPesoPed) partes.push(infoPesoPed);
+
+      if (numRom) partes.push(numRom);
+
+      const linhaBloco = `${idx + 1}. ${partes.join(' | ')}`;
       texto += `${linhaBloco}\n\n`;
     });
+
+    texto += `Ficamos à disposição para agendamento.`;
 
     return texto.trim();
   }, [clienteSelecionado, blocosParaEnvio]);
@@ -648,7 +666,7 @@ export function ModalNotificarClienteWhatsApp({
                         />
                         <div>
                           <strong style={{ color: '#fff', fontSize: '0.84rem' }}>
-                            Bloco nº {b.numero_bloco}
+                            Bloco {b.numero_bloco}
                           </strong>
                           {b.material && (
                             <span style={{ fontSize: '0.74rem', color: '#38bdf8', marginLeft: 8 }}>

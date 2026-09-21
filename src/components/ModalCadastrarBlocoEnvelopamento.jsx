@@ -44,6 +44,7 @@ export function ModalCadastrarBlocoEnvelopamento({
     cliente_nome: blocoEdicao?.cliente_nome || '',
     cliente_cnpj: blocoEdicao?.cliente_cnpj || '',
     status: blocoEdicao?.status || 'pendente_envelopamento',
+    data_envelopamento: blocoEdicao?.data_envelopamento ? (typeof blocoEdicao.data_envelopamento === 'string' ? blocoEdicao.data_envelopamento.slice(0, 10) : '') : (blocoEdicao?.data_liberacao ? blocoEdicao.data_liberacao.slice(0, 10) : new Date().toISOString().slice(0, 10)),
     observacoes: blocoEdicao?.observacoes || ''
   });
 
@@ -56,6 +57,7 @@ export function ModalCadastrarBlocoEnvelopamento({
     cliente_nome: '',
     cliente_cnpj: '',
     status: 'pendente_envelopamento',
+    data_envelopamento: new Date().toISOString().slice(0, 10),
     textoBlocos: '',
     observacoes: ''
   });
@@ -87,6 +89,29 @@ export function ModalCadastrarBlocoEnvelopamento({
     carregarClientes();
     listarEnvelopamentos().then(res => setEnvelopamentosExistentes(res || [])).catch(() => {});
   }, []);
+
+  // Sincroniza formulário quando o bloco em edição mudar
+  useEffect(() => {
+    if (blocoEdicao) {
+      const dataIso = blocoEdicao.data_envelopamento || blocoEdicao.data_liberacao || '';
+      const dataFmt = dataIso && typeof dataIso === 'string' ? dataIso.slice(0, 10) : new Date().toISOString().slice(0, 10);
+
+      setFormData({
+        id: blocoEdicao.id || null,
+        pedreira_id: blocoEdicao.pedreira_id || 'uruoca',
+        pedreira_nome: blocoEdicao.pedreira_nome || 'Uruoca - CE (Taj Mahal)',
+        material: blocoEdicao.material || 'Taj Mahal',
+        numero_bloco: blocoEdicao.numero_bloco || '',
+        peso_kg: blocoEdicao.peso_kg || '',
+        numero_romaneio: blocoEdicao.numero_romaneio || '',
+        cliente_nome: blocoEdicao.cliente_nome || '',
+        cliente_cnpj: blocoEdicao.cliente_cnpj || '',
+        status: blocoEdicao.status || 'pendente_envelopamento',
+        data_envelopamento: dataFmt,
+        observacoes: blocoEdicao.observacoes || ''
+      });
+    }
+  }, [blocoEdicao]);
 
   // Verificação de duplicidade individual em tempo real
   const duplicidadeIndividual = React.useMemo(() => {
@@ -326,6 +351,8 @@ export function ModalCadastrarBlocoEnvelopamento({
       return;
     }
 
+    const dataIsoLote = loteData.status === 'envelopado' && loteData.data_envelopamento ? loteData.data_envelopamento : null;
+
     const itens = linhas.map(bloco => ({
       numero_bloco: bloco,
       pedreira_id: loteData.pedreira_id,
@@ -334,6 +361,8 @@ export function ModalCadastrarBlocoEnvelopamento({
       cliente_nome: loteData.cliente_nome,
       cliente_cnpj: loteData.cliente_cnpj,
       status: loteData.status,
+      data_envelopamento: dataIsoLote,
+      data_liberacao: dataIsoLote,
       observacoes: loteData.observacoes
     }));
 
@@ -570,6 +599,62 @@ export function ModalCadastrarBlocoEnvelopamento({
                   ))}
                 </select>
               </div>
+
+              {/* Data do Envelopamento / Liberação */}
+              {formData.status === 'envelopado' && (
+                <div className="form-group">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <label className="form-label" style={{ fontSize: '0.82rem', color: '#4ade80', fontWeight: 700, margin: 0 }}>
+                      📅 Data do Envelopamento:
+                    </label>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, data_envelopamento: new Date().toISOString().slice(0, 10) }))}
+                        style={{
+                          background: 'rgba(34, 197, 94, 0.15)',
+                          border: '1px solid rgba(34, 197, 94, 0.3)',
+                          color: '#4ade80',
+                          fontSize: '0.68rem',
+                          borderRadius: 4,
+                          padding: '1px 6px',
+                          cursor: 'pointer',
+                          fontWeight: 600
+                        }}
+                      >
+                        Hoje
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() - 1);
+                          setFormData(prev => ({ ...prev, data_envelopamento: d.toISOString().slice(0, 10) }));
+                        }}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          color: 'var(--slate-300)',
+                          fontSize: '0.68rem',
+                          borderRadius: 4,
+                          padding: '1px 6px',
+                          cursor: 'pointer',
+                          fontWeight: 600
+                        }}
+                      >
+                        Ontem
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={formData.data_envelopamento || new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setFormData(prev => ({ ...prev, data_envelopamento: e.target.value }))}
+                    style={{ borderColor: 'rgba(34, 197, 94, 0.4)' }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* BARRA DE PESQUISA DE CLIENTES NO BANCO DE DADOS + BOTÃO CADASTRAR CLIENTE */}
@@ -856,6 +941,22 @@ export function ModalCadastrarBlocoEnvelopamento({
                   ))}
                 </select>
               </div>
+
+              {/* Data do Envelopamento dos Blocos no Lote */}
+              {loteData.status === 'envelopado' && (
+                <div className="form-group">
+                  <label className="form-label" style={{ fontSize: '0.82rem', color: '#4ade80', fontWeight: 600 }}>
+                    📅 Data do Envelopamento:
+                  </label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={loteData.data_envelopamento || new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setLoteData(prev => ({ ...prev, data_envelopamento: e.target.value }))}
+                    style={{ borderColor: 'rgba(34, 197, 94, 0.4)' }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Barra de Pesquisa de Cliente no Lote */}

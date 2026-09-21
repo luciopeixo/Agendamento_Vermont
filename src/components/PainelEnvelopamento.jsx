@@ -53,6 +53,7 @@ import { ModalImportarRomaneioPdf } from './ModalImportarRomaneioPdf';
 import { ModalHistoricoEnvelopamentos } from './ModalHistoricoEnvelopamentos';
 import { ModalVisualizarDuplicidades } from './ModalVisualizarDuplicidades';
 import { ModalNotificarClienteWhatsApp } from './ModalNotificarClienteWhatsApp';
+import { ModalConfirmarDataEnvelopamento } from './ModalConfirmarDataEnvelopamento';
 import { GraficosEnvelopamento } from './GraficosEnvelopamento';
 
 export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
@@ -65,8 +66,16 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
   const [modalWhatsAppAberto, setModalWhatsAppAberto] = useState(false);
   const [clienteNotificarWhatsApp, setClienteNotificarWhatsApp] = useState('');
-  const [historicoFiltroBloco, setHistoricoFiltroBloco] = useState('');
+  const [historicoFiltroBloco, setHistoricoFiltroBloco] = useState(null);
   const [modalDuplicidadesAberto, setModalDuplicidadesAberto] = useState(false);
+  const [modalDataEnvelopamento, setModalDataEnvelopamento] = useState({
+    aberto: false,
+    item: null,
+    itens: [],
+    ids: [],
+    status: 'envelopado',
+    executando: false
+  });
   const [confirmacaoModal, setConfirmacaoModal] = useState({
     aberto: false,
     titulo: '',
@@ -81,8 +90,8 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [buscaTexto, setBuscaTexto] = useState('');
   const [executandoAcaoId, setExecutandoAcaoId] = useState(null);
 
-  const abrirHistoricoBloco = (numeroBloco = '') => {
-    setHistoricoFiltroBloco(numeroBloco || '');
+  const abrirHistoricoBloco = (blocoContexto = null) => {
+    setHistoricoFiltroBloco(blocoContexto);
     setModalHistoricoAberto(true);
   };
 
@@ -345,6 +354,18 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   };
 
   const handleAvancarStatus = async (item, proximoStatus) => {
+    if (proximoStatus === 'envelopado') {
+      setModalDataEnvelopamento({
+        aberto: true,
+        item: item,
+        itens: [],
+        ids: [item.id],
+        status: 'envelopado',
+        executando: false
+      });
+      return;
+    }
+
     setExecutandoAcaoId(item.id);
     try {
       await atualizarStatusEnvelopamento(item.id, proximoStatus, usuarioNome);
@@ -353,6 +374,35 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       console.error('Erro ao avançar status:', err);
     } finally {
       setExecutandoAcaoId(null);
+    }
+  };
+
+  const handleConfirmarDataEnvelopamento = async (dataEscolhida) => {
+    setModalDataEnvelopamento(prev => ({ ...prev, executando: true }));
+    try {
+      if (modalDataEnvelopamento.item) {
+        await atualizarStatusEnvelopamento(
+          modalDataEnvelopamento.item.id,
+          'envelopado',
+          usuarioNome,
+          dataEscolhida
+        );
+      } else if (modalDataEnvelopamento.ids?.length > 0) {
+        await atualizarStatusEnvelopamentosEmLote(
+          modalDataEnvelopamento.ids,
+          'envelopado',
+          usuarioNome,
+          dataEscolhida
+        );
+        setBlocosSelecionados(new Set());
+      }
+      await carregarDados();
+      setModalDataEnvelopamento({ aberto: false, item: null, itens: [], ids: [], status: 'envelopado', executando: false });
+    } catch (err) {
+      console.error('Erro ao confirmar envelopamento:', err);
+      alert('Erro ao confirmar envelopamento. Tente novamente.');
+    } finally {
+      setModalDataEnvelopamento(prev => ({ ...prev, executando: false }));
     }
   };
 
@@ -439,6 +489,19 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
     const statusObj = STATUS_ENVELOPAMENTO[novoStatus?.toUpperCase()] || { label: novoStatus };
     const count = idsElegiveis.length;
+
+    if (novoStatus === 'envelopado') {
+      const itensLote = idsElegiveis.map(id => envelopamentos.find(b => b.id === id)).filter(Boolean);
+      setModalDataEnvelopamento({
+        aberto: true,
+        item: null,
+        itens: itensLote,
+        ids: idsElegiveis,
+        status: 'envelopado',
+        executando: false
+      });
+      return;
+    }
 
     solicitarConfirmacao({
       titulo: `Alterar Status de ${count} Bloco(s)`,
@@ -1685,7 +1748,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
                                           <button
                                             type="button"
-                                            onClick={() => abrirHistoricoBloco(b.numero_bloco)}
+                                            onClick={() => abrirHistoricoBloco(b)}
                                             style={{
                                               background: 'none',
                                               border: 'none',
@@ -1773,7 +1836,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
                                             <button
                                               type="button"
-                                              onClick={() => abrirHistoricoBloco(b.numero_bloco)}
+                                              onClick={() => abrirHistoricoBloco(b)}
                                               className="btn btn-secondary"
                                               style={{ padding: '4px 6px', color: '#38bdf8' }}
                                               title={`Ver histórico e auditoria do bloco ${b.numero_bloco}`}
@@ -2027,7 +2090,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
                         <button
                           type="button"
-                          onClick={() => abrirHistoricoBloco(b.numero_bloco)}
+                          onClick={() => abrirHistoricoBloco(b)}
                           style={{
                             background: 'none',
                             border: 'none',
@@ -2114,7 +2177,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
 
                           <button
                             type="button"
-                            onClick={() => abrirHistoricoBloco(b.numero_bloco)}
+                            onClick={() => abrirHistoricoBloco(b)}
                             className="btn btn-secondary"
                             style={{ padding: '5px 7px', color: '#38bdf8' }}
                             title={`Ver histórico e auditoria do bloco ${b.numero_bloco}`}
@@ -2348,6 +2411,16 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           filtroBlocoInicial={historicoFiltroBloco}
         />
       )}
+
+      {/* Modal de Confirmação de Data para Envelopamento (Individual ou Lote) */}
+      <ModalConfirmarDataEnvelopamento
+        aberto={modalDataEnvelopamento.aberto}
+        item={modalDataEnvelopamento.item}
+        itens={modalDataEnvelopamento.itens}
+        executando={modalDataEnvelopamento.executando}
+        onFechar={() => setModalDataEnvelopamento({ aberto: false, item: null, itens: [], ids: [], status: 'envelopado', executando: false })}
+        onConfirmar={handleConfirmarDataEnvelopamento}
+      />
 
       {/* Modal de Visualização e Gestão de Blocos Duplicados (5ª Regra) */}
       {modalDuplicidadesAberto && (
