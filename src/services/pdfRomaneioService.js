@@ -1,5 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import { formatarCNPJ, limparNomeEmpresa, PEDREIRAS_CEARA, MATERIAIS_POR_PEDREIRA, consultarCNPJReceita, sanitizarNumeroBloco } from './agendamentoService.js';
+import { formatarCNPJ, limparNomeEmpresa, PEDREIRAS_CEARA, MATERIAIS_POR_PEDREIRA, consultarCNPJReceita, sanitizarNumeroBloco, isClienteComBarraNoBloco } from './agendamentoService.js';
 
 // Configurar o worker do PDF.js para funcionar perfeitamente em navegadores
 try {
@@ -735,8 +735,8 @@ export const processarRomaneioPdfTexto = async (textoCompleto) => {
         continue;
       }
 
-      const isThorOuArgos = clienteNome.includes('THOR') || clienteNome.includes('ARGOS');
-      const numeroBloco = sanitizarNumeroBloco(numeroBlocoBruto, isThorOuArgos);
+      const isExcecaoBarra = isClienteComBarraNoBloco(clienteNome);
+      const numeroBloco = sanitizarNumeroBloco(numeroBlocoBruto, isExcecaoBarra);
       
       // Evitar blocos duplicados acidentais no mesmo arquivo
       if (blocosJaAdicionados.has(numeroBloco)) {

@@ -2706,18 +2706,34 @@ export function detectarMultiplosBlocos(texto = '') {
 }
 
 /**
- * Verifica se o cliente é THOR ou ARGOS
+ * Lista de clientes com exceção de barra '/' permitida/exigida no número do bloco:
+ * - THOR
+ * - ARGOS
+ * - MARMI OROBICI DO BRASIL LTDA / MARMI OROBICI GRANITI SPA
+ * - STONEVAL DO BRASIL MARMORES E GRANITOS LTDA / STONEVAL SRL
+ * - VERZU TRADING LTDA
  */
-export function isClienteThorOuArgos(cliente = '') {
+export function isClienteComBarraNoBloco(cliente = '') {
   if (!cliente || typeof cliente !== 'string') return false;
   const c = cliente.toUpperCase().trim();
-  return /\bTHOR\b/i.test(c) || /\bARGOS\b/i.test(c);
+  return (
+    /\bTHOR\b/i.test(c) ||
+    /\bARGOS\b/i.test(c) ||
+    /\bOROBICI\b/i.test(c) ||
+    /\bSTONEVAL\b/i.test(c) ||
+    /\bVERZU\b/i.test(c)
+  );
 }
+
+/**
+ * Mantido para compatibilidade reversa com chamadas existentes
+ */
+export const isClienteThorOuArgos = isClienteComBarraNoBloco;
 
 /**
  * Valida a regra de formatação de número de bloco:
  * 1. Proibição universal de '-' (hífen) ou '.' (ponto) para todos os clientes e pedreiras.
- * 2. Se o Cliente for THOR ou ARGOS (em qualquer pedreira): o número do bloco DEVE conter '/' (ex: 11/26 ou 123/26)
+ * 2. Se o Cliente for exceção autorizada (THOR, ARGOS, MARMI OROBICI, STONEVAL, VERZU TRADING, etc.): o número do bloco DEVE conter '/' (ex: 11/26 ou 123/26)
  * 3. Se for qualquer outro cliente: o número do bloco NÃO PODE conter a barra '/'
  * Retorna { valido: boolean, mensagem: string | null }
  */
@@ -2736,12 +2752,12 @@ export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numer
   }
 
   const contemBarra = blocoTrim.includes('/');
-  const isThorArgos = isClienteThorOuArgos(cliente);
+  const isClienteBarra = isClienteComBarraNoBloco(cliente);
 
-  // Se o cliente for THOR ou ARGOS (em todas as pedreiras): a barra '/' é OBRIGATÓRIA
-  if (isThorArgos) {
+  // Se o cliente for exceção autorizada: a barra '/' é OBRIGATÓRIA
+  if (isClienteBarra) {
     if (!contemBarra) {
-      const nomeCli = cliente ? cliente.toUpperCase().trim() : 'THOR / ARGOS';
+      const nomeCli = cliente ? cliente.toUpperCase().trim() : 'comprador';
       return {
         valido: false,
         mensagem: `Para o cliente ${nomeCli}, o número do bloco deve conter a barra com o ano (ex: 11/26 ou 123/26).`
