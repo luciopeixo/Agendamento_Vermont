@@ -221,6 +221,7 @@ export function PainelGestao({
     return typeof Notification !== 'undefined' && Notification.permission === 'granted';
   });
   const INTERVALO_ATUALIZACAO_SEGUNDOS = 180; // 3 minutos para economia de banda da cota Supabase
+  const [bannerAlerta, setBannerAlerta] = useState(null);
   const [segundosRestantes, setSegundosRestantes] = useState(INTERVALO_ATUALIZACAO_SEGUNDOS);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState(new Date());
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Layers, Box, Building2, Search, CheckCircle2, AlertTriangle, UploadCloud, Plus, UserPlus, Hash, FileText } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
@@ -7,7 +7,9 @@ import {
   consultarCNPJReceita,
   sanitizarNumeroBloco,
   validarFormatoBlocoTajMahal,
-  isClienteThorOuArgos
+  isClienteThorOuArgos,
+  isClienteAntolini,
+  isMaterialTajMahal
 } from '../services/agendamentoService';
 import { 
   STATUS_ENVELOPAMENTO, 
@@ -25,7 +27,8 @@ export function ModalCadastrarBlocoEnvelopamento({
   blocoEdicao = null,
   onFechar,
   onSalvo,
-  usuarioNome = 'Equipe Vermont'
+  usuarioNome = 'Equipe Vermont',
+  isAdmin = false
 }) {
   const [modoAba, setModoAba] = useState('individual'); // 'individual' | 'lote' | 'pdf'
   const [modalGestaoClientesAberto, setModalGestaoClientesAberto] = useState(false);
@@ -127,6 +130,20 @@ export function ModalCadastrarBlocoEnvelopamento({
       listaExistente: envelopamentosExistentes
     });
   }, [formData.numero_bloco, formData.cliente_nome, formData.cliente_cnpj, formData.material, formData.pedreira_id, formData.pedreira_nome, formData.id, envelopamentosExistentes]);
+
+  const isAntoliniTajIndividual = useMemo(() => {
+    return isClienteAntolini(formData.cliente_nome) && isMaterialTajMahal(formData.material, formData.pedreira_nome || formData.pedreira_id);
+  }, [formData.cliente_nome, formData.material, formData.pedreira_nome, formData.pedreira_id]);
+
+  const alertaTajMahalIndividual = useMemo(() => {
+    return validarFormatoBlocoTajMahal({
+      material: formData.material,
+      pedreira: formData.pedreira_nome || formData.pedreira_id,
+      cliente: formData.cliente_nome,
+      numero_bloco: formData.numero_bloco,
+      isAdmin: Boolean(blocoEdicao && isAdmin)
+    });
+  }, [formData.material, formData.pedreira_nome, formData.pedreira_id, formData.cliente_nome, formData.numero_bloco, blocoEdicao, isAdmin]);
 
   // Verificação de duplicidade em lote
   const blocosLoteAvaliados = React.useMemo(() => {
@@ -306,6 +323,19 @@ export function ModalCadastrarBlocoEnvelopamento({
     }
     if (!formData.cliente_nome.trim()) {
       setErro('Informe o cliente / comprador do bloco.');
+      return;
+    }
+
+    const isEdicaoAdmin = Boolean(blocoEdicao && isAdmin);
+    const valTaj = validarFormatoBlocoTajMahal({
+      material: formData.material,
+      pedreira: formData.pedreira_nome || formData.pedreira_id,
+      cliente: formData.cliente_nome,
+      numero_bloco: formData.numero_bloco,
+      isAdmin: isEdicaoAdmin
+    });
+    if (!valTaj.valido) {
+      setErro(valTaj.mensagem);
       return;
     }
 
@@ -549,17 +579,38 @@ export function ModalCadastrarBlocoEnvelopamento({
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Ex: 0326 ou 18/26TB"
+                  placeholder={isAntoliniTajIndividual ? "Ex: 2510TM ou 2511TM" : "Ex: 0326 ou 18/26TB"}
                   value={formData.numero_bloco}
                   onChange={(e) => {
                     setFormData(prev => ({ ...prev, numero_bloco: e.target.value.toUpperCase() }));
                   }}
                   onBlur={(e) => {
-                    const limpo = e.target.value.trim().replace(/[.\s]+$/, '');
+                    const isEdicaoAdmin = Boolean(blocoEdicao && isAdmin);
+                    const limpo = sanitizarNumeroBloco(
+                      e.target.value,
+                      isClienteThorOuArgos(formData.cliente_nome),
+                      isAntoliniTajIndividual,
+                      isEdicaoAdmin
+                    );
                     setFormData(prev => ({ ...prev, numero_bloco: limpo }));
                   }}
                   required
                 />
+                {isAntoliniTajIndividual && (
+                  <span style={{ fontSize: '0.74rem', color: '#38bdf8', display: 'block', marginTop: 4, fontWeight: 600 }}>
+                    ℹ️ Blocos do Taj Mahal para Antolini devem terminar com <strong>TM</strong> (Ex: 2510TM, 2511TM).
+                  </span>
+                )}
+                {blocoEdicao && isAdmin && (
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 3 }}>
+                    🔓 Edição Administrador: Permite salvar bloco com barra ("/") ou sem barra livremente.
+                  </span>
+                )}
+                {!alertaTajMahalIndividual.valido && (
+                  <span className="animate-fade" style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
+                    ⚠️ {alertaTajMahalIndividual.mensagem}
+                  </span>
+                )}
               </div>
 
               {/* Peso (Kg) */}

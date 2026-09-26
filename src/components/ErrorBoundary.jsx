@@ -58,6 +58,17 @@ export class ErrorBoundary extends React.Component {
               Os dados estão preservados com segurança. Clique abaixo para tentar novamente ou retornar ao início.
             </p>
 
+            {this.state.error && (
+              <details style={{ textAlign: 'left', background: 'rgba(0,0,0,0.4)', padding: '10px 14px', borderRadius: 8, marginBottom: 20, color: '#fca5a5', fontSize: '0.8rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600, color: '#f87171', outline: 'none' }}>
+                  Ver detalhes do erro ({this.state.error?.message || String(this.state.error)})
+                </summary>
+                <pre style={{ marginTop: 8, overflowX: 'auto', fontSize: '0.74rem', whiteSpace: 'pre-wrap', color: 'var(--slate-300)' }}>
+                  {this.state.error?.stack || this.state.error?.message || String(this.state.error)}
+                </pre>
+              </details>
+            )}
+
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
                 type="button"

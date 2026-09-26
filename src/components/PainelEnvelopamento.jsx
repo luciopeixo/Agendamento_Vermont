@@ -2640,6 +2640,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         <ModalCadastrarBlocoEnvelopamento
           blocoEdicao={blocoEmEdicao}
           usuarioNome={usuarioNome}
+          isAdmin={isAdmin}
           onFechar={() => {
             setModalCadastroAberto(false);
             setBlocoEmEdicao(null);

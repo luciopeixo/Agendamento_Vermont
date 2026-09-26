@@ -2585,7 +2585,7 @@ export function obterPrimeiroHorarioDisponivel(horariosOcupados = [], dataStr = 
  * Sanitiza a numeração do bloco para remover textos extras (ex: 'BLOCO:', 'Bloco', 'Nº', 'Quartzito', 'Taj Mahal')
  * deixando apenas a numeração/código oficial do bloco a ser imputado no campo.
  */
-export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false, isAntoliniTajMahal = false) {
+export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false, isAntoliniTajMahal = false, permiteBarra = false) {
   if (!texto || typeof texto !== 'string') return '';
   let str = String(texto).trim().toUpperCase().replace(/[.\s]+$/, '').replace(/^[.\s]+/, '');
   
@@ -2625,7 +2625,7 @@ export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false, isAntoli
     const seq = str.slice(0, 1);
     const ano = str.slice(1);
     const anoNum = parseInt(ano, 10);
-    if (isThorOuArgos) {
+    if (isThorOuArgos && !permiteBarra) {
       return `0${seq}/${ano}`;
     }
     if (anoNum >= 20 && anoNum <= 35) {
@@ -2638,7 +2638,7 @@ export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false, isAntoli
     const ano = str.slice(1, 3);
     const sufixo = str.slice(3).toUpperCase();
     const anoNum = parseInt(ano, 10);
-    if (isThorOuArgos) {
+    if (isThorOuArgos && !permiteBarra) {
       return `0${seq}/${ano}${sufixo}`;
     }
     if (anoNum >= 20 && anoNum <= 35) {
@@ -2807,7 +2807,7 @@ export function isMaterialTajMahal(material = '', pedreira = '') {
  * 4. Se for qualquer outro cliente: o número do bloco NÃO PODE conter a barra '/'
  * Retorna { valido: boolean, mensagem: string | null }
  */
-export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numero_bloco = '', pedreira = '' }) {
+export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numero_bloco = '', pedreira = '', isAdmin = false }) {
   if (!numero_bloco) return { valido: true };
 
   const blocoTrim = String(numero_bloco).trim();
@@ -2839,6 +2839,11 @@ export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numer
         mensagem: `Atenção: Para o cliente Antolini (Brasil / Exportação) com material Taj Mahal, o bloco deve obrigatoriamente conter "TM" no final (ex: 2510TM, 2511TM). Bloco informado: ${blocosSemTM.join(', ')}.`
       };
     }
+  }
+
+  // Se for usuário Administrador (no ato da edição): pode colocar com barra ou não livremente
+  if (isAdmin) {
+    return { valido: true };
   }
 
   const contemBarra = blocoTrim.includes('/');
@@ -3670,11 +3675,13 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
         return { success: false, error: checkDuplicado.mensagem };
       }
 
+      const isAdm = Boolean(usuarioInfo?.isAdmin || usuarioInfo?.role === 'Administrador Geral');
       const valTaj = validarFormatoBlocoTajMahal({
         material: agendamentoAtualizado.material,
         pedreira: agendamentoAtualizado.pedreira,
         cliente: agendamentoAtualizado.cliente,
-        numero_bloco: agendamentoAtualizado.numero_bloco
+        numero_bloco: agendamentoAtualizado.numero_bloco,
+        isAdmin: isAdm
       });
       if (!valTaj.valido) {
         return { success: false, error: valTaj.mensagem };

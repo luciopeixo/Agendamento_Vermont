@@ -113,9 +113,10 @@ export function ModalEditarAgendamento({
       material: formData.material,
       pedreira: formData.pedreira,
       cliente: formData.cliente,
-      numero_bloco: formData.numero_bloco
+      numero_bloco: formData.numero_bloco,
+      isAdmin
     });
-  }, [formData.material, formData.pedreira, formData.cliente, formData.numero_bloco]);
+  }, [formData.material, formData.pedreira, formData.cliente, formData.numero_bloco, isAdmin]);
 
   const isAntoliniTaj = useMemo(() => {
     return isClienteAntolini(formData.cliente) && isMaterialTajMahal(formData.material, formData.pedreira);
@@ -317,7 +318,7 @@ export function ModalEditarAgendamento({
     setErro('');
     setSalvando(true);
 
-    const blocoLimpo = sanitizarNumeroBloco(formData.numero_bloco, false, isAntoliniTaj);
+    const blocoLimpo = sanitizarNumeroBloco(formData.numero_bloco, false, isAntoliniTaj, isAdmin);
     if (!blocoLimpo) {
       setErro('Informe a numeração do bloco.');
       setSalvando(false);
@@ -328,7 +329,8 @@ export function ModalEditarAgendamento({
       material: formData.material,
       pedreira: formData.pedreira,
       cliente: formData.cliente,
-      numero_bloco: blocoLimpo
+      numero_bloco: blocoLimpo,
+      isAdmin
     });
     if (!valTaj.valido) {
       setErro(valTaj.mensagem);
@@ -552,12 +554,17 @@ export function ModalEditarAgendamento({
                   style={{ textTransform: 'uppercase', fontWeight: 700 }}
                   value={formData.numero_bloco}
                   onChange={(e) => handleChange('numero_bloco', e.target.value.toUpperCase())}
-                  onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value, false, isAntoliniTaj))}
+                  onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value, false, isAntoliniTaj, isAdmin))}
                   required
                 />
                 {isAntoliniTaj && (
                   <span style={{ fontSize: '0.74rem', color: '#38bdf8', display: 'block', marginTop: 4, fontWeight: 600 }}>
                     ℹ️ Blocos do Taj Mahal para Antolini devem terminar com <strong>TM</strong> (Ex: 2510TM, 2511TM).
+                  </span>
+                )}
+                {isAdmin && (
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 3 }}>
+                    🔓 Edição Administrador: Permite salvar bloco com barra ("/") ou sem barra livremente.
                   </span>
                 )}
                 {!alertaTajMahal.valido && (
