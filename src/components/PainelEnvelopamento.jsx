@@ -21,6 +21,9 @@ import {
   Sparkles,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
   PlusCircle,
   MinusCircle,
   LayoutGrid,
@@ -48,7 +51,13 @@ import {
   normalizarPedreira,
   verificarStatusCarregamentoBloco
 } from '../services/envelopamentoService';
-import { PEDREIRAS_CEARA, formatarDataHoraBR, listarAgendamentos } from '../services/agendamentoService';
+import { 
+  PEDREIRAS_CEARA, 
+  MATERIAIS_POR_PEDREIRA, 
+  obterMateriaisPorPedreira, 
+  formatarDataHoraBR, 
+  listarAgendamentos 
+} from '../services/agendamentoService';
 import { supabase, isSupabaseConfigurado } from '../lib/supabase';
 import { ModalCadastrarBlocoEnvelopamento } from './ModalCadastrarBlocoEnvelopamento';
 import { ModalGestaoClientes } from './ModalGestaoClientes';
@@ -91,9 +100,12 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   });
   const [blocoEmEdicao, setBlocoEmEdicao] = useState(null);
   const [filtroPedreira, setFiltroPedreira] = useState(pedreiraOperador || '');
+  const [filtroMaterial, setFiltroMaterial] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroCarregamento, setFiltroCarregamento] = useState(''); // '', 'carregado', 'agendado', 'no_patio'
   const [buscaTexto, setBuscaTexto] = useState('');
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(20); // 20, 50, 100, 'todos'
   const [executandoAcaoId, setExecutandoAcaoId] = useState(null);
 
   const abrirHistoricoBloco = (blocoContexto = null) => {
@@ -165,6 +177,11 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           return false;
         }
       }
+      if (filtroMaterial) {
+        const matItem = String(item.material || '').trim().toUpperCase();
+        const matFiltro = String(filtroMaterial || '').trim().toUpperCase();
+        if (matItem !== matFiltro) return false;
+      }
       if (filtroStatus && item.status !== filtroStatus) return false;
       if (filtroCarregamento) {
         const infoCarregamento = verificarStatusCarregamentoBloco(item, todosAgendamentos);
@@ -198,7 +215,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       }
       return true;
     });
-  }, [todosEnvelopamentos, todosAgendamentos, filtroPedreira, filtroStatus, filtroCarregamento, buscaTexto]);
+  }, [todosEnvelopamentos, todosAgendamentos, filtroPedreira, filtroMaterial, filtroStatus, filtroCarregamento, buscaTexto]);
 
   const metricas = calcularMetricasEnvelopamento(envelopamentos);
 
@@ -369,6 +386,54 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
     // 1ª REGRA: Ordenar clientes em ordem alfabética (A-Z)
     return lista.sort((a, b) => (a.clienteNome || '').localeCompare(b.clienteNome || '', 'pt-BR'));
   }, [envelopamentos]);
+
+  // Lista dinâmica de materiais disponíveis baseada na pedreira ou geral
+  const listaMateriaisDisponiveis = useMemo(() => {
+    if (filtroPedreira) {
+      const mats = obterMateriaisPorPedreira(filtroPedreira);
+      if (mats && mats.length > 0) return mats;
+    }
+    const todosOficiais = Object.values(MATERIAIS_POR_PEDREIRA).flat();
+    const dosEnvelopamentos = (todosEnvelopamentos || []).map(e => e.material).filter(Boolean);
+    const conjunto = new Set([...todosOficiais, ...dosEnvelopamentos]);
+    return Array.from(conjunto).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [filtroPedreira, todosEnvelopamentos]);
+
+  // Paginação dos Grupos de Clientes (Modo Matriz) e dos Blocos (Modo Tabela)
+  const totalItensPaginacao = modoVisualizacao === 'matriz' ? gruposPorCliente.length : envelopamentos.length;
+  const totalPaginas = itensPorPagina === 'todos' ? 1 : Math.max(1, Math.ceil(totalItensPaginacao / itensPorPagina));
+
+  useEffect(() => {
+    if (paginaAtual > totalPaginas) {
+      setPaginaAtual(1);
+    }
+  }, [totalPaginas, paginaAtual]);
+
+  const gruposPorClientePaginados = useMemo(() => {
+    if (itensPorPagina === 'todos') return gruposPorCliente;
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    return gruposPorCliente.slice(inicio, inicio + itensPorPagina);
+  }, [gruposPorCliente, paginaAtual, itensPorPagina]);
+
+  const blocosPaginados = useMemo(() => {
+    const ordenados = [...envelopamentos].sort(compararNumeroBlocoDecrescente);
+    if (itensPorPagina === 'todos') return ordenados;
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    return ordenados.slice(inicio, inicio + itensPorPagina);
+  }, [envelopamentos, paginaAtual, itensPorPagina]);
+
+  const gerarBotoesPaginacao = (atual, total) => {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    if (atual <= 4) {
+      return [1, 2, 3, 4, 5, '...', total];
+    }
+    if (atual >= total - 3) {
+      return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
+    }
+    return [1, '...', atual - 1, atual, atual + 1, '...', total];
+  };
 
   const toggleCliente = (cliNome) => {
     setClientesExpandidos(prev => {
@@ -1125,7 +1190,18 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             <select
               className="form-select"
               value={filtroPedreira}
-              onChange={(e) => setFiltroPedreira(e.target.value)}
+              onChange={(e) => {
+                const novaP = e.target.value;
+                setFiltroPedreira(novaP);
+                setPaginaAtual(1);
+                if (novaP && filtroMaterial) {
+                  const matsP = obterMateriaisPorPedreira(novaP);
+                  if (matsP && matsP.length > 0) {
+                    const existe = matsP.some(m => m.toUpperCase() === filtroMaterial.toUpperCase());
+                    if (!existe) setFiltroMaterial('');
+                  }
+                }
+              }}
               style={{ 
                 height: 42, 
                 fontSize: '0.88rem',
@@ -1140,6 +1216,33 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             </select>
           </div>
 
+          {/* Filtro Material */}
+          <div>
+            <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Sparkles size={14} color="var(--vermont-green-light)" />
+              FILTRAR MATERIAL:
+            </label>
+            <select
+              className="form-select"
+              value={filtroMaterial}
+              onChange={(e) => {
+                setFiltroMaterial(e.target.value);
+                setPaginaAtual(1);
+              }}
+              style={{ 
+                height: 42, 
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                border: '1px solid rgba(255, 255, 255, 0.22)'
+              }}
+            >
+              <option value="">Todos os Materiais</option>
+              {listaMateriaisDisponiveis.map(mat => (
+                <option key={mat} value={mat}>{mat}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Filtro Status Envelopamento */}
           <div>
             <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1149,7 +1252,10 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             <select
               className="form-select"
               value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value)}
+              onChange={(e) => {
+                setFiltroStatus(e.target.value);
+                setPaginaAtual(1);
+              }}
               style={{ 
                 height: 42, 
                 fontSize: '0.88rem',
@@ -1173,7 +1279,10 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             <select
               className="form-select"
               value={filtroCarregamento}
-              onChange={(e) => setFiltroCarregamento(e.target.value)}
+              onChange={(e) => {
+                setFiltroCarregamento(e.target.value);
+                setPaginaAtual(1);
+              }}
               style={{ 
                 height: 42, 
                 fontSize: '0.88rem',
@@ -1189,15 +1298,17 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           </div>
 
           {/* Botão Limpar Filtros */}
-          {(buscaTexto || filtroPedreira || filtroStatus || filtroCarregamento) && (
+          {(buscaTexto || filtroPedreira || filtroMaterial || filtroStatus || filtroCarregamento) && (
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <button
                 type="button"
                 onClick={() => {
                   setBuscaTexto('');
                   setFiltroPedreira('');
+                  setFiltroMaterial('');
                   setFiltroStatus('');
                   setFiltroCarregamento('');
+                  setPaginaAtual(1);
                 }}
                 className="btn btn-secondary"
                 style={{ 
@@ -1217,16 +1328,19 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         </div>
       </div>
 
-      {/* Barra de Controle de Visualização: Matriz por Cliente vs Tabela Plana */}
+      {/* Barra de Controle de Visualização: Matriz por Cliente vs Tabela Plana + Seletor de Quantidade */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'inherit' }}>
             Visualização:
           </span>
           <div style={{ display: 'flex', background: 'rgba(0,0,0,0.15)', padding: 3, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
             <button
               type="button"
-              onClick={() => setModoVisualizacao('matriz')}
+              onClick={() => {
+                setModoVisualizacao('matriz');
+                setPaginaAtual(1);
+              }}
               className={`btn ${modoVisualizacao === 'matriz' ? 'btn-vermont' : 'btn-secondary'}`}
               style={{ padding: '6px 12px', fontSize: '0.80rem', gap: 6 }}
             >
@@ -1235,13 +1349,52 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             </button>
             <button
               type="button"
-              onClick={() => setModoVisualizacao('tabela')}
+              onClick={() => {
+                setModoVisualizacao('tabela');
+                setPaginaAtual(1);
+              }}
               className={`btn ${modoVisualizacao === 'tabela' ? 'btn-vermont' : 'btn-secondary'}`}
               style={{ padding: '6px 12px', fontSize: '0.80rem', gap: 6 }}
             >
               <List size={15} />
               Lista Plana (Todos os Blocos)
             </button>
+          </div>
+
+          {/* Seletor Rápido de Itens por Página */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)', fontWeight: 600 }}>
+              Exibir:
+            </span>
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: 2, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}>
+              {[20, 50, 100, 'todos'].map((qtd) => {
+                const isSelected = itensPorPagina === qtd;
+                return (
+                  <button
+                    key={String(qtd)}
+                    type="button"
+                    onClick={() => {
+                      setItensPorPagina(qtd);
+                      setPaginaAtual(1);
+                    }}
+                    style={{
+                      padding: '4px 9px',
+                      fontSize: '0.75rem',
+                      fontWeight: isSelected ? 800 : 500,
+                      borderRadius: 6,
+                      background: isSelected ? 'var(--vermont-green-subtle, rgba(0, 168, 62, 0.28))' : 'transparent',
+                      color: isSelected ? '#4ade80' : 'var(--slate-400)',
+                      border: isSelected ? '1px solid rgba(0, 168, 62, 0.45)' : '1px solid transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                    title={qtd === 'todos' ? 'Mostrar todos os registros sem paginação' : `Mostrar de ${qtd} em ${qtd} ${modoVisualizacao === 'matriz' ? 'clientes' : 'blocos'}`}
+                  >
+                    {qtd === 'todos' ? 'Todos' : qtd}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {totalDuplicadosDetectados > 0 && (
@@ -1325,7 +1478,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
            VISÃO MATRIZ AGRUPADA POR CLIENTE COM BOTÃO [+] EXPANSÍVEL
            ========================================================================= */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {gruposPorCliente.map((grupo) => {
+          {gruposPorClientePaginados.map((grupo) => {
             const isExpandido = buscaTexto ? true : clientesExpandidos.has(grupo.clienteNome);
             const pedreirasStr = Array.from(grupo.pedreiras).join(', ') || 'Polo Vermont';
 
@@ -2102,9 +2255,9 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                     <input 
                       type="checkbox"
                       style={{ cursor: 'pointer', width: 16, height: 16, accentColor: '#0284c7' }}
-                      checked={envelopamentos.length > 0 && envelopamentos.every(b => blocosSelecionados.has(b.id))}
+                      checked={blocosPaginados.length > 0 && blocosPaginados.every(b => blocosSelecionados.has(b.id))}
                       onChange={() => {
-                        const todosIds = envelopamentos.map(b => b.id);
+                        const todosIds = blocosPaginados.map(b => b.id);
                         setBlocosSelecionados(prev => {
                           const novo = new Set(prev);
                           const todosMarcados = todosIds.length > 0 && todosIds.every(id => novo.has(id));
@@ -2113,7 +2266,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                           return novo;
                         });
                       }}
-                      title="Selecionar / Desmarcar todos os blocos visíveis"
+                      title="Selecionar / Desmarcar todos os blocos visíveis nesta página"
                     />
                   </th>
                   <th style={{ padding: '12px 14px', fontSize: '0.78rem', color: 'var(--slate-400)', textAlign: 'left' }}>BLOCO / ROCHA</th>
@@ -2125,7 +2278,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                 </tr>
               </thead>
               <tbody>
-                {[...envelopamentos].sort(compararNumeroBlocoDecrescente).map((b) => {
+                {blocosPaginados.map((b) => {
                   const statusInfo = STATUS_ENVELOPAMENTO[b.status?.toUpperCase()] || STATUS_ENVELOPAMENTO.PENDENTE_ENVELOPAMENTO;
                   const executando = executandoAcaoId === b.id;
                   const isSelecionado = blocosSelecionados.has(b.id);
@@ -2460,6 +2613,158 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          RODAPÉ DE PAGINAÇÃO (MATRIZ OU LISTA PLANA)
+          ========================================================================= */}
+      {(totalItensPaginacao > 0 && (totalPaginas > 1 || itensPorPagina !== 'todos')) && (
+        <div 
+          className="glass-panel" 
+          style={{ 
+            marginTop: 18, 
+            padding: '12px 18px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            flexWrap: 'wrap', 
+            gap: 14,
+            borderRadius: 12,
+            border: '1px solid rgba(255, 255, 255, 0.12)'
+          }}
+        >
+          {/* Resumo de visualização */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.84rem', color: 'var(--slate-400)', flexWrap: 'wrap' }}>
+            <span>
+              Exibindo <strong style={{ color: '#fff' }}>{itensPorPagina === 'todos' ? 1 : ((paginaAtual - 1) * itensPorPagina) + 1}</strong> a <strong style={{ color: '#fff' }}>{itensPorPagina === 'todos' ? totalItensPaginacao : Math.min(paginaAtual * itensPorPagina, totalItensPaginacao)}</strong> de <strong style={{ color: '#fff' }}>{totalItensPaginacao}</strong> {modoVisualizacao === 'matriz' ? 'clientes' : 'blocos'}
+            </span>
+            {modoVisualizacao === 'matriz' && (
+              <span style={{
+                background: 'rgba(0, 168, 62, 0.15)',
+                color: '#4ade80',
+                padding: '2px 8px',
+                borderRadius: 6,
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                border: '1px solid rgba(0, 168, 62, 0.35)'
+              }}>
+                {envelopamentos.length} blocos filtrados
+              </span>
+            )}
+          </div>
+
+          {/* Controles de navegação de páginas */}
+          {totalPaginas > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                disabled={paginaAtual <= 1}
+                onClick={() => setPaginaAtual(1)}
+                className="btn btn-secondary"
+                style={{ padding: '6px 9px', fontSize: '0.78rem', opacity: paginaAtual <= 1 ? 0.35 : 1, cursor: paginaAtual <= 1 ? 'not-allowed' : 'pointer' }}
+                title="Primeira página"
+              >
+                <ChevronsLeft size={15} />
+              </button>
+
+              <button
+                type="button"
+                disabled={paginaAtual <= 1}
+                onClick={() => setPaginaAtual(prev => Math.max(1, prev - 1))}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.78rem', opacity: paginaAtual <= 1 ? 0.35 : 1, cursor: paginaAtual <= 1 ? 'not-allowed' : 'pointer', gap: 4 }}
+                title="Página anterior"
+              >
+                <ChevronLeft size={15} /> Anterior
+              </button>
+
+              {/* Botões numéricos de página */}
+              <div style={{ display: 'flex', gap: 4 }}>
+                {gerarBotoesPaginacao(paginaAtual, totalPaginas).map((pg, idx) => {
+                  if (pg === '...') {
+                    return <span key={`ellipsis-${idx}`} style={{ padding: '6px 6px', color: 'var(--slate-500)', fontSize: '0.8rem' }}>...</span>;
+                  }
+                  const isAtiva = pg === paginaAtual;
+                  return (
+                    <button
+                      key={`page-${pg}`}
+                      type="button"
+                      onClick={() => setPaginaAtual(pg)}
+                      className={isAtiva ? 'btn btn-vermont' : 'btn btn-secondary'}
+                      style={{
+                        minWidth: 32,
+                        height: 30,
+                        padding: '0 6px',
+                        fontSize: '0.78rem',
+                        fontWeight: isAtiva ? 800 : 500,
+                        boxShadow: isAtiva ? '0 0 10px rgba(0, 168, 62, 0.4)' : 'none'
+                      }}
+                    >
+                      {pg}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                disabled={paginaAtual >= totalPaginas}
+                onClick={() => setPaginaAtual(prev => Math.min(totalPaginas, prev + 1))}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '0.78rem', opacity: paginaAtual >= totalPaginas ? 0.35 : 1, cursor: paginaAtual >= totalPaginas ? 'not-allowed' : 'pointer', gap: 4 }}
+                title="Próxima página"
+              >
+                Próxima <ChevronRight size={15} />
+              </button>
+
+              <button
+                type="button"
+                disabled={paginaAtual >= totalPaginas}
+                onClick={() => setPaginaAtual(totalPaginas)}
+                className="btn btn-secondary"
+                style={{ padding: '6px 9px', fontSize: '0.78rem', opacity: paginaAtual >= totalPaginas ? 0.35 : 1, cursor: paginaAtual >= totalPaginas ? 'not-allowed' : 'pointer' }}
+                title="Última página"
+              >
+                <ChevronsRight size={15} />
+              </button>
+            </div>
+          )}
+
+          {/* Seletor de quantidade no rodapé */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--slate-400)', fontWeight: 600 }}>
+              {modoVisualizacao === 'matriz' ? 'Clientes' : 'Blocos'} por pág:
+            </span>
+            <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 2, border: '1px solid rgba(255,255,255,0.08)' }}>
+              {[20, 50, 100, 'todos'].map((qtd) => {
+                const selecionado = itensPorPagina === qtd;
+                return (
+                  <button
+                    key={String(qtd)}
+                    type="button"
+                    onClick={() => {
+                      setItensPorPagina(qtd);
+                      setPaginaAtual(1);
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '0.74rem',
+                      fontWeight: selecionado ? 800 : 500,
+                      borderRadius: 6,
+                      background: selecionado ? 'var(--vermont-green-subtle, rgba(0, 168, 62, 0.28))' : 'transparent',
+                      color: selecionado ? '#4ade80' : 'var(--slate-400)',
+                      border: selecionado ? '1px solid rgba(0, 168, 62, 0.45)' : '1px solid transparent',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {qtd === 'todos' ? 'Todos' : qtd}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
