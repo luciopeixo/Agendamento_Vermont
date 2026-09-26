@@ -483,11 +483,26 @@ export function registrarHistoricoEdicaoMotorista(motoristaAnterior = {}, motori
   return [novoEvento, ...historicoExistente];
 }
 
+let cacheBaseMotoristas = null;
+let cacheBaseMotoristasTime = 0;
+const CACHE_MOTORISTAS_TTL = 60 * 1000; // 60 segundos de cache em memória para evitar requisições redundantes
+
+export function invalidarCacheMotoristas() {
+  cacheBaseMotoristas = null;
+  cacheBaseMotoristasTime = 0;
+}
+
 /**
  * Carrega a base unificada e consolidada de todos os motoristas cadastrados
  * Unifica: Base de Conformidade (localStorage / Supabase) + Histórico completo de agendamentos
  */
 export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
+  const agora = Date.now();
+  // Se não foi passado agendamentos específicos e o cache ainda for recente, reutiliza sem gastar banda Supabase
+  if ((!agendamentosProp || agendamentosProp.length === 0) && cacheBaseMotoristas && (agora - cacheBaseMotoristasTime < CACHE_MOTORISTAS_TTL)) {
+    return cacheBaseMotoristas;
+  }
+
   const mapaMotoristas = new Map();
   const cpfsExcluidos = obterCpfsMotoristasExcluidos();
 
@@ -610,6 +625,9 @@ export async function carregarBaseMotoristasUnificada(agendamentosProp = []) {
   // Salva no cache local para persistência rápida
   localStorage.setItem(MOTORISTAS_BASE_KEY, codificarBaseMotoristasLocal(listaCompleta));
 
+  cacheBaseMotoristas = listaCompleta;
+  cacheBaseMotoristasTime = Date.now();
+
   return listaCompleta;
 }
 
@@ -701,6 +719,7 @@ export async function salvarMotoristaNaBase(dadosMotorista = {}) {
         await supabase.from('base_motoristas').upsert(payload, { onConflict: 'cpf' });
       } catch (_e) {}
     }
+    invalidarCacheMotoristas();
   } catch (e) {
     console.warn('Erro ao salvar motorista na base:', e);
   }
@@ -865,6 +884,7 @@ export async function salvarMotoristaFrotaConformidade(dados = {}, usuarioInfo =
       }
     }
 
+    invalidarCacheMotoristas();
     return { sucesso: true, motorista: registroAtualizado };
   } catch (err) {
     return { sucesso: false, erro: err.message || 'Erro ao salvar conformidade.' };
@@ -896,6 +916,7 @@ export async function excluirMotoristaFrota(cpf = '') {
       } catch (_e) {}
     }
 
+    invalidarCacheMotoristas();
     return true;
   } catch (e) {
     return false;
@@ -2840,7 +2861,7 @@ export async function verificarBlocoDuplicado({
     try {
       const { data, error } = await supabase
         .from('agendamentos_pedreira')
-        .select('*')
+        .select('id, status, observacoes, numero_bloco, pedreira, material, cliente, cliente_cnpj, data_agendamento, horario_agendamento')
         .neq('status', 'Cancelado')
         .order('data_agendamento', { ascending: false });
 

@@ -8,7 +8,7 @@ import { ComprovanteModal } from './components/ComprovanteModal';
 import { RegrasModal } from './components/RegrasModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ShieldCheck, Mail, MapPin } from 'lucide-react';
-import { EMAIL_NOTIFICACAO_DESTINO, isSupabaseConfigurado, carregarBaseMotoristasUnificada } from './services/agendamentoService';
+import { EMAIL_NOTIFICACAO_DESTINO, isSupabaseConfigurado, carregarBaseMotoristasUnificada, invalidarCacheMotoristas } from './services/agendamentoService';
 import { supabase } from './lib/supabase';
 
 export function App() {
@@ -98,6 +98,7 @@ export function App() {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'base_motoristas' },
           () => {
+            invalidarCacheMotoristas();
             carregarBaseMotoristasUnificada().catch(() => {});
           }
         )

@@ -609,12 +609,26 @@ export const identificarDuplicidadesEmLista = (listaNova = [], listaExistente = 
   });
 };
 
+let cacheEnvelopamentosNuvem = null;
+let cacheEnvelopamentosTime = 0;
+const CACHE_ENVELOPAMENTOS_TTL = 60 * 1000; // 60 segundos de cache em memória
+
+export const invalidarCacheEnvelopamentos = () => {
+  cacheEnvelopamentosNuvem = null;
+  cacheEnvelopamentosTime = 0;
+};
+
 /**
  * Consulta a lista de envelopamentos na nuvem com paginação automática,
  * superando o limite restrito de 1.000 linhas por requisição do Supabase/PostgREST.
  */
 const consultarEnvelopamentosNuvem = async () => {
   if (!isSupabaseConfigurado()) return null;
+
+  const agora = Date.now();
+  if (cacheEnvelopamentosNuvem && (agora - cacheEnvelopamentosTime < CACHE_ENVELOPAMENTOS_TTL)) {
+    return cacheEnvelopamentosNuvem;
+  }
 
   try {
     let todosRegistros = [];
@@ -650,7 +664,10 @@ const consultarEnvelopamentosNuvem = async () => {
     }
 
     if (todosRegistros.length > 0) {
-      return todosRegistros.map(parseItemDeSupabaseEnvelopamentos);
+      const parsed = todosRegistros.map(parseItemDeSupabaseEnvelopamentos);
+      cacheEnvelopamentosNuvem = parsed;
+      cacheEnvelopamentosTime = Date.now();
+      return parsed;
     }
   } catch (e) {
     console.warn('[Envelopamento] Falha ao consultar tabela envelopamentos:', e);
@@ -737,6 +754,8 @@ export const listarEnvelopamentos = async (filtros = {}) => {
 
 // Dispara evento local para sincronização reativa instantânea entre componentes e abas
 export const notificarAlteracaoEnvelopamento = () => {
+  invalidarCacheEnvelopamentos();
+  invalidarCacheClientes();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vermont_envelopamento_changed'));
   }
@@ -758,6 +777,7 @@ export const inscreverEnvelopamentosRealtime = (callback) => {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'envelopamentos' },
           (payload) => {
+            invalidarCacheEnvelopamentos();
             if (typeof callback === 'function') callback(payload);
           }
         )
@@ -1917,11 +1937,25 @@ const calcularScoreNomeCliente = (nome = '') => {
   return score;
 };
 
+let cacheClientesBanco = null;
+let cacheClientesBancoTime = 0;
+const CACHE_CLIENTES_TTL = 5 * 60 * 1000; // 5 minutos de cache para clientes
+
+export const invalidarCacheClientes = () => {
+  cacheClientesBanco = null;
+  cacheClientesBancoTime = 0;
+};
+
 /**
  * Obtém todos os clientes e importadores cadastrados e operados no sistema,
  * preservando todas as empresas cadastradas e deduplicando de forma segura (por CNPJ exato ou nome completo).
  */
 export const obterClientesDoBancoDeDados = async () => {
+  const agora = Date.now();
+  if (cacheClientesBanco && (agora - cacheClientesBancoTime < CACHE_CLIENTES_TTL)) {
+    return cacheClientesBanco;
+  }
+
   const itensColetados = [];
 
   const coletar = (nomeBruto, cnpjBruto, extra = {}) => {
@@ -2056,6 +2090,8 @@ export const obterClientesDoBancoDeDados = async () => {
 
   const resultado = Array.from(mapaPorChaveUnica.values());
   resultado.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  cacheClientesBanco = resultado;
+  cacheClientesBancoTime = Date.now();
   return resultado;
 };
 

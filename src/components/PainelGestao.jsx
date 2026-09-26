@@ -32,12 +32,14 @@ import {
   verificarConformidadeDocumental,
   obterBaseMotoristas,
   carregarBaseMotoristasUnificada,
+  invalidarCacheMotoristas,
   isSupabaseConfigurado
 } from '../services/agendamentoService';
 import { 
   listarEnvelopamentos, 
   verificarStatusEnvelopamentoAgendamento, 
-  inscreverEnvelopamentosRealtime 
+  inscreverEnvelopamentosRealtime,
+  invalidarCacheEnvelopamentos
 } from '../services/envelopamentoService';
 import { supabase } from '../lib/supabase';
 import { ModalEditarAgendamento } from './ModalEditarAgendamento';
@@ -218,8 +220,8 @@ export function PainelGestao({
   const [desktopPermitido, setDesktopPermitido] = useState(() => {
     return typeof Notification !== 'undefined' && Notification.permission === 'granted';
   });
-  const [bannerAlerta, setBannerAlerta] = useState(null);
-  const [segundosRestantes, setSegundosRestantes] = useState(60);
+  const INTERVALO_ATUALIZACAO_SEGUNDOS = 180; // 3 minutos para economia de banda da cota Supabase
+  const [segundosRestantes, setSegundosRestantes] = useState(INTERVALO_ATUALIZACAO_SEGUNDOS);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState(new Date());
 
   const statusAnterioresMapRef = useRef(new Map());
@@ -323,7 +325,7 @@ export function PainelGestao({
   const carregarDados = async (isManual = true) => {
     if (isManual) setCarregando(true);
     try {
-      const [lista, pendentes, listaCompletaGeral, envsData] = await Promise.all([
+      const promises = [
         listarAgendamentos({
           pedreira: filtroPedreira,
           status: filtroStatus,
@@ -332,25 +334,41 @@ export function PainelGestao({
         obterPendenciasAnteriores({
           pedreira: filtroPedreira,
           dataReferencia: hojeStr
-        }),
-        // Busca base histórica completa sem restrição de data para alimentar a aba analítica / gráficos do Admin
-        listarAgendamentos({}),
-        // Busca dados sincronizados de envelopamento de blocos
-        listarEnvelopamentos()
-      ]);
+        })
+      ];
+
+      // Busca base histórica completa apenas em carga manual, ao acessar aba de gráficos ou na primeira carga
+      const precisaHistorico = isManual || abaAtiva === 'graficos' || todosAgendamentos.length === 0;
+      if (precisaHistorico) {
+        promises.push(listarAgendamentos({}));
+      } else {
+        promises.push(Promise.resolve(todosAgendamentos));
+      }
+
+      // Base de envelopamentos: o Supabase Realtime já sincroniza em tempo real, portanto recarregamos na íntegra apenas na primeira vez ou refresh manual
+      const precisaEnvelopamentos = isManual || envelopamentos.length === 0;
+      if (precisaEnvelopamentos) {
+        promises.push(listarEnvelopamentos());
+      } else {
+        promises.push(Promise.resolve(envelopamentos));
+      }
+
+      const [lista, pendentes, listaCompletaGeral, envsData] = await Promise.all(promises);
 
       setPendenciasAnteriores(pendentes);
       setTodosAgendamentos(listaCompletaGeral);
-      if (Array.isArray(envsData)) {
+      if (Array.isArray(envsData) && envsData.length > 0) {
         setEnvelopamentos(envsData);
       }
 
-      // Sincroniza a base de motoristas em segundo plano com o Supabase e histórico de agendamentos
-      try {
-        await carregarBaseMotoristasUnificada(listaCompletaGeral);
-        setVersaoBaseMotoristas(v => v + 1);
-      } catch (e) {
-        console.warn('Sync motoristas:', e);
+      // Sincroniza a base de motoristas apenas na primeira carga ou refresh manual (Supabase Realtime cuida do restante)
+      if (isManual || versaoBaseMotoristas === 0) {
+        try {
+          await carregarBaseMotoristasUnificada(listaCompletaGeral);
+          setVersaoBaseMotoristas(v => v + 1);
+        } catch (e) {
+          console.warn('Sync motoristas:', e);
+        }
       }
 
       const mapaAnterior = statusAnterioresMapRef.current;
@@ -404,7 +422,7 @@ export function PainelGestao({
 
       setAgendamentos(lista);
       setUltimaAtualizacao(new Date());
-      setSegundosRestantes(60);
+      setSegundosRestantes(INTERVALO_ATUALIZACAO_SEGUNDOS);
     } catch (err) {
       console.error('Erro ao consultar agendamentos:', err);
     } finally {
@@ -417,6 +435,13 @@ export function PainelGestao({
     carregarDados(true);
   }, [filtroPedreira, filtroStatus, filtroData]);
 
+  // Carrega base histórica se o usuário entrar na aba de gráficos e ela estiver vazia
+  useEffect(() => {
+    if (abaAtiva === 'graficos' && todosAgendamentos.length === 0) {
+      carregarDados(true);
+    }
+  }, [abaAtiva]);
+
   // Sincronização em tempo real via Supabase Realtime para agendamentos, base de motoristas e envelopamentos
   useEffect(() => {
     let channel = null;
@@ -427,6 +452,7 @@ export function PainelGestao({
           'postgres_changes',
           { event: '*', schema: 'public', table: 'base_motoristas' },
           () => {
+            invalidarCacheMotoristas();
             carregarBaseMotoristasUnificada()
               .then(() => setVersaoBaseMotoristas(v => v + 1))
               .catch(() => {});
@@ -443,6 +469,7 @@ export function PainelGestao({
           'postgres_changes',
           { event: '*', schema: 'public', table: 'envelopamentos' },
           () => {
+            invalidarCacheEnvelopamentos();
             listarEnvelopamentos().then(envs => setEnvelopamentos(envs)).catch(() => {});
           }
         )
@@ -466,20 +493,42 @@ export function PainelGestao({
     };
   }, []);
 
-  // Intervalo de Auto-Atualização a cada 1 minuto (60 segundos) com contador em tempo real
+  // Intervalo de Auto-Atualização inteligente (com pausa em segundo plano para economia de dados)
   useEffect(() => {
     const timer = setInterval(() => {
+      // Se a aba estiver oculta / minimizada, suspende o timer para poupar cota de banda do Supabase
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+
       setSegundosRestantes(prev => {
         if (prev <= 1) {
           carregarDados(false);
-          return 60;
+          return INTERVALO_ATUALIZACAO_SEGUNDOS;
         }
         return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [filtroPedreira, filtroStatus, filtroData, somAtivado]);
+    const handleVisibilidade = () => {
+      if (!document.hidden) {
+        // Ao retornar para a aba visível, atualiza suavemente se necessário
+        carregarDados(false);
+        setSegundosRestantes(INTERVALO_ATUALIZACAO_SEGUNDOS);
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilidade);
+    }
+
+    return () => {
+      clearInterval(timer);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilidade);
+      }
+    };
+  }, [filtroPedreira, filtroStatus, filtroData, somAtivado, abaAtiva]);
 
   const notificacoesNaoLidas = notificacoes.filter(n => !n.lida);
 
@@ -1224,7 +1273,7 @@ export function PainelGestao({
               background: '#22c55e',
               boxShadow: '0 0 8px #22c55e'
             }} />
-            <span>Atualiza em <strong>{segundosRestantes}s</strong></span>
+            <span>Atualiza em <strong>{segundosRestantes >= 60 ? `${Math.floor(segundosRestantes / 60)}m ${String(segundosRestantes % 60).padStart(2, '0')}s` : `${segundosRestantes}s`}</strong></span>
           </div>
 
           <button
