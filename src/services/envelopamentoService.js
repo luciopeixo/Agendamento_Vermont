@@ -916,13 +916,18 @@ export const listarHistoricoEnvelopamentos = async () => {
         .from('envelopamentos_historico')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(300);
+        .limit(1000);
 
       if (!error && Array.isArray(data) && data.length > 0) {
         salvarHistoricoLocais(data);
         return data;
       }
-    } catch (e) {}
+      if (error) {
+        console.warn('[Envelopamento] Falha ao consultar envelopamentos_historico:', error);
+      }
+    } catch (e) {
+      console.warn('[Envelopamento] Exceção ao consultar historico:', e);
+    }
   }
   return carregarHistoricoLocais();
 };
