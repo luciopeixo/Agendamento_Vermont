@@ -15,6 +15,8 @@ import {
   sanitizarNumeroBloco,
   validarFormatoBlocoTajMahal,
   isClienteThorOuArgos,
+  isClienteAntolini,
+  isMaterialTajMahal,
   limparTagsInternasObservacoes,
   obterStatusConformidadeCNH,
   obterStatusConformidadeCavalo,
@@ -109,10 +111,15 @@ export function ModalEditarAgendamento({
   const alertaTajMahal = useMemo(() => {
     return validarFormatoBlocoTajMahal({
       material: formData.material,
+      pedreira: formData.pedreira,
       cliente: formData.cliente,
       numero_bloco: formData.numero_bloco
     });
-  }, [formData.material, formData.cliente, formData.numero_bloco]);
+  }, [formData.material, formData.pedreira, formData.cliente, formData.numero_bloco]);
+
+  const isAntoliniTaj = useMemo(() => {
+    return isClienteAntolini(formData.cliente) && isMaterialTajMahal(formData.material, formData.pedreira);
+  }, [formData.cliente, formData.material, formData.pedreira]);
 
   // Sincronização em tempo real do status de envelopamento do bloco
   const [infoEnvelopamento, setInfoEnvelopamento] = useState(null);
@@ -310,7 +317,7 @@ export function ModalEditarAgendamento({
     setErro('');
     setSalvando(true);
 
-    const blocoLimpo = sanitizarNumeroBloco(formData.numero_bloco);
+    const blocoLimpo = sanitizarNumeroBloco(formData.numero_bloco, false, isAntoliniTaj);
     if (!blocoLimpo) {
       setErro('Informe a numeração do bloco.');
       setSalvando(false);
@@ -319,6 +326,7 @@ export function ModalEditarAgendamento({
 
     const valTaj = validarFormatoBlocoTajMahal({
       material: formData.material,
+      pedreira: formData.pedreira,
       cliente: formData.cliente,
       numero_bloco: blocoLimpo
     });
@@ -540,12 +548,18 @@ export function ModalEditarAgendamento({
                 <input
                   type="text"
                   className="form-input"
+                  placeholder={isAntoliniTaj ? "Ex: 2510TM ou 2510TM, 2511TM" : "Ex: 1256926"}
                   style={{ textTransform: 'uppercase', fontWeight: 700 }}
                   value={formData.numero_bloco}
                   onChange={(e) => handleChange('numero_bloco', e.target.value.toUpperCase())}
-                  onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value))}
+                  onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value, false, isAntoliniTaj))}
                   required
                 />
+                {isAntoliniTaj && (
+                  <span style={{ fontSize: '0.74rem', color: '#38bdf8', display: 'block', marginTop: 4, fontWeight: 600 }}>
+                    ℹ️ Blocos do Taj Mahal para Antolini devem terminar com <strong>TM</strong> (Ex: 2510TM, 2511TM).
+                  </span>
+                )}
                 {!alertaTajMahal.valido && (
                   <span className="animate-fade" style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
                     ⚠️ {alertaTajMahal.mensagem}

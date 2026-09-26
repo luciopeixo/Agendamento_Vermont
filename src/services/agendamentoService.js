@@ -2585,7 +2585,7 @@ export function obterPrimeiroHorarioDisponivel(horariosOcupados = [], dataStr = 
  * Sanitiza a numeração do bloco para remover textos extras (ex: 'BLOCO:', 'Bloco', 'Nº', 'Quartzito', 'Taj Mahal')
  * deixando apenas a numeração/código oficial do bloco a ser imputado no campo.
  */
-export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false) {
+export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false, isAntoliniTajMahal = false) {
   if (!texto || typeof texto !== 'string') return '';
   let str = String(texto).trim().toUpperCase().replace(/[.\s]+$/, '').replace(/^[.\s]+/, '');
   
@@ -2657,7 +2657,15 @@ export function sanitizarNumeroBloco(texto = '', isThorOuArgos = false) {
     }
   }
   
-  return str.replace(/[.\s]+$/, '').trim();
+  let resultadoFinal = str.replace(/[.\s]+$/, '').trim();
+
+  // 8. Regra Especial Antolini + Taj Mahal:
+  // Se for apenas numérico (ex: "2510"), anexa automaticamente o sufixo "TM" ("2510TM")
+  if (isAntoliniTajMahal && resultadoFinal && !resultadoFinal.endsWith('TM')) {
+    resultadoFinal = `${resultadoFinal}TM`;
+  }
+  
+  return resultadoFinal;
 }
 
 /**
@@ -2772,13 +2780,34 @@ export function isClienteComBarraNoBloco(cliente = '') {
 export const isClienteThorOuArgos = isClienteComBarraNoBloco;
 
 /**
+ * Identifica se o cliente informado refere-se à Antolini (ex: "Antolini do Brasil", "Antolini Exportação", "Antolini Spa", etc.)
+ */
+export function isClienteAntolini(cliente = '') {
+  if (!cliente || typeof cliente !== 'string') return false;
+  return /\bANTOLINI\b/i.test(cliente);
+}
+
+/**
+ * Identifica se o material ou a pedreira refere-se ao Taj Mahal / Quartzito Taj Mahal (Uruoca)
+ */
+export function isMaterialTajMahal(material = '', pedreira = '') {
+  const m = String(material || '').toUpperCase().trim();
+  const p = String(pedreira || '').toUpperCase().trim();
+  if (m.includes('TAJ MAHAL') || m.includes('TAJMAHAL')) return true;
+  if (p.includes('TAJ MAHAL') || p.includes('URUOCA')) return true;
+  return false;
+}
+
+/**
  * Valida a regra de formatação de número de bloco:
  * 1. Proibição universal de '-' (hífen) ou '.' (ponto) para todos os clientes e pedreiras.
- * 2. Se o Cliente for exceção autorizada (THOR, ARGOS, MARMI OROBICI, STONEVAL, VERZU TRADING, etc.): o número do bloco DEVE conter '/' (ex: 11/26 ou 123/26)
- * 3. Se for qualquer outro cliente: o número do bloco NÃO PODE conter a barra '/'
+ * 2. Regra Obrigatória Antolini (Brasil ou Exportação) para blocos do Taj Mahal:
+ *    O número do bloco DEVE conter "TM" no final (ex: 2510TM, 2511TM).
+ * 3. Se o Cliente for exceção autorizada de barra (THOR, ARGOS, MARMI OROBICI, STONEVAL, VERZU TRADING, etc.): o número do bloco DEVE conter '/' (ex: 11/26 ou 123/26)
+ * 4. Se for qualquer outro cliente: o número do bloco NÃO PODE conter a barra '/'
  * Retorna { valido: boolean, mensagem: string | null }
  */
-export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numero_bloco = '' }) {
+export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numero_bloco = '', pedreira = '' }) {
   if (!numero_bloco) return { valido: true };
 
   const blocoTrim = String(numero_bloco).trim();
@@ -2790,6 +2819,26 @@ export function validarFormatoBlocoTajMahal({ material = '', cliente = '', numer
       valido: false,
       mensagem: 'Número do bloco não pode conter "-" ou ".".'
     };
+  }
+
+  // 2. Regra Obrigatória Antolini (Brasil / Exportação) para blocos do Taj Mahal
+  const isAntolini = isClienteAntolini(cliente);
+  const isTajMahal = isMaterialTajMahal(material, pedreira);
+
+  if (isAntolini && isTajMahal) {
+    const blocosDigitados = extrairBlocosDigitados(blocoTrim);
+    const listaChecagem = blocosDigitados.length > 0 ? blocosDigitados : [blocoTrim];
+    const blocosSemTM = listaChecagem.filter(b => {
+      const bLimpo = String(b || '').trim().toUpperCase();
+      return !bLimpo.endsWith('TM');
+    });
+
+    if (blocosSemTM.length > 0) {
+      return {
+        valido: false,
+        mensagem: `Atenção: Para o cliente Antolini (Brasil / Exportação) com material Taj Mahal, o bloco deve obrigatoriamente conter "TM" no final (ex: 2510TM, 2511TM). Bloco informado: ${blocosSemTM.join(', ')}.`
+      };
+    }
   }
 
   const contemBarra = blocoTrim.includes('/');
@@ -3623,6 +3672,7 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
 
       const valTaj = validarFormatoBlocoTajMahal({
         material: agendamentoAtualizado.material,
+        pedreira: agendamentoAtualizado.pedreira,
         cliente: agendamentoAtualizado.cliente,
         numero_bloco: agendamentoAtualizado.numero_bloco
       });
@@ -4999,9 +5049,10 @@ export async function salvarAgendamento(dados) {
       throw new Error(checkDuplicado.mensagem);
     }
 
-    // Validação de formato de bloco Taj Mahal (Thor/Argos exige '/', outros proíbe '/')
+    // Validação de formato de bloco Taj Mahal (Thor/Argos exige '/', outros proíbe '/', Antolini exige 'TM')
     const valTaj = validarFormatoBlocoTajMahal({
       material: dados.material,
+      pedreira: dados.pedreira,
       cliente: dados.cliente,
       numero_bloco: dados.numero_bloco
     });
@@ -5188,9 +5239,10 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
         throw new Error(`[${numPonto}º Carregamento] ${checkDuplicado.mensagem}`);
       }
 
-      // Validação de formato de bloco Taj Mahal (Thor/Argos exige '/', outros proíbe '/')
+      // Validação de formato de bloco Taj Mahal (Thor/Argos exige '/', outros proíbe '/', Antolini exige 'TM')
       const valTaj = validarFormatoBlocoTajMahal({
         material: p.material,
+        pedreira: p.pedreira,
         cliente: clientePonto,
         numero_bloco: p.numero_bloco
       });

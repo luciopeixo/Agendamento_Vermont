@@ -31,6 +31,8 @@ import {
   verificarBlocoDuplicado,
   validarFormatoBlocoTajMahal,
   isClienteThorOuArgos,
+  isClienteAntolini,
+  isMaterialTajMahal,
   validarCPF,
   consultarMotoristaPorCPF,
   validarCNPJ,
@@ -244,32 +246,47 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
     return () => { ativo = false; };
   }, [formData.numero_bloco, formData.cliente, formData.cliente_cnpj, formData.material, formData.pedreira]);
 
-  // Validação em tempo real de formato de bloco para Taj Mahal (Thor/Argos exige "/", outros proíbe "/")
+  // Validação em tempo real de formato de bloco para Taj Mahal (Thor/Argos exige "/", outros proíbe "/", Antolini exige "TM")
   const alertaTajMahal1 = useMemo(() => {
     return validarFormatoBlocoTajMahal({
       material: formData.material,
+      pedreira: formData.pedreira,
       cliente: formData.cliente,
       numero_bloco: formData.numero_bloco
     });
-  }, [formData.material, formData.cliente, formData.numero_bloco]);
+  }, [formData.material, formData.pedreira, formData.cliente, formData.numero_bloco]);
 
   const alertaTajMahal2 = useMemo(() => {
     if (tipoCarregamento !== 'combinado') return { valido: true };
     return validarFormatoBlocoTajMahal({
       material: ponto2.material,
+      pedreira: ponto2.pedreira,
       cliente: ponto2.cliente || formData.cliente,
       numero_bloco: ponto2.numero_bloco
     });
-  }, [tipoCarregamento, ponto2.material, ponto2.cliente, formData.cliente, ponto2.numero_bloco]);
+  }, [tipoCarregamento, ponto2.material, ponto2.pedreira, ponto2.cliente, formData.cliente, ponto2.numero_bloco]);
 
   const alertaTajMahal3 = useMemo(() => {
     if (tipoCarregamento !== 'combinado' || qtdBlocosCombinados !== 3) return { valido: true };
     return validarFormatoBlocoTajMahal({
       material: ponto3.material,
+      pedreira: ponto3.pedreira,
       cliente: ponto3.cliente || formData.cliente,
       numero_bloco: ponto3.numero_bloco
     });
-  }, [tipoCarregamento, qtdBlocosCombinados, ponto3.material, ponto3.cliente, formData.cliente, ponto3.numero_bloco]);
+  }, [tipoCarregamento, qtdBlocosCombinados, ponto3.material, ponto3.pedreira, ponto3.cliente, formData.cliente, ponto3.numero_bloco]);
+
+  const isAntoliniTaj1 = useMemo(() => {
+    return isClienteAntolini(formData.cliente) && isMaterialTajMahal(formData.material, formData.pedreira);
+  }, [formData.cliente, formData.material, formData.pedreira]);
+
+  const isAntoliniTaj2 = useMemo(() => {
+    return isClienteAntolini(ponto2.cliente || formData.cliente) && isMaterialTajMahal(ponto2.material, ponto2.pedreira);
+  }, [ponto2.cliente, formData.cliente, ponto2.material, ponto2.pedreira]);
+
+  const isAntoliniTaj3 = useMemo(() => {
+    return isClienteAntolini(ponto3.cliente || formData.cliente) && isMaterialTajMahal(ponto3.material, ponto3.pedreira);
+  }, [ponto3.cliente, formData.cliente, ponto3.material, ponto3.pedreira]);
 
   // Verificação automática de conformidade documental com a base interna da pedreira
   useEffect(() => {
@@ -1162,6 +1179,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
       const valTaj = validarFormatoBlocoTajMahal({
         material: formData.material,
+        pedreira: formData.pedreira,
         cliente: formData.cliente,
         numero_bloco: formData.numero_bloco
       });
@@ -1184,6 +1202,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
       const valTaj1 = validarFormatoBlocoTajMahal({
         material: formData.material,
+        pedreira: formData.pedreira,
         cliente: formData.cliente,
         numero_bloco: formData.numero_bloco
       });
@@ -1206,6 +1225,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
       const valTaj2 = validarFormatoBlocoTajMahal({
         material: ponto2.material,
+        pedreira: ponto2.pedreira,
         cliente: ponto2.cliente || formData.cliente,
         numero_bloco: ponto2.numero_bloco
       });
@@ -1229,6 +1249,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
         const valTaj3 = validarFormatoBlocoTajMahal({
           material: ponto3.material,
+          pedreira: ponto3.pedreira,
           cliente: ponto3.cliente || formData.cliente,
           numero_bloco: ponto3.numero_bloco
         });
@@ -1564,13 +1585,32 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Ex: 1256926 ou VT-2026/089"
+                    placeholder={isAntoliniTaj1 ? "Ex: 2510TM, 2511TM" : "Ex: 1256926 ou VT-2026/089"}
                     value={formData.numero_bloco}
                     onChange={(e) => handleChange('numero_bloco', e.target.value)}
-                    onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value))}
+                    onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value, false, isAntoliniTaj1))}
                     required
                     style={{ textTransform: 'uppercase' }}
                   />
+                  {isAntoliniTaj1 && (
+                    <div className="animate-fade" style={{
+                      marginTop: 6,
+                      marginBottom: 4,
+                      padding: '6px 10px',
+                      background: 'rgba(56, 189, 248, 0.1)',
+                      border: '1px solid rgba(56, 189, 248, 0.35)',
+                      borderRadius: 6,
+                      color: '#38bdf8',
+                      fontSize: '0.78rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 600
+                    }}>
+                      <Info size={15} style={{ flexShrink: 0 }} />
+                      <span>Regra Antolini: Blocos do Taj Mahal devem terminar com "TM" (ex: 2510TM, 2511TM).</span>
+                    </div>
+                  )}
                   <span style={{ fontSize: '0.74rem', color: 'var(--slate-400)', display: 'block', marginTop: 4 }}>
                     1 bloco por agendamento simples
                   </span>
@@ -2000,13 +2040,32 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Ex: 1256926"
+                    placeholder={isAntoliniTaj1 ? "Ex: 2510TM" : "Ex: 1256926"}
                     value={formData.numero_bloco}
                     onChange={(e) => handleChange('numero_bloco', e.target.value)}
-                    onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value))}
+                    onBlur={(e) => handleChange('numero_bloco', sanitizarNumeroBloco(e.target.value, false, isAntoliniTaj1))}
                     required
                     style={{ textTransform: 'uppercase' }}
                   />
+                  {isAntoliniTaj1 && (
+                    <div className="animate-fade" style={{
+                      marginTop: 6,
+                      marginBottom: 4,
+                      padding: '6px 10px',
+                      background: 'rgba(56, 189, 248, 0.1)',
+                      border: '1px solid rgba(56, 189, 248, 0.35)',
+                      borderRadius: 6,
+                      color: '#38bdf8',
+                      fontSize: '0.78rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 600
+                    }}>
+                      <Info size={15} style={{ flexShrink: 0 }} />
+                      <span>Regra Antolini: Blocos do Taj Mahal devem terminar com "TM" (ex: 2510TM).</span>
+                    </div>
+                  )}
                   {detectarMultiplosBlocos(formData.numero_bloco).isMultiplos && (
                     <span style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
                       ⚠️ Digite apenas 1 bloco aqui. O 2º bloco deve ser informado no 2º ponto logo abaixo.
@@ -2238,13 +2297,32 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="Ex: 1256972"
+                    placeholder={isAntoliniTaj2 ? "Ex: 2510TM" : "Ex: 1256972"}
                     value={ponto2.numero_bloco}
                     onChange={(e) => handlePonto2Change('numero_bloco', e.target.value)}
-                    onBlur={(e) => handlePonto2Change('numero_bloco', sanitizarNumeroBloco(e.target.value))}
+                    onBlur={(e) => handlePonto2Change('numero_bloco', sanitizarNumeroBloco(e.target.value, false, isAntoliniTaj2))}
                     required
                     style={{ textTransform: 'uppercase' }}
                   />
+                  {isAntoliniTaj2 && (
+                    <div className="animate-fade" style={{
+                      marginTop: 6,
+                      marginBottom: 4,
+                      padding: '6px 10px',
+                      background: 'rgba(56, 189, 248, 0.1)',
+                      border: '1px solid rgba(56, 189, 248, 0.35)',
+                      borderRadius: 6,
+                      color: '#38bdf8',
+                      fontSize: '0.78rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontWeight: 600
+                    }}>
+                      <Info size={15} style={{ flexShrink: 0 }} />
+                      <span>Regra Antolini: Blocos do Taj Mahal devem terminar com "TM" (ex: 2510TM).</span>
+                    </div>
+                  )}
                   {detectarMultiplosBlocos(ponto2.numero_bloco).isMultiplos && (
                     <span style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
                       ⚠️ Digite apenas 1 bloco aqui. Caso tenha um 3º bloco, selecione '3 Blocos' no topo.
@@ -2586,13 +2664,32 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Ex: 1256980"
+                      placeholder={isAntoliniTaj3 ? "Ex: 2511TM" : "Ex: 1256980"}
                       value={ponto3.numero_bloco}
                       onChange={(e) => handlePonto3Change('numero_bloco', e.target.value)}
-                      onBlur={(e) => handlePonto3Change('numero_bloco', sanitizarNumeroBloco(e.target.value))}
+                      onBlur={(e) => handlePonto3Change('numero_bloco', sanitizarNumeroBloco(e.target.value, false, isAntoliniTaj3))}
                       required
                       style={{ textTransform: 'uppercase' }}
                     />
+                    {isAntoliniTaj3 && (
+                      <div className="animate-fade" style={{
+                        marginTop: 6,
+                        marginBottom: 4,
+                        padding: '6px 10px',
+                        background: 'rgba(56, 189, 248, 0.1)',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        borderRadius: 6,
+                        color: '#38bdf8',
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontWeight: 600
+                      }}>
+                        <Info size={15} style={{ flexShrink: 0 }} />
+                        <span>Regra Antolini: Blocos do Taj Mahal devem terminar com "TM" (ex: 2511TM).</span>
+                      </div>
+                    )}
                     {detectarMultiplosBlocos(ponto3.numero_bloco).isMultiplos && (
                       <span style={{ fontSize: '0.74rem', color: '#fca5a5', display: 'block', marginTop: 4, fontWeight: 600 }}>
                         ⚠️ Digite apenas 1 bloco por campo.
