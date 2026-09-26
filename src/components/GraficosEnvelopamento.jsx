@@ -96,8 +96,8 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
         return false;
       }
 
-      // Filtro de Data (usa data_cadastro, created_at ou data_romaneio)
-      const dataStr = item.data_cadastro || item.created_at || item.data_romaneio;
+      // Filtro de Data (prioriza data_envelopamento, data_liberacao, data_cadastro, created_at ou data_romaneio)
+      const dataStr = item.data_envelopamento || item.data_liberacao || item.data_cadastro || item.created_at || item.data_romaneio;
       if (dataStr && (dataMin || dataMax)) {
         try {
           let dt = null;

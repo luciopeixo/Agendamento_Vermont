@@ -19,6 +19,7 @@ import {
   Play,
   FileText,
   Sparkles,
+  Calendar,
   ChevronDown,
   ChevronRight,
   ChevronLeft,
@@ -103,6 +104,9 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [filtroMaterial, setFiltroMaterial] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroCarregamento, setFiltroCarregamento] = useState(''); // '', 'carregado', 'agendado', 'no_patio'
+  const [filtroDataPeriodo, setFiltroDataPeriodo] = useState('todos'); // 'todos', 'hoje', 'ontem', '7_dias', '30_dias', 'mes_atual', 'custom'
+  const [filtroDataInicio, setFiltroDataInicio] = useState('');
+  const [filtroDataFim, setFiltroDataFim] = useState('');
   const [buscaTexto, setBuscaTexto] = useState('');
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(20); // 20, 50, 100, 'todos'
@@ -167,6 +171,78 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
     };
   }, []);
 
+  // Helper para sanitizar datas em formato YYYY-MM-DD
+  const extrairDataIso = (dataStr) => {
+    if (!dataStr) return null;
+    const str = String(dataStr).trim();
+    if (str.includes('T')) {
+      return str.split('T')[0];
+    }
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      return str.slice(0, 10);
+    }
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(str)) {
+      const [d, m, y] = str.slice(0, 10).split('/');
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    if (/^\d{2}-\d{2}-\d{4}/.test(str)) {
+      const [d, m, y] = str.slice(0, 10).split('-');
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    const timestamp = Date.parse(str);
+    if (!isNaN(timestamp)) {
+      const d = new Date(timestamp);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dia = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dia}`;
+    }
+    return null;
+  };
+
+  // Faixa de datas para o filtro de envelopamento
+  const { dataMinIso, dataMaxIso } = useMemo(() => {
+    const hoje = new Date();
+    const formatYMD = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dia = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dia}`;
+    };
+
+    if (filtroDataPeriodo === 'hoje') {
+      const h = formatYMD(hoje);
+      return { dataMinIso: h, dataMaxIso: h };
+    }
+    if (filtroDataPeriodo === 'ontem') {
+      const ontem = new Date();
+      ontem.setDate(hoje.getDate() - 1);
+      const o = formatYMD(ontem);
+      return { dataMinIso: o, dataMaxIso: o };
+    }
+    if (filtroDataPeriodo === '7_dias') {
+      const d7 = new Date();
+      d7.setDate(hoje.getDate() - 7);
+      return { dataMinIso: formatYMD(d7), dataMaxIso: formatYMD(hoje) };
+    }
+    if (filtroDataPeriodo === '30_dias') {
+      const d30 = new Date();
+      d30.setDate(hoje.getDate() - 30);
+      return { dataMinIso: formatYMD(d30), dataMaxIso: formatYMD(hoje) };
+    }
+    if (filtroDataPeriodo === 'mes_atual') {
+      const mInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      return { dataMinIso: formatYMD(mInicio), dataMaxIso: formatYMD(hoje) };
+    }
+    if (filtroDataPeriodo === 'custom') {
+      return { 
+        dataMinIso: filtroDataInicio || null, 
+        dataMaxIso: filtroDataFim || null 
+      };
+    }
+    return { dataMinIso: null, dataMaxIso: null };
+  }, [filtroDataPeriodo, filtroDataInicio, filtroDataFim]);
+
   // Lista filtrada para a visualização da tabela/matriz do Controle de Envelopamento
   const envelopamentos = useMemo(() => {
     return (todosEnvelopamentos || []).filter(item => {
@@ -188,6 +264,14 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         if (filtroCarregamento === 'carregado' && !infoCarregamento.isCarregado) return false;
         if (filtroCarregamento === 'agendado' && !infoCarregamento.isAgendado && !infoCarregamento.isCarregando) return false;
         if (filtroCarregamento === 'no_patio' && !infoCarregamento.isNoPatio) return false;
+      }
+      if (dataMinIso || dataMaxIso) {
+        // Prioridade de data: data_envelopamento -> data_liberacao -> data_cadastro -> created_at -> data_romaneio
+        const rawData = item.data_envelopamento || item.data_liberacao || item.data_cadastro || item.created_at || item.data_romaneio;
+        const itemDataIso = extrairDataIso(rawData);
+        if (!itemDataIso) return false;
+        if (dataMinIso && itemDataIso < dataMinIso) return false;
+        if (dataMaxIso && itemDataIso > dataMaxIso) return false;
       }
       if (buscaTexto) {
         const termo = buscaTexto.toLowerCase().trim();
@@ -215,7 +299,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       }
       return true;
     });
-  }, [todosEnvelopamentos, todosAgendamentos, filtroPedreira, filtroMaterial, filtroStatus, filtroCarregamento, buscaTexto]);
+  }, [todosEnvelopamentos, todosAgendamentos, filtroPedreira, filtroMaterial, filtroStatus, filtroCarregamento, buscaTexto, dataMinIso, dataMaxIso]);
 
   const metricas = calcularMetricasEnvelopamento(envelopamentos);
 
@@ -1297,8 +1381,74 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
             </select>
           </div>
 
+          {/* Filtro Data de Envelopamento */}
+          <div>
+            <label className="form-label" style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Calendar size={14} color="var(--vermont-green-light)" />
+              DATA ENVELOPAMENTO:
+            </label>
+            <select
+              className="form-select"
+              value={filtroDataPeriodo}
+              onChange={(e) => {
+                setFiltroDataPeriodo(e.target.value);
+                setPaginaAtual(1);
+              }}
+              style={{ 
+                height: 42, 
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                border: '1px solid rgba(255, 255, 255, 0.22)'
+              }}
+            >
+              <option value="todos">Todas as Datas</option>
+              <option value="hoje">📅 Hoje</option>
+              <option value="ontem">⏪ Ontem</option>
+              <option value="7_dias">🗓️ Últimos 7 dias</option>
+              <option value="30_dias">🗓️ Últimos 30 dias</option>
+              <option value="mes_atual">📊 Este Mês</option>
+              <option value="custom">🔍 Data Específica / Período</option>
+            </select>
+          </div>
+
+          {/* Inputs de Data Personalizada quando 'custom' */}
+          {filtroDataPeriodo === 'custom' && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <label className="form-label" style={{ fontSize: '0.74rem', fontWeight: 700, marginBottom: 4, display: 'block' }}>
+                  DE:
+                </label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={filtroDataInicio}
+                  onChange={(e) => {
+                    setFiltroDataInicio(e.target.value);
+                    setPaginaAtual(1);
+                  }}
+                  style={{ height: 42, fontSize: '0.84rem', fontWeight: 600, border: '1px solid rgba(255, 255, 255, 0.22)' }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label className="form-label" style={{ fontSize: '0.74rem', fontWeight: 700, marginBottom: 4, display: 'block' }}>
+                  ATÉ:
+                </label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={filtroDataFim}
+                  onChange={(e) => {
+                    setFiltroDataFim(e.target.value);
+                    setPaginaAtual(1);
+                  }}
+                  style={{ height: 42, fontSize: '0.84rem', fontWeight: 600, border: '1px solid rgba(255, 255, 255, 0.22)' }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Botão Limpar Filtros */}
-          {(buscaTexto || filtroPedreira || filtroMaterial || filtroStatus || filtroCarregamento) && (
+          {(buscaTexto || filtroPedreira || filtroMaterial || filtroStatus || filtroCarregamento || filtroDataPeriodo !== 'todos' || filtroDataInicio || filtroDataFim) && (
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <button
                 type="button"
@@ -1308,6 +1458,9 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                   setFiltroMaterial('');
                   setFiltroStatus('');
                   setFiltroCarregamento('');
+                  setFiltroDataPeriodo('todos');
+                  setFiltroDataInicio('');
+                  setFiltroDataFim('');
                   setPaginaAtual(1);
                 }}
                 className="btn btn-secondary"
