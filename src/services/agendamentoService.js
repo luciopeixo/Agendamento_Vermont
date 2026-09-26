@@ -71,7 +71,9 @@ export const MATERIAIS_POR_PEDREIRA = {
   sobral_jaibaras: [
     'Breccia Imperiale',
     'Zitan',
-    'Scenario'
+    'Scenario',
+    'Chambord',
+    'Laredo'
   ],
   serrote: [
     'Blue Deep',

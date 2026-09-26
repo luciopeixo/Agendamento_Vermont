@@ -161,7 +161,7 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
       if (filtroPedreira) {
         const pF = normalizarPedreira(filtroPedreira);
         const pI = normalizarPedreira(item.pedreira_id, item.pedreira_nome);
-        if (pF && pI && pF !== pI && !pI.startsWith(pF) && !pF.startsWith(pI)) {
+        if (pF && pI && pF !== pI) {
           return false;
         }
       }

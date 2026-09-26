@@ -316,16 +316,18 @@ export const extrairRaizCliente = (nome = '') => {
  * Normaliza a pedreira para identificação consistente
  */
 export const normalizarPedreira = (pedId = '', pedNome = '') => {
-  const texto = `${pedId || ''} ${pedNome || ''}`.toLowerCase();
-  if (texto.includes('uruoca')) return 'uruoca';
-  if (texto.includes('massape') || texto.includes('massapê')) return 'massape';
-  if (texto.includes('sobral') || texto.includes('jaibaras')) return 'sobral';
-  if (texto.includes('serrote') || texto.includes('sao goncalo') || texto.includes('são gonçalo')) return 'serrote';
+  const texto = `${pedId || ''} ${pedNome || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (texto.includes('uruoca') || texto.includes('taj mahal') || texto.includes('tajmahal')) return 'uruoca';
+  if (texto.includes('del mare') || texto.includes('delmare') || texto.includes('massape_delmare')) return 'massape_delmare';
+  if (texto.includes('negresco') || texto.includes('massape_negresco')) return 'massape_negresco';
+  if (texto.includes('massape')) return 'massape_negresco';
+  if (texto.includes('sobral') || texto.includes('jaibaras')) return 'sobral_jaibaras';
+  if (texto.includes('serrote') || texto.includes('sao goncalo')) return 'serrote';
   if (texto.includes('beberibe')) return 'beberibe';
-  if (texto.includes('uruacu') || texto.includes('uruaçu') || texto.includes('goias') || texto.includes('goiás')) return 'uruacu';
-  if (texto.includes('hidrolandia') || texto.includes('hidrolândia')) return 'hidrolandia';
-  if (texto.includes('banabuiu') || texto.includes('banabuiú')) return 'banabuiu';
-  if (texto.includes('santa_quiteria') || texto.includes('quiteria') || texto.includes('quitéria')) return 'santa_quiteria';
+  if (texto.includes('uruacu') || texto.includes('goias')) return 'uruacu';
+  if (texto.includes('hidrolandia')) return 'hidrolandia';
+  if (texto.includes('banabuiu')) return 'banabuiu';
+  if (texto.includes('santa_quiteria') || texto.includes('quiteria')) return 'santa_quiteria';
   return String(pedId || pedNome || '').trim().toLowerCase();
 };
 
@@ -716,7 +718,7 @@ export const listarEnvelopamentos = async (filtros = {}) => {
     if (filtros.pedreira) {
       const pF = normalizarPedreira(filtros.pedreira);
       const pI = normalizarPedreira(item.pedreira_id, item.pedreira_nome);
-      if (pF && pI && pF !== pI && !pI.startsWith(pF) && !pF.startsWith(pI)) {
+      if (pF && pI && pF !== pI) {
         return false;
       }
     }

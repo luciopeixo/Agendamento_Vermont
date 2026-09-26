@@ -161,7 +161,8 @@ export const normalizarMaterialVermont = (materialBruto, pedreiraId = '') => {
   const matLimpo = String(materialBruto).trim();
   const matUpper = matLimpo.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   
-  // Regras diretas de materiais conhecidos
+  if (matUpper.includes('CHAMBORD')) return 'Chambord';
+  if (matUpper.includes('LAREDO') || matUpper.includes('MARROM LAREDO')) return 'Laredo';
   if (matUpper.includes('CRISTALLO')) return 'Cristallo Absolut';
   if (matUpper.includes('NAURIKA')) return 'Naurika';
   if (matUpper.includes('RAFFINATO')) return 'Raffinato';
@@ -244,7 +245,7 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
   }
 
   // 2. Buscar por menções a materiais específicos no documento (ordem de especificidade)
-  if (matUpper.includes('ZITAN') || t.includes('ZITAN') || matUpper.includes('SCENARIO') || t.includes('SCENARIO') || matUpper.includes('BRECCIA IMPERIALE') || t.includes('BRECCIA IMPERIALE') || t.includes('JAIBARAS') || (t.includes('SOBRAL') && !t.includes('MASSAPE'))) {
+  if (matUpper.includes('CHAMBORD') || t.includes('CHAMBORD') || matUpper.includes('LAREDO') || t.includes('LAREDO') || matUpper.includes('ZITAN') || t.includes('ZITAN') || matUpper.includes('SCENARIO') || t.includes('SCENARIO') || matUpper.includes('BRECCIA IMPERIALE') || t.includes('BRECCIA IMPERIALE') || t.includes('JAIBARAS') || (t.includes('SOBRAL') && !t.includes('MASSAPE'))) {
     const p = PEDREIRAS_CEARA.find(item => item.id === 'sobral_jaibaras');
     return {
       id: 'sobral_jaibaras',
