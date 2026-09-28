@@ -67,6 +67,7 @@ import { ModalHistoricoEnvelopamentos } from './ModalHistoricoEnvelopamentos';
 import { ModalVisualizarDuplicidades } from './ModalVisualizarDuplicidades';
 import { ModalNotificarClienteWhatsApp } from './ModalNotificarClienteWhatsApp';
 import { ModalConfirmarDataEnvelopamento } from './ModalConfirmarDataEnvelopamento';
+import { ModalEditarRomaneio } from './ModalEditarRomaneio';
 import { GraficosEnvelopamento } from './GraficosEnvelopamento';
 
 export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
@@ -75,6 +76,8 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
   const [carregando, setCarregando] = useState(true);
   const [abaSubmodulo, setAbaSubmodulo] = useState('gestao'); // 'gestao' ou 'graficos'
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
+  const [modalEditarRomaneioAberto, setModalEditarRomaneioAberto] = useState(false);
+  const [romaneioEmEdicao, setRomaneioEmEdicao] = useState(null);
   const [modalPdfAberto, setModalPdfAberto] = useState(false);
   const [modalClientesAberto, setModalClientesAberto] = useState(false);
   const [modalHistoricoAberto, setModalHistoricoAberto] = useState(false);
@@ -2009,6 +2012,32 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
                                 </button>
                               )}
 
+                              {/* Botão de Editar Romaneio Completo */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRomaneioEmEdicao(rom);
+                                  setModalEditarRomaneioAberto(true);
+                                }}
+                                className="btn btn-secondary"
+                                style={{
+                                  padding: '3px 8px',
+                                  fontSize: '0.72rem',
+                                  color: '#38bdf8',
+                                  borderColor: 'rgba(56, 189, 248, 0.35)',
+                                  background: 'rgba(56, 189, 248, 0.08)',
+                                  fontWeight: 700,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}
+                                title="Editar dados completos deste romaneio (Cliente, CNPJ, Data, etc.)"
+                              >
+                                <Edit3 size={12} />
+                                Editar Romaneio
+                              </button>
+
                               {/* Botão de Excluir Romaneio Completo */}
                               <button
                                 type="button"
@@ -3284,6 +3313,21 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
           clienteInicial={clienteNotificarWhatsApp}
           blocosPreSelecionadosIds={blocosNotificarWhatsApp}
           pedreiraOperador={pedreiraOperador}
+        />
+      )}
+
+      {/* Modal de Edição Completa de Romaneio */}
+      {modalEditarRomaneioAberto && romaneioEmEdicao && (
+        <ModalEditarRomaneio
+          romaneio={romaneioEmEdicao}
+          onFechar={() => {
+            setModalEditarRomaneioAberto(false);
+            setRomaneioEmEdicao(null);
+          }}
+          onSucesso={async () => {
+            await carregarDados();
+          }}
+          usuarioNome={usuarioNome}
         />
       )}
     </div>

@@ -414,7 +414,19 @@ export const saoBlocosCorrespondentes = (itemA, itemB) => {
 
   let clienteBate = true;
   if (cnpjA.length === 14 && cnpjB.length === 14) {
-    clienteBate = (cnpjA === cnpjB);
+    if (cnpjA === cnpjB || cnpjA.slice(0, 8) === cnpjB.slice(0, 8)) {
+      clienteBate = true;
+    } else if (nomeA && nomeB) {
+      const rA = extrairRaizCliente(nomeA);
+      const rB = extrairRaizCliente(nomeB);
+      if (rA && rB) {
+        clienteBate = (rA === rB || rA.includes(rB) || rB.includes(rA));
+      } else {
+        clienteBate = false;
+      }
+    } else {
+      clienteBate = false;
+    }
   } else if (nomeA && nomeB) {
     const rA = extrairRaizCliente(nomeA);
     const rB = extrairRaizCliente(nomeB);
@@ -1392,6 +1404,94 @@ export const excluirRomaneioTotalmente = async ({
 };
 
 /**
+ * Edita todos os blocos de um Romaneio completo (atualizando CNPJ, Cliente, Número do Romaneio, Data de Emissão, Pedreira, etc.)
+ */
+export const editarRomaneioCompleto = async ({
+  ids = [],
+  novosDados = {},
+  usuarioNome = 'Equipe Vermont'
+}) => {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new Error('Nenhum bloco informado para edição do romaneio.');
+  }
+
+  const setIds = new Set(ids);
+  const locais = carregarEnvelopamentosLocais();
+  const agora = new Date().toISOString();
+
+  const numRomNovo = novosDados.numero_romaneio ? String(novosDados.numero_romaneio).trim().toUpperCase() : undefined;
+  const dataRomNova = novosDados.data_romaneio ? String(novosDados.data_romaneio).trim() : undefined;
+  const cliNomeNovo = novosDados.cliente_nome ? String(novosDados.cliente_nome).trim().toUpperCase() : undefined;
+  const cliCnpjNovo = novosDados.cliente_cnpj !== undefined ? String(novosDados.cliente_cnpj).trim() : undefined;
+  const pedIdNovo = novosDados.pedreira_id || undefined;
+  const pedNomeNovo = novosDados.pedreira_nome || undefined;
+  const matNovo = novosDados.material ? String(novosDados.material).trim() : undefined;
+
+  const itensAtualizados = [];
+
+  const novaLista = locais.map(item => {
+    if (!setIds.has(item.id)) return item;
+
+    const atualizado = {
+      ...item,
+      cliente_nome: cliNomeNovo !== undefined ? cliNomeNovo : item.cliente_nome,
+      cliente_cnpj: cliCnpjNovo !== undefined ? cliCnpjNovo : item.cliente_cnpj,
+      numero_romaneio: numRomNovo !== undefined ? numRomNovo : item.numero_romaneio,
+      data_romaneio: dataRomNova !== undefined ? dataRomNova : item.data_romaneio,
+      pedreira_id: pedIdNovo !== undefined ? pedIdNovo : item.pedreira_id,
+      pedreira_nome: pedNomeNovo !== undefined ? pedNomeNovo : item.pedreira_nome,
+      material: matNovo !== undefined ? matNovo : item.material,
+      updated_at: agora
+    };
+
+    itensAtualizados.push(atualizado);
+    return atualizado;
+  });
+
+  // 1. Salvar no LocalStorage
+  salvarEnvelopamentosLocais(novaLista);
+
+  // 2. Salvar no Supabase
+  if (isSupabaseConfigurado() && itensAtualizados.length > 0) {
+    const rowsDB = itensAtualizados.map(item => formatarItemParaSupabaseEnvelopamentos(item));
+    const chunkSize = 30;
+    for (let i = 0; i < rowsDB.length; i += chunkSize) {
+      const chunk = rowsDB.slice(i, i + chunkSize);
+      try {
+        const { error } = await supabase.from('envelopamentos').upsert(chunk, { onConflict: 'id' });
+        if (error) {
+          console.error('[Envelopamento] Erro ao editar romaneio no Supabase:', error);
+        }
+      } catch (eChunk) {
+        console.warn('[Envelopamento] Exceção ao editar romaneio no Supabase:', eChunk);
+      }
+    }
+  }
+
+  // 3. Registrar no Histórico
+  try {
+    const romIdentificador = numRomNovo || itensAtualizados[0]?.numero_romaneio || 'S/N';
+    for (const at of itensAtualizados) {
+      await registrarHistoricoEnvelopamento({
+        tipo_acao: 'EDICAO_ROMANEIO',
+        numero_bloco: at.numero_bloco,
+        cliente_nome: at.cliente_nome,
+        material: at.material,
+        pedreira_nome: at.pedreira_nome,
+        numero_romaneio: at.numero_romaneio,
+        usuario_nome: usuarioNome,
+        detalhes: `Romaneio Nº ${romIdentificador} editado: Cliente "${at.cliente_nome}" (CNPJ: ${at.cliente_cnpj || 'Não informado'})`
+      });
+    }
+  } catch (eH) {}
+
+  // 4. Notificar ouvintes
+  notificarAlteracaoEnvelopamento();
+
+  return itensAtualizados;
+};
+
+/**
  * Importa múltiplos blocos em lote de forma atômica e com sincronização instantânea,
  * bloqueando estritamente a inserção de quaisquer blocos duplicados.
  */
@@ -1647,21 +1747,25 @@ export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelo
     const cnpjEnv = String(env.cliente_cnpj || '').replace(/\D/g, '');
     const nomeEnv = String(env.cliente_nome || '').trim();
 
-    // Se ambos tiverem CNPJs com 14 dígitos, a igualdade do CNPJ é definitiva
+    // Se ambos tiverem CNPJs com 14 dígitos
     if (clienteCnpjAg.length === 14 && cnpjEnv.length === 14) {
-      return clienteCnpjAg === cnpjEnv;
+      // Bate se for idêntico ou mesma raiz de 8 dígitos (Matriz/Filial da mesma empresa)
+      if (clienteCnpjAg === cnpjEnv || clienteCnpjAg.slice(0, 8) === cnpjEnv.slice(0, 8)) {
+        return true;
+      }
     }
 
-    // Se um tem CNPJ e o outro tem CNPJ diferente válido, não bate
-    if (clienteCnpjAg.length === 14 && cnpjEnv.length === 14 && clienteCnpjAg !== cnpjEnv) {
-      return false;
-    }
-
-    // Comparação por nomes
+    // Comparação por nomes / razão social
     if (clienteNomeAg && nomeEnv) {
       const c1 = normalizarCliente(clienteNomeAg, clienteCnpjAg);
       const c2 = normalizarCliente(nomeEnv, cnpjEnv);
       if (c1 === c2) return true;
+
+      const r1 = extrairRaizCliente(clienteNomeAg);
+      const r2 = extrairRaizCliente(nomeEnv);
+      if (r1 && r2 && (r1 === r2 || r1.includes(r2) || r2.includes(r1))) {
+        return true;
+      }
 
       const n1 = clienteNomeAg.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
       const n2 = nomeEnv.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -2141,13 +2245,21 @@ export const verificarStatusCarregamentoBloco = (bloco, listaAgendamentos = []) 
     const agNome = String(ag.cliente || ag.cliente_nome || '').trim();
 
     if (clienteCnpj.length === 14 && agCnpj.length === 14) {
-      return clienteCnpj === agCnpj;
+      if (clienteCnpj === agCnpj || clienteCnpj.slice(0, 8) === agCnpj.slice(0, 8)) {
+        return true;
+      }
     }
 
     if (clienteNome && agNome) {
       const c1 = normalizarCliente(clienteNome, clienteCnpj);
       const c2 = normalizarCliente(agNome, agCnpj);
       if (c1 === c2) return true;
+
+      const r1 = extrairRaizCliente(clienteNome);
+      const r2 = extrairRaizCliente(agNome);
+      if (r1 && r2 && (r1 === r2 || r1.includes(r2) || r2.includes(r1))) {
+        return true;
+      }
 
       const n1 = clienteNome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
       const n2 = agNome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
