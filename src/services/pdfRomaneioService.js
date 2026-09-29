@@ -191,6 +191,7 @@ export const normalizarMaterialVermont = (materialBruto, pedreiraId = '') => {
   if (matUpper.includes('KOUROS')) return 'Kouros';
   if (matUpper.includes('BROWNIE')) return 'Brownie';
   if (matUpper.includes('TELLUS')) return 'Tellus';
+  if (matUpper.includes('DUETTO')) return 'Duetto';
   if (matUpper.includes('ILLUSION')) return 'Illusion';
 
   // Se uma pedreira específica foi informada, verificar primeiro seus materiais
@@ -269,7 +270,7 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
     };
   }
 
-  if (matUpper.includes('NEGRESCO') || t.includes('NEGRESCO') || matUpper.includes('INFINITY BROWN') || t.includes('INFINITY BROWN') || matUpper.includes('INFINITY BLACK') || t.includes('INFINITY BLACK') || matUpper.includes('JJ BROWN') || t.includes('JJ BROWN') || matUpper.includes('BROWN STRINGS') || t.includes('BROWN STRINGS') || matUpper.includes('BROWNIE') || t.includes('BROWNIE') || matUpper.includes('KOUROS') || t.includes('KOUROS') || matUpper.includes('TELLUS') || t.includes('TELLUS') || t.includes('BOA VISTA') || t.includes('MASSAPE') || t.includes('MASSAPÊ')) {
+  if (matUpper.includes('DUETTO') || t.includes('DUETTO') || matUpper.includes('NEGRESCO') || t.includes('NEGRESCO') || matUpper.includes('INFINITY BROWN') || t.includes('INFINITY BROWN') || matUpper.includes('INFINITY BLACK') || t.includes('INFINITY BLACK') || matUpper.includes('JJ BROWN') || t.includes('JJ BROWN') || matUpper.includes('BROWN STRINGS') || t.includes('BROWN STRINGS') || matUpper.includes('BROWNIE') || t.includes('BROWNIE') || matUpper.includes('KOUROS') || t.includes('KOUROS') || matUpper.includes('TELLUS') || t.includes('TELLUS') || t.includes('BOA VISTA') || t.includes('MASSAPE') || t.includes('MASSAPÊ')) {
     const p = PEDREIRAS_CEARA.find(item => item.id === 'massape_negresco');
     return {
       id: 'massape_negresco',

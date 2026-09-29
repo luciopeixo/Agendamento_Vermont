@@ -117,6 +117,10 @@ const MAPA_MATERIAL_PADRAO_PEDREIRA = {
   'kouros': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
   'jj brown': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
   'tellus': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'duetto': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'granito marrom duetto': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'basalto marrom duetto': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'marrom duetto': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
   'del mare': { id: 'massape_delmare', nome: 'Massapê - CE (Del Mare)' },
   'chateau blanc': { id: 'massape_delmare', nome: 'Massapê - CE (Del Mare)' },
   'breccia viola': { id: 'massape_delmare', nome: 'Massapê - CE (Del Mare)' },
@@ -214,6 +218,10 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
     pedNome = 'São Gonçalo do Amarante - CE (Serrote)';
   } else if (matUpper === 'TELLUS' || matUpper.startsWith('TELLUS ')) {
     matFinal = 'Tellus';
+    pedId = 'massape_negresco';
+    pedNome = 'Massapê - CE (Negresco)';
+  } else if (matUpper.includes('DUETTO')) {
+    matFinal = 'Duetto';
     pedId = 'massape_negresco';
     pedNome = 'Massapê - CE (Negresco)';
   } else if (matUpper.includes('TAJ MAHAL') || matUpper.includes('TAJMAHAL')) {

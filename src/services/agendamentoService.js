@@ -60,7 +60,8 @@ export const MATERIAIS_POR_PEDREIRA = {
     'Brown Strings',
     'Kouros',
     'JJ Brown',
-    'Tellus'
+    'Tellus',
+    'Duetto'
   ],
   massape_delmare: [
     'Del Mare',
