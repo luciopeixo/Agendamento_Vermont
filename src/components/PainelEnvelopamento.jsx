@@ -253,7 +253,12 @@ export function PainelEnvelopamento({ usuario, isAdmin, pedreiraOperador }) {
         const pF = normalizarPedreira(filtroPedreira);
         const pI = normalizarPedreira(item.pedreira_id, item.pedreira_nome);
         if (pF && pI && pF !== pI) {
-          return false;
+          // Permitir visualização de materiais da pedreira de São Domingos quando filtrado por Massapê Negresco
+          if (pF === 'massape_negresco' && pI === 'sao_domingos') {
+            // Permite exibição
+          } else {
+            return false;
+          }
         }
       }
       if (filtroMaterial) {

@@ -10,6 +10,11 @@ export const PEDREIRAS_CEARA = [
     cidade: 'Uruoca - CE'
   },
   {
+    id: 'sao_domingos',
+    nome: 'São Domingos - CE',
+    cidade: 'São Domingos - CE'
+  },
+  {
     id: 'massape_negresco',
     nome: 'Massapê - CE (Negresco)',
     cidade: 'Massapê - CE'
@@ -51,6 +56,9 @@ export const MATERIAIS_POR_PEDREIRA = {
   ],
   uruacu: [
     'Cristallo Absolut'
+  ],
+  sao_domingos: [
+    'Duetto'
   ],
   massape_negresco: [
     'Infinity Brown',
@@ -103,6 +111,9 @@ export function obterMateriaisPorPedreira(pedreiraOuId = '') {
   
   if (maiusc === 'URUOCA' || maiusc.includes('URUOCA')) {
     return MATERIAIS_POR_PEDREIRA.uruoca;
+  }
+  if (maiusc === 'SAO_DOMINGOS' || maiusc.includes('DOMINGOS') || maiusc.includes('SAO DOMINGOS') || maiusc.includes('SÃO DOMINGOS')) {
+    return MATERIAIS_POR_PEDREIRA.sao_domingos;
   }
   if (maiusc === 'MASSAPE_NEGRESCO' || maiusc.includes('NEGRESCO')) {
     return MATERIAIS_POR_PEDREIRA.massape_negresco;
@@ -3869,6 +3880,7 @@ export function normalizarChavePedreira(nome) {
   if (!nome) return '';
   const up = String(nome).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   if (up.includes('URUOCA')) return 'URUOCA';
+  if (up.includes('DOMINGOS')) return 'SAO_DOMINGOS';
   if (up.includes('NEGRESCO')) return 'MASSAPE_NEGRESCO';
   if (up.includes('DEL MARE') || up.includes('DELMARE')) return 'MASSAPE_DELMARE';
   if (up.includes('JAIBARAS') || (up.includes('SOBRAL') && !up.includes('MASSAPE'))) return 'SOBRAL_JAIBARAS';

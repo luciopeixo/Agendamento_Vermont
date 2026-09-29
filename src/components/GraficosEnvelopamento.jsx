@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { STATUS_ENVELOPAMENTO } from '../services/envelopamentoService';
-import { PEDREIRAS_CEARA, saoMesmaPedreira, formatarDataBR } from '../services/agendamentoService';
+import { PEDREIRAS_CEARA, saoMesmaPedreira, normalizarChavePedreira, formatarDataBR } from '../services/agendamentoService';
 import { ModalNotificarClienteWhatsApp } from './ModalNotificarClienteWhatsApp';
 
 export function GraficosEnvelopamento({ envelopamentos = [] }) {
@@ -118,7 +118,8 @@ export function GraficosEnvelopamento({ envelopamentos = [] }) {
       // Filtro de Pedreira
       if (filtroPedreira !== 'todas') {
         const pedItem = item.pedreira_nome || item.pedreira_id || '';
-        if (!saoMesmaPedreira(pedItem, filtroPedreira)) {
+        const bate = saoMesmaPedreira(pedItem, filtroPedreira) || (normalizarChavePedreira(filtroPedreira) === 'MASSAPE_NEGRESCO' && normalizarChavePedreira(pedItem) === 'SAO_DOMINGOS');
+        if (!bate) {
           return false;
         }
       }

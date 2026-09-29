@@ -13,7 +13,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { obterClientesDoBancoDeDados, normalizarPeso } from '../services/envelopamentoService';
-import { saoMesmaPedreira } from '../services/agendamentoService';
+import { saoMesmaPedreira, normalizarChavePedreira } from '../services/agendamentoService';
 
 export function ModalNotificarClienteWhatsApp({ 
   aberto, 
@@ -159,7 +159,8 @@ export function ModalNotificarClienteWhatsApp({
 
       if (!isPre && filtroPedreira !== 'todas') {
         const ped = item.pedreira_nome || item.pedreira_id || '';
-        if (!saoMesmaPedreira(ped, filtroPedreira)) return;
+        const bate = saoMesmaPedreira(ped, filtroPedreira) || (normalizarChavePedreira(filtroPedreira) === 'MASSAPE_NEGRESCO' && normalizarChavePedreira(ped) === 'SAO_DOMINGOS');
+        if (!bate) return;
       }
 
       if (!isPre) {
@@ -243,7 +244,8 @@ export function ModalNotificarClienteWhatsApp({
 
       if (!isPre && filtroPedreira !== 'todas') {
         const ped = item.pedreira_nome || item.pedreira_id || '';
-        if (!saoMesmaPedreira(ped, filtroPedreira)) return false;
+        const bate = saoMesmaPedreira(ped, filtroPedreira) || (normalizarChavePedreira(filtroPedreira) === 'MASSAPE_NEGRESCO' && normalizarChavePedreira(ped) === 'SAO_DOMINGOS');
+        if (!bate) return false;
       }
 
       if (!isPre) {

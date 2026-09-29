@@ -117,10 +117,10 @@ const MAPA_MATERIAL_PADRAO_PEDREIRA = {
   'kouros': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
   'jj brown': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
   'tellus': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
-  'duetto': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
-  'granito marrom duetto': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
-  'basalto marrom duetto': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
-  'marrom duetto': { id: 'massape_negresco', nome: 'Massapê - CE (Negresco)' },
+  'duetto': { id: 'sao_domingos', nome: 'São Domingos - CE' },
+  'granito marrom duetto': { id: 'sao_domingos', nome: 'São Domingos - CE' },
+  'basalto marrom duetto': { id: 'sao_domingos', nome: 'São Domingos - CE' },
+  'marrom duetto': { id: 'sao_domingos', nome: 'São Domingos - CE' },
   'del mare': { id: 'massape_delmare', nome: 'Massapê - CE (Del Mare)' },
   'chateau blanc': { id: 'massape_delmare', nome: 'Massapê - CE (Del Mare)' },
   'breccia viola': { id: 'massape_delmare', nome: 'Massapê - CE (Del Mare)' },
@@ -222,8 +222,8 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
     pedNome = 'Massapê - CE (Negresco)';
   } else if (matUpper.includes('DUETTO')) {
     matFinal = 'Duetto';
-    pedId = 'massape_negresco';
-    pedNome = 'Massapê - CE (Negresco)';
+    pedId = 'sao_domingos';
+    pedNome = 'São Domingos - CE';
   } else if (matUpper.includes('TAJ MAHAL') || matUpper.includes('TAJMAHAL')) {
     matFinal = 'Taj Mahal';
     pedId = 'uruoca';
@@ -325,6 +325,7 @@ export const extrairRaizCliente = (nome = '') => {
  */
 export const normalizarPedreira = (pedId = '', pedNome = '') => {
   const texto = `${pedId || ''} ${pedNome || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (texto.includes('sao domingos') || texto.includes('sao_domingos') || texto.includes('domingos')) return 'sao_domingos';
   if (texto.includes('uruoca') || texto.includes('taj mahal') || texto.includes('tajmahal')) return 'uruoca';
   if (texto.includes('del mare') || texto.includes('delmare') || texto.includes('massape_delmare')) return 'massape_delmare';
   if (texto.includes('negresco') || texto.includes('massape_negresco')) return 'massape_negresco';
@@ -450,7 +451,12 @@ export const saoBlocosCorrespondentes = (itemA, itemB) => {
   const pedB = normalizarPedreira(itemB.pedreira_id, itemB.pedreira_nome || itemB.pedreira);
   let pedreiraBate = true;
   if (pedA && pedB) {
-    pedreiraBate = (pedA === pedB || (pedA.startsWith('massape') && pedB.startsWith('massape')));
+    pedreiraBate = (
+      pedA === pedB ||
+      (pedA.startsWith('massape') && pedB.startsWith('massape')) ||
+      ((pedA === 'massape_negresco' || pedA.startsWith('massape')) && pedB === 'sao_domingos') ||
+      (pedA === 'sao_domingos' && (pedB === 'massape_negresco' || pedB.startsWith('massape')))
+    );
   }
   if (!pedreiraBate) return false;
 
@@ -735,11 +741,16 @@ export const listarEnvelopamentos = async (filtros = {}) => {
 
   // Aplicar filtros em memória
   return dados.filter(item => {
-    if (filtros.pedreira) {
+    if (filtros.pedreira && filtros.pedreira !== 'todas') {
       const pF = normalizarPedreira(filtros.pedreira);
       const pI = normalizarPedreira(item.pedreira_id, item.pedreira_nome);
       if (pF && pI && pF !== pI) {
-        return false;
+        // Permitir visualização de materiais da pedreira de São Domingos quando filtrado por Massapê Negresco
+        if (pF === 'massape_negresco' && pI === 'sao_domingos') {
+          // Permite exibição
+        } else {
+          return false;
+        }
       }
     }
     if (filtros.status && item.status !== filtros.status) return false;
@@ -1808,6 +1819,8 @@ export const verificarStatusEnvelopamentoAgendamento = (agendamento, listaEnvelo
     if (!pedreiraAg || !pedEnv) return true;
     if (pedreiraAg === pedEnv) return true;
     if (pedreiraAg.startsWith('massape') && pedEnv.startsWith('massape')) return true;
+    if ((pedreiraAg === 'massape_negresco' || pedreiraAg.startsWith('massape')) && pedEnv === 'sao_domingos') return true;
+    if (pedreiraAg === 'sao_domingos' && (pedEnv === 'massape_negresco' || pedEnv.startsWith('massape'))) return true;
     return false;
   };
 
