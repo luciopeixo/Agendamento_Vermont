@@ -140,6 +140,10 @@ const MAPA_MATERIAL_PADRAO_PEDREIRA = {
   'raffinato': { id: 'beberibe', nome: 'Beberibe - CE' },
   'guiness': { id: 'beberibe', nome: 'Beberibe - CE' },
   'nouveau': { id: 'beberibe', nome: 'Beberibe - CE' },
+  'aragonita white': { id: 'pio_ix', nome: 'Pio IX - PI' },
+  'aragonita': { id: 'pio_ix', nome: 'Pio IX - PI' },
+  'ivory white': { id: 'pio_ix', nome: 'Pio IX - PI' },
+  'ivory': { id: 'pio_ix', nome: 'Pio IX - PI' },
   'cristallo absolut': { id: 'uruacu', nome: 'Uruaçu - GO' },
   'cristallo absolute': { id: 'uruacu', nome: 'Uruaçu - GO' },
   'cristallo': { id: 'uruacu', nome: 'Uruaçu - GO' }
@@ -224,6 +228,14 @@ export const parseItemDeSupabaseEnvelopamentos = (row) => {
     matFinal = 'Duetto';
     pedId = 'sao_domingos';
     pedNome = 'São Domingos - CE';
+  } else if (matUpper.includes('ARAGONITA')) {
+    matFinal = 'Aragonita White';
+    pedId = 'pio_ix';
+    pedNome = 'Pio IX - PI';
+  } else if (matUpper.includes('IVORY')) {
+    matFinal = 'Ivory White';
+    pedId = 'pio_ix';
+    pedNome = 'Pio IX - PI';
   } else if (matUpper.includes('TAJ MAHAL') || matUpper.includes('TAJMAHAL')) {
     matFinal = 'Taj Mahal';
     pedId = 'uruoca';
@@ -333,6 +345,7 @@ export const normalizarPedreira = (pedId = '', pedNome = '') => {
   if (texto.includes('sobral') || texto.includes('jaibaras')) return 'sobral_jaibaras';
   if (texto.includes('serrote') || texto.includes('sao goncalo')) return 'serrote';
   if (texto.includes('beberibe')) return 'beberibe';
+  if (texto.includes('pio ix') || texto.includes('pio_ix') || texto.includes('pioix') || texto.includes('pio 9') || texto.includes('piaui')) return 'pio_ix';
   if (texto.includes('uruacu') || texto.includes('goias')) return 'uruacu';
   if (texto.includes('hidrolandia')) return 'hidrolandia';
   if (texto.includes('banabuiu')) return 'banabuiu';

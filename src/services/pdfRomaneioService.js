@@ -192,6 +192,8 @@ export const normalizarMaterialVermont = (materialBruto, pedreiraId = '') => {
   if (matUpper.includes('BROWNIE')) return 'Brownie';
   if (matUpper.includes('TELLUS')) return 'Tellus';
   if (matUpper.includes('DUETTO')) return 'Duetto';
+  if (matUpper.includes('ARAGONITA')) return 'Aragonita White';
+  if (matUpper.includes('IVORY')) return 'Ivory White';
   if (matUpper.includes('ILLUSION')) return 'Illusion';
 
   // Se uma pedreira específica foi informada, verificar primeiro seus materiais
@@ -291,6 +293,14 @@ export const identificarPedreiraDoDocumento = (textoCompleto = '', materialDetec
     return {
       id: 'beberibe',
       nome: p ? p.nome : 'Beberibe - CE'
+    };
+  }
+
+  if (matUpper.includes('ARAGONITA') || t.includes('ARAGONITA') || matUpper.includes('IVORY') || t.includes('IVORY') || t.includes('PIO IX') || t.includes('PIOIX') || t.includes('PIAUÍ') || t.includes('PIAUI')) {
+    const p = PEDREIRAS_CEARA.find(item => item.id === 'pio_ix');
+    return {
+      id: 'pio_ix',
+      nome: p ? p.nome : 'Pio IX - PI'
     };
   }
 

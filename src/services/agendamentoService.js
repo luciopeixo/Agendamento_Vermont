@@ -40,6 +40,11 @@ export const PEDREIRAS_CEARA = [
     cidade: 'Beberibe - CE'
   },
   {
+    id: 'pio_ix',
+    nome: 'Pio IX - PI',
+    cidade: 'Pio IX - PI'
+  },
+  {
     id: 'uruacu',
     nome: 'Uruaçu - GO',
     cidade: 'Uruaçu - GO'
@@ -99,6 +104,10 @@ export const MATERIAIS_POR_PEDREIRA = {
     'Guiness',
     'Nouveau',
     'Naurika'
+  ],
+  pio_ix: [
+    'Aragonita White',
+    'Ivory White'
   ]
 };
 
@@ -129,6 +138,9 @@ export function obterMateriaisPorPedreira(pedreiraOuId = '') {
   }
   if (maiusc === 'BEBERIBE' || maiusc.includes('BEBERIBE')) {
     return MATERIAIS_POR_PEDREIRA.beberibe;
+  }
+  if (maiusc === 'PIO_IX' || maiusc.includes('PIO IX') || maiusc.includes('PIOIX') || maiusc.includes('PIO 9') || maiusc.includes('PIAUÍ') || maiusc.includes('PIAUI')) {
+    return MATERIAIS_POR_PEDREIRA.pio_ix;
   }
   if (maiusc === 'URUACU' || maiusc.includes('URUACU') || maiusc.includes('URUAÇU') || maiusc.includes('GOIAS') || maiusc.includes('GOIÁS')) {
     return MATERIAIS_POR_PEDREIRA.uruacu;
@@ -3886,6 +3898,7 @@ export function normalizarChavePedreira(nome) {
   if (up.includes('JAIBARAS') || (up.includes('SOBRAL') && !up.includes('MASSAPE'))) return 'SOBRAL_JAIBARAS';
   if (up.includes('SERROTE') || up.includes('SAO GONCALO')) return 'SERROTE';
   if (up.includes('BEBERIBE')) return 'BEBERIBE';
+  if (up.includes('PIO IX') || up.includes('PIOIX') || up.includes('PIO 9') || up.includes('PIAUI') || up.includes('PIAUÍ')) return 'PIO_IX';
   if (up.includes('URUACU') || up.includes('URUAÇU') || up.includes('GOIAS') || up.includes('GOIÁS')) return 'URUACU';
   return up.replace(/[^A-Z0-9]/g, '');
 }
@@ -5047,7 +5060,7 @@ O transportador deverá sempre confirmar com o cliente, antes de realizar o carr
 
 Atenciosamente,
 Vermont Mineração Ltda.
-Portal de Agendamentos • Polos Ceará & Goiás`;
+Portal de Agendamentos • Polos Ceará, Goiás & Piauí`;
 
   return `mailto:${encodeURIComponent(emailDestino)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
 }

@@ -347,7 +347,7 @@ export function App() {
             }} />
           </div>
 
-          {/* Polos Operacionais Ceará e Goiás e Unidades */}
+          {/* Polos Operacionais Ceará, Goiás e Piauí e Unidades */}
           <div style={{
             fontSize: '0.84rem',
             lineHeight: 1.6,
@@ -360,15 +360,17 @@ export function App() {
           }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#4ade80', fontWeight: 700, marginRight: 8 }}>
               <MapPin size={14} color="#4ade80" />
-              <span>Polos Operacionais (Ceará & Goiás):</span>
+              <span>Polos Operacionais (Ceará, Goiás & Piauí):</span>
             </div>
             <span>
               Uruoca (Taj Mahal) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
+              São Domingos (Duetto) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
               Massapê (Negresco) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
               Massapê (Del Mare) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
               Sobral (Jaibaras) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
               São Gonçalo do Amarante (Serrote) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
               Beberibe <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
+              Pio IX (PI) <span style={{ color: '#4ade80', margin: '0 5px' }}>•</span>
               Uruaçu (GO)
             </span>
           </div>
