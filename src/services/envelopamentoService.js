@@ -1663,13 +1663,22 @@ export const buscarStatusEnvelopamentoPorBloco = async (
 ) => {
   if (!numeroBloco) return null;
 
+  const cNome = String(clienteNome || '').trim();
+  const cCnpj = String(clienteCnpj || '').replace(/\D/g, '');
+
+  // A validação de envelopamento exige a identificação do cliente/destinatário,
+  // pois a mesma numeração de bloco pode existir para clientes distintos.
+  if (!cNome && !cCnpj) {
+    return null;
+  }
+
   // 1. Tenta verificar no cache local em memória/localStorage primeiro (zero egress)
   const dadosLocais = carregarEnvelopamentosLocais();
   if (Array.isArray(dadosLocais) && dadosLocais.length > 0) {
     const info = verificarStatusEnvelopamentoAgendamento({
       numero_bloco: numeroBloco,
-      cliente: clienteNome,
-      cliente_cnpj: clienteCnpj,
+      cliente: cNome,
+      cliente_cnpj: cCnpj,
       material: material,
       pedreira: pedreira
     }, dadosLocais);
@@ -1684,7 +1693,7 @@ export const buscarStatusEnvelopamentoPorBloco = async (
     try {
       const { data, error } = await supabase.rpc('rpc_consultar_status_envelopamento_bloco', {
         p_numero_bloco: String(numeroBloco).trim(),
-        p_cliente: String(clienteNome || '').trim(),
+        p_cliente: cNome,
         p_material: String(material || '').trim(),
         p_pedreira: String(pedreira || '').trim()
       });

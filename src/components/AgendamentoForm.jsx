@@ -230,7 +230,11 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
   useEffect(() => {
     let ativo = true;
-    if (!formData.numero_bloco || formData.numero_bloco.trim().length < 2) {
+    const temBloco = Boolean(formData.numero_bloco && formData.numero_bloco.trim().length >= 2);
+    const cnpjDigitos = String(formData.cliente_cnpj || '').replace(/\D/g, '');
+    const temCliente = Boolean((formData.cliente && formData.cliente.trim().length >= 2) || cnpjDigitos.length >= 8);
+
+    if (!temBloco || !temCliente) {
       setStatusEnvelopamento1(null);
       return;
     }
