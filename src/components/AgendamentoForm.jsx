@@ -230,7 +230,12 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
   useEffect(() => {
     let ativo = true;
-    if (formData.numero_bloco && formData.numero_bloco.length >= 2) {
+    if (!formData.numero_bloco || formData.numero_bloco.trim().length < 2) {
+      setStatusEnvelopamento1(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
       buscarStatusEnvelopamentoPorBloco(
         formData.numero_bloco, 
         formData.cliente, 
@@ -240,10 +245,12 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
       ).then(res => {
         if (ativo) setStatusEnvelopamento1(res);
       }).catch(() => {});
-    } else {
-      setStatusEnvelopamento1(null);
-    }
-    return () => { ativo = false; };
+    }, 350);
+
+    return () => {
+      ativo = false;
+      clearTimeout(timer);
+    };
   }, [formData.numero_bloco, formData.cliente, formData.cliente_cnpj, formData.material, formData.pedreira]);
 
   // Validação em tempo real de formato de bloco para Taj Mahal (Thor/Argos exige "/", outros proíbe "/", Antolini exige "TM")

@@ -2912,6 +2912,11 @@ export async function verificarBlocoDuplicado({
   const pedreiraLimpa = (pedreira || '').trim();
   const materialLimpo = (material || '').trim().toUpperCase();
 
+  const isStatusInativoOuCancelado = (status) => {
+    const s = String(status || '').toLowerCase().trim();
+    return s.includes('cancelad') || s.includes('rejeit') || s === 'excluido' || s === 'excluído' || s === 'inativo';
+  };
+
   let listaParaChecar = [];
   if (isSupabaseConfigurado()) {
     try {
@@ -2921,10 +2926,10 @@ export async function verificarBlocoDuplicado({
         .neq('status', 'Cancelado')
         .order('data_agendamento', { ascending: false });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         listaParaChecar = data;
-      } else {
-        // Se SELECT foi bloqueado por RLS para anon, checa via RPC segura
+      } else if (error) {
+        // Se SELECT foi bloqueado por RLS para anon ou deu erro, checa via RPC segura
         for (const bl of blocosParaVerificar) {
           try {
             const { data: ehDuplicado, error: errRpc } = await supabase.rpc('rpc_verificar_bloco_duplicado_publico', {
@@ -2944,7 +2949,7 @@ export async function verificarBlocoDuplicado({
     } catch (e) {}
   }
 
-  const locais = obterAgendamentosLocais().filter(l => l && l.status !== 'Cancelado');
+  const locais = obterAgendamentosLocais().filter(l => l && !isStatusInativoOuCancelado(l.status));
   const mapaUnificado = new Map();
   listaParaChecar.forEach(item => {
     if (item && item.id) mapaUnificado.set(String(item.id).trim(), item);
@@ -2959,7 +2964,7 @@ export async function verificarBlocoDuplicado({
     const agIdStr = String(ag.id || '').trim();
     if (idsExcluidos.has(agIdStr)) return false;
     if (idIgnorarStr && agIdStr === idIgnorarStr) return false;
-    if (ag.status === 'Cancelado') return false;
+    if (isStatusInativoOuCancelado(ag.status)) return false;
     if (typeof ag.observacoes === 'string' && ag.observacoes.includes('[EXCLUÍDO DEFINITIVAMENTE PELO ADMINISTRADOR]')) return false;
     return true;
   });
@@ -3664,7 +3669,8 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
     }
 
     // 1.1 Verificação de duplicidade de bloco ao editar
-    if (agendamentoAtualizado.numero_bloco && agendamentoAtualizado.status !== 'Cancelado') {
+    const isCanceladoEdicao = String(agendamentoAtualizado.status || '').toLowerCase().trim().includes('cancelad');
+    if (agendamentoAtualizado.numero_bloco && !isCanceladoEdicao) {
       const checkDuplicado = await verificarBlocoDuplicado({
         pedreira: agendamentoAtualizado.pedreira,
         material: agendamentoAtualizado.material,
@@ -3950,6 +3956,8 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
                 registrarIdExcluido(idStr);
                 return false;
               }
+              const st = String(item.status || '').toLowerCase().trim();
+              if (st.includes('cancelad') || st.includes('rejeit') || st === 'excluido' || st === 'inativo') return false;
               return true;
             })
             .filter(item => saoMesmaPedreira(item.pedreira, pedreira))
@@ -3965,7 +3973,10 @@ export async function obterHorariosOcupados(dataStr, pedreira) {
     const locais = obterAgendamentosLocais();
     ocupados = locais
       .filter(item => !idsExcluidos.has(String(item.id).trim()))
-      .filter(item => item.data_agendamento === dataStr && saoMesmaPedreira(item.pedreira, pedreira) && item.status !== 'Cancelado')
+      .filter(item => {
+        const st = String(item.status || '').toLowerCase().trim();
+        return item.data_agendamento === dataStr && saoMesmaPedreira(item.pedreira, pedreira) && !st.includes('cancelad') && !st.includes('rejeit') && st !== 'excluido' && st !== 'inativo';
+      })
       .map(item => item.horario_agendamento)
       .filter(h => h && h !== 'outros' && !h.startsWith('Sábado'));
 
@@ -4520,6 +4531,18 @@ export async function atualizarStatusAgendamento(agendamentoOuId, novoStatus, us
 
           if (!errorSimples && dataSimples) {
             atualizado = { ...dataSimples, historico_status: historicoAtualizado, ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema' };
+          } else if (errorSimples) {
+            try {
+              const { data: dataRpc, error: errorRpc } = await supabase.rpc('rpc_atualizar_status_agendamento', {
+                p_id: String(id),
+                p_novo_status: novoStatus,
+                p_historico: historicoAtualizado,
+                p_usuario_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema'
+              });
+              if (!errorRpc && dataRpc) {
+                atualizado = { ...dataRpc, historico_status: historicoAtualizado, ultimo_editor: usuarioInfo.nome || usuarioInfo.email || 'Sistema' };
+              }
+            } catch (eRpc) {}
           }
         }
       } catch (e) {

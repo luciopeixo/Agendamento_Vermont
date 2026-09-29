@@ -1655,20 +1655,23 @@ export const buscarStatusEnvelopamentoPorBloco = async (
 ) => {
   if (!numeroBloco) return null;
 
-  const todos = await listarEnvelopamentos();
-  const info = verificarStatusEnvelopamentoAgendamento({
-    numero_bloco: numeroBloco,
-    cliente: clienteNome,
-    cliente_cnpj: clienteCnpj,
-    material: material,
-    pedreira: pedreira
-  }, todos);
+  // 1. Tenta verificar no cache local em memória/localStorage primeiro (zero egress)
+  const dadosLocais = carregarEnvelopamentosLocais();
+  if (Array.isArray(dadosLocais) && dadosLocais.length > 0) {
+    const info = verificarStatusEnvelopamentoAgendamento({
+      numero_bloco: numeroBloco,
+      cliente: clienteNome,
+      cliente_cnpj: clienteCnpj,
+      material: material,
+      pedreira: pedreira
+    }, dadosLocais);
 
-  if (info.encontrado && info.registro) {
-    return info.registro;
+    if (info.encontrado && info.registro) {
+      return info.registro;
+    }
   }
 
-  // Se não encontrou na lista local (ex: usuário anônimo com RLS ativa), consulta via RPC segura
+  // 2. Consulta direta via RPC segura e ultraleve (retorna apenas 1 registro específico, economizando banda)
   if (isSupabaseConfigurado()) {
     try {
       const { data, error } = await supabase.rpc('rpc_consultar_status_envelopamento_bloco', {
