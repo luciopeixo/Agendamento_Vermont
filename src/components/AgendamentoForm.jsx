@@ -918,7 +918,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
     if (tipoDia === 'dia_util' && formData.horario_agendamento !== 'outros') {
       if (isHorarioPassado(formData.data_agendamento, formData.horario_agendamento)) {
-        setMensagemErro(`O horário ${formData.horario_agendamento} já passou para a data de hoje (${formatarDataBR(formData.data_agendamento)}). Por favor, selecione um horário futuro disponível.`);
+        setMensagemErro(`O horário ${formData.horario_agendamento} está indisponível para a data de hoje (${formatarDataBR(formData.data_agendamento)}). Por favor, selecione um horário disponível.`);
         return;
       }
 
@@ -984,7 +984,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
       if (tipoDia2 === 'dia_util' && ponto2.horario_agendamento !== 'outros') {
         if (isHorarioPassado(ponto2.data_agendamento, ponto2.horario_agendamento)) {
-          setMensagemErro(`O horário ${ponto2.horario_agendamento} do 2º carregamento já passou para a data de hoje (${formatarDataBR(ponto2.data_agendamento)}). Selecione um horário futuro.`);
+          setMensagemErro(`O horário ${ponto2.horario_agendamento} do 2º carregamento está indisponível para a data de hoje (${formatarDataBR(ponto2.data_agendamento)}). Selecione um horário disponível.`);
           return;
         }
 
@@ -1050,7 +1050,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
         if (tipoDia3 === 'dia_util' && ponto3.horario_agendamento !== 'outros') {
           if (isHorarioPassado(ponto3.data_agendamento, ponto3.horario_agendamento)) {
-            setMensagemErro(`O horário ${ponto3.horario_agendamento} do 3º carregamento já passou para a data de hoje (${formatarDataBR(ponto3.data_agendamento)}). Selecione um horário futuro.`);
+            setMensagemErro(`O horário ${ponto3.horario_agendamento} do 3º carregamento está indisponível para a data de hoje (${formatarDataBR(ponto3.data_agendamento)}). Selecione um horário disponível.`);
             return;
           }
 
@@ -1882,7 +1882,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
                           return (
                             <option key={h.id} value={h.id} disabled={indisponivel}>
-                              {h.id} {expirado ? '— [HORÁRIO JÁ PASSOU]' : (ocupado ? '— [INDISPONÍVEL / OCUPADO]' : '— Disponível')}
+                              {h.id} {indisponivel ? '— [HORÁRIO INDISPONÍVEL]' : '— Disponível'}
                             </option>
                           );
                         })}
@@ -1895,7 +1895,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
                           return (
                             <option key={h.id} value={h.id} disabled={indisponivel}>
-                              {h.id} {expirado ? '— [HORÁRIO JÁ PASSOU]' : (ocupado ? '— [INDISPONÍVEL / OCUPADO]' : '— Disponível')}
+                              {h.id} {indisponivel ? '— [HORÁRIO INDISPONÍVEL]' : '— Disponível'}
                             </option>
                           );
                         })}
@@ -2217,7 +2217,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
                       return (
                         <option key={h.id} value={h.id} disabled={indisponivel}>
-                          {h.id} {h.id === 'outros' ? '' : (expirado ? '— [JÁ PASSOU]' : (ocupado ? '— [OCUPADO]' : '— Disponível'))}
+                          {h.id} {h.id === 'outros' ? '' : (indisponivel ? '— [HORÁRIO INDISPONÍVEL]' : '— Disponível')}
                         </option>
                       );
                     })}
@@ -2482,7 +2482,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
                         return (
                           <option key={h.id} value={h.id} disabled={indisponivel}>
-                            {h.id} {h.id === 'outros' ? '' : (expirado ? '— [JÁ PASSOU]' : (ocupado ? '— [OCUPADO]' : '— Disponível'))}
+                            {h.id} {h.id === 'outros' ? '' : (indisponivel ? '— [HORÁRIO INDISPONÍVEL]' : '— Disponível')}
                           </option>
                         );
                       })}
@@ -2849,7 +2849,7 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
 
                           return (
                             <option key={h.id} value={h.id} disabled={indisponivel}>
-                              {h.id} {h.id === 'outros' ? '' : (expirado ? '— [JÁ PASSOU]' : (ocupado ? '— [OCUPADO]' : '— Disponível'))}
+                              {h.id} {h.id === 'outros' ? '' : (indisponivel ? '— [HORÁRIO INDISPONÍVEL]' : '— Disponível')}
                             </option>
                           );
                         })}

@@ -5068,7 +5068,7 @@ export async function salvarAgendamento(dados) {
       }
     } else if (dados.tipo_dia === 'dia_util' && dados.horario_agendamento !== 'outros') {
       if (isHorarioPassado(dados.data_agendamento, dados.horario_agendamento)) {
-        throw new Error(`O horário ${dados.horario_agendamento} já passou para a data de hoje (${formatarDataBR(dados.data_agendamento)}). Por favor, selecione um horário futuro disponível.`);
+        throw new Error(`O horário ${dados.horario_agendamento} está indisponível para a data de hoje (${formatarDataBR(dados.data_agendamento)}). Por favor, selecione um horário disponível.`);
       }
 
       const ocupados = await obterHorariosOcupados(dados.data_agendamento, dados.pedreira);
@@ -5262,7 +5262,7 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
         }
       } else if (p.tipo_dia === 'dia_util' && p.horario_agendamento !== 'outros') {
         if (isHorarioPassado(p.data_agendamento, p.horario_agendamento)) {
-          throw new Error(`[${numPonto}º Carregamento] O horário ${p.horario_agendamento} já encerrou/passou para a data de hoje (${formatarDataBR(p.data_agendamento)}). Escolha um horário futuro.`);
+          throw new Error(`[${numPonto}º Carregamento] O horário ${p.horario_agendamento} está indisponível para a data de hoje (${formatarDataBR(p.data_agendamento)}). Escolha um horário disponível.`);
         }
         const ocupados = await obterHorariosOcupados(p.data_agendamento, p.pedreira);
         if (ocupados.includes(p.horario_agendamento)) {
