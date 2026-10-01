@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { AlertTriangle, ArrowRight, CheckCircle2, X, Shield, Clock, PlayCircle, CheckCheck, XCircle, Share2, MessageCircle, Send } from 'lucide-react';
-import { formatarDataBR, formatarPlacasExibicao, abrirNotificacaoWhatsAppAdmin, gerarMensagemWhatsAppCarregando, WHATSAPP_ADMIN_PADRAO } from '../services/agendamentoService';
+import { AlertTriangle, ArrowRight, CheckCircle2, X, Shield, Clock, PlayCircle, CheckCheck, XCircle, Share2, MessageCircle, Send, Check, AlertCircle, Scale, PackageCheck, FileCheck } from 'lucide-react';
+import { formatarDataBR, formatarPlacasExibicao, abrirNotificacaoWhatsAppAdmin, gerarMensagemWhatsAppCarregando, WHATSAPP_ADMIN_PADRAO, avaliarAptidaoLiberacaoAgendamento } from '../services/agendamentoService';
 
 export function ModalConfirmarStatus({
   agendamento,
   novoStatus,
   usuarioInfo,
+  envelopamentos = [],
   onConfirmar,
   onCancelar,
   processando = false
@@ -284,6 +285,110 @@ export function ModalConfirmarStatus({
               {getStatusBadge(novoStatus)}
             </div>
           </div>
+
+          {/* Checklist Inteligente de Liberação (Exclusivo quando liberando agendamento) */}
+          {(novoStatus === 'Liberado para Carregar' || novoStatus === 'Confirmado') && (() => {
+            const aptidao = avaliarAptidaoLiberacaoAgendamento(agendamento, envelopamentos);
+            return (
+              <div style={{
+                background: aptidao.apto ? 'rgba(34, 197, 94, 0.06)' : 'rgba(239, 68, 68, 0.06)',
+                border: aptidao.apto ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid rgba(239, 68, 68, 0.25)',
+                borderRadius: 12,
+                padding: '14px 16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#fff' }}>
+                      📋 Checklist de Liberação Operacional
+                    </span>
+                  </div>
+                  <span style={{
+                    background: aptidao.badge.bg,
+                    color: aptidao.badge.cor,
+                    border: `1px solid ${aptidao.badge.border}`,
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    fontSize: '0.74rem',
+                    fontWeight: 800
+                  }}>
+                    {aptidao.badge.label}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.80rem' }}>
+                  {/* Premissa 1: Status do Bloco */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(0,0,0,0.25)', padding: '8px 10px', borderRadius: 8 }}>
+                    <span style={{ color: aptidao.bloco.apto ? '#22c55e' : '#ef4444', marginTop: 2 }}>
+                      {aptidao.bloco.apto ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>1. Status do Bloco / Pátio:</span>
+                        <span style={{ color: aptidao.bloco.apto ? '#4ade80' : '#f87171' }}>{aptidao.bloco.label}</span>
+                      </div>
+                      <div style={{ color: 'var(--slate-400)', fontSize: '0.74rem', marginTop: 2 }}>
+                        {aptidao.bloco.mensagem}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Premissa 2: Peso x Porte */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(0,0,0,0.25)', padding: '8px 10px', borderRadius: 8 }}>
+                    <span style={{ color: aptidao.peso.apto ? '#22c55e' : '#ef4444', marginTop: 2 }}>
+                      {aptidao.peso.apto ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>2. Peso vs Porte do Veículo:</span>
+                        <span style={{ color: aptidao.peso.apto ? '#4ade80' : '#f87171' }}>
+                          {aptidao.peso.pesoFormatado} (Limite: {aptidao.peso.limiteFormatado})
+                        </span>
+                      </div>
+                      <div style={{ color: 'var(--slate-400)', fontSize: '0.74rem', marginTop: 2 }}>
+                        {aptidao.peso.mensagem}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Premissa 3: CNH x Documentos */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'rgba(0,0,0,0.25)', padding: '8px 10px', borderRadius: 8 }}>
+                    <span style={{ color: aptidao.documentos.apto ? '#22c55e' : '#ef4444', marginTop: 2 }}>
+                      {aptidao.documentos.apto ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>3. CNH & Documentação da Frota:</span>
+                        <span style={{ color: aptidao.documentos.apto ? '#4ade80' : '#f87171' }}>
+                          {aptidao.documentos.status === 'REGULAR' ? 'Regular' : aptidao.documentos.status === 'AVENCER' ? 'A Vencer' : aptidao.documentos.status === 'VENCIDO' ? 'Vencido' : 'Pendente'}
+                        </span>
+                      </div>
+                      <div style={{ color: 'var(--slate-400)', fontSize: '0.74rem', marginTop: 2 }}>
+                        {aptidao.documentos.mensagem}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {!aptidao.apto && (
+                  <div style={{
+                    marginTop: 10,
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    borderRadius: 8,
+                    padding: '8px 12px',
+                    color: '#fca5a5',
+                    fontSize: '0.76rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}>
+                    <AlertTriangle size={15} color="#ef4444" />
+                    <span><strong>Atenção Admin:</strong> Há premissas pendentes. A confirmação de liberação fica sob sua responsabilidade direta.</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Mensagem Explicativa de Impacto */}
           <div style={{

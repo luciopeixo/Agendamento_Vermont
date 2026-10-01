@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigurado } from '../lib/supabase.js';
+import { verificarStatusEnvelopamentoAgendamento, normalizarPeso } from './envelopamentoService.js';
 
 export { isSupabaseConfigurado };
 
@@ -3233,6 +3234,306 @@ export const TIPOS_VEICULO = [
   'Truck (3 Eixos)',
   'Outro'
 ];
+
+/**
+ * Tabela oficial de Limites Máximos Recomendados de Peso do Bloco por Porte/Tipo de Veículo
+ * Premissa: Status do Bloco e Peso X Porte e CNH X Documentos
+ */
+export const LIMITES_PESO_VEICULO = [
+  { tipo: 'Carreta LS (6 Eixos)', limiteKg: 33600, labelLimite: 'Até 33.600 kg (33,6 t)' },
+  { tipo: 'Carreta Vanderleia (3 Eixos Distanciados)', limiteKg: 38500, labelLimite: 'Até 38.500 kg (38,5 t)' },
+  { tipo: 'LS 7 Eixos (4 Eixos no Cavalo)', limiteKg: 38500, labelLimite: 'Até 38.500 kg (38,5 t)' },
+  { tipo: 'LS 7 Eixos (4 Carreta)', limiteKg: 40000, labelLimite: 'Até 40.000 kg (40,0 t)' },
+  { tipo: 'Bitrem (7 Eixos)', limiteKg: 38000, labelLimite: 'Até 38.000 kg (38,0 t)' },
+  { tipo: 'Rodotrem (9 Eixos)', limiteKg: 65000, labelLimite: 'Até 65.000 kg (65,0 t)' },
+  { tipo: 'Bitruck (4 Eixos)', limiteKg: 20000, labelLimite: 'Até 20.000 kg (20,0 t)' },
+  { tipo: 'Truck (3 Eixos)', limiteKg: null, labelLimite: 'Não definido ainda' }
+];
+
+export const CAPACIDADE_CARGA_VEICULOS = {
+  'Carreta LS (6 Eixos)': 33600,
+  'Carreta Vanderleia': 38500,
+  'Carreta Vanderleia (3 Eixos Distanciados)': 38500,
+  'LS 7 Eixos (4 Eixos no Cavalo)': 38500,
+  'LS 7 Eixos (4 Carreta)': 40000,
+  'LS 7 Eixos (4 Eixos na Carreta)': 40000,
+  'Bitrem (7 Eixos)': 38000,
+  'Rodotrem (9 Eixos)': 65000,
+  'Bitruck (4 Eixos)': 20000,
+  'Truck (3 Eixos)': null,
+  'Outro': null
+};
+
+/**
+ * Obtém a configuração de limite de capacidade em kg para um tipo de veículo
+ */
+export function obterConfiguracaoCapacidadeVeiculo(tipoVeiculo = '') {
+  const tipoStr = String(tipoVeiculo || '').trim();
+  if (!tipoStr) {
+    return { tipo: 'Não informado', limiteKg: null, labelLimite: 'Não informado' };
+  }
+
+  if (CAPACIDADE_CARGA_VEICULOS[tipoStr] !== undefined) {
+    const limiteKg = CAPACIDADE_CARGA_VEICULOS[tipoStr];
+    return {
+      tipo: tipoStr,
+      limiteKg,
+      labelLimite: limiteKg ? `Até ${limiteKg.toLocaleString('pt-BR')} kg (${(limiteKg / 1000).toFixed(1).replace('.', ',')} t)` : 'Não definido ainda'
+    };
+  }
+
+  const strNorm = tipoStr.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  if (strNorm.includes('bitruck') || (strNorm.includes('4 eixos') && !strNorm.includes('cavalo') && !strNorm.includes('carreta'))) {
+    return { tipo: 'Bitruck (4 Eixos)', limiteKg: 20000, labelLimite: 'Até 20.000 kg (20,0 t)' };
+  }
+  if (strNorm.includes('rodotrem') || strNorm.includes('9 eixos')) {
+    return { tipo: 'Rodotrem (9 Eixos)', limiteKg: 65000, labelLimite: 'Até 65.000 kg (65,0 t)' };
+  }
+  if (strNorm.includes('bitrem')) {
+    return { tipo: 'Bitrem (7 Eixos)', limiteKg: 38000, labelLimite: 'Até 38.000 kg (38,0 t)' };
+  }
+  if (strNorm.includes('7 eixos') && (strNorm.includes('carreta') || strNorm.includes('4 carreta'))) {
+    return { tipo: 'LS 7 Eixos (4 Carreta)', limiteKg: 40000, labelLimite: 'Até 40.000 kg (40,0 t)' };
+  }
+  if (strNorm.includes('7 eixos') && (strNorm.includes('cavalo') || strNorm.includes('4 cavalo'))) {
+    return { tipo: 'LS 7 Eixos (4 Eixos no Cavalo)', limiteKg: 38500, labelLimite: 'Até 38.500 kg (38,5 t)' };
+  }
+  if (strNorm.includes('vanderleia') || strNorm.includes('distanciados')) {
+    return { tipo: 'Carreta Vanderleia (3 Eixos Distanciados)', limiteKg: 38500, labelLimite: 'Até 38.500 kg (38,5 t)' };
+  }
+  if (strNorm.includes('ls') || strNorm.includes('6 eixos')) {
+    return { tipo: 'Carreta LS (6 Eixos)', limiteKg: 33600, labelLimite: 'Até 33.600 kg (33,6 t)' };
+  }
+  if (strNorm.includes('truck') && !strNorm.includes('bitruck')) {
+    return { tipo: 'Truck (3 Eixos)', limiteKg: null, labelLimite: 'Não definido ainda' };
+  }
+
+  return { tipo: tipoStr, limiteKg: null, labelLimite: 'Não definido' };
+}
+
+/**
+ * Avalia a aptidão e gera a indicação inteligente de liberação de agendamento (Exclusivo Admin)
+ * Baseado nas 3 premissas operacionais:
+ * 1. Status do Bloco (Envelopamento): Deve ser "Envelopado" ou "Sem envelopamento" (liberado)
+ * 2. Peso do Bloco vs Porte do Veículo: Deve respeitar o limite máximo recomendado da tabela
+ * 3. Documentos: CNH do motorista, CRLV e Laudo de Rocha regulares
+ */
+export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamentos = []) {
+  if (!agendamento) {
+    return {
+      apto: false,
+      statusGeral: 'PENDENTE',
+      motivosBloqueio: ['Agendamento não fornecido'],
+      avisosAtencao: [],
+      bloco: { apto: false, label: 'Não informado', status: 'nao_informado', mensagem: 'Dados do bloco indisponíveis' },
+      peso: { apto: false, pesoKg: 0, limiteMaxKg: null, excessoKg: 0, status: 'pendente', mensagem: 'Peso não informado' },
+      documentos: { apto: false, status: 'NAO_CADASTRADO', mensagem: 'Documentação não avaliada' },
+      badge: { label: 'Indisponível', cor: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)', border: '#64748b' }
+    };
+  }
+
+  const motivosBloqueio = [];
+  const avisosAtencao = [];
+
+  // 1. PREMISSA 1: STATUS DO BLOCO / ENVELOPAMENTO
+  const infoEnv = verificarStatusEnvelopamentoAgendamento(agendamento, listaEnvelopamentos);
+  const blocoApto = infoEnv.isEnvelopadoOuLiberado === true;
+
+  let blocoMensagem = '';
+  if (infoEnv.isEnvelopadoOuLiberado) {
+    blocoMensagem = infoEnv.status === 'sem_envelopamento'
+      ? 'Bloco liberado sem necessidade de envelopamento'
+      : 'Bloco envelopado e liberado para transporte';
+  } else {
+    blocoMensagem = infoEnv.descricao || `Status atual do bloco no pátio: ${infoEnv.label}`;
+    motivosBloqueio.push(`Bloco ${agendamento.numero_bloco || 'S/N'}: ${infoEnv.label} (${blocoMensagem})`);
+  }
+
+  const blocoItem = {
+    apto: blocoApto,
+    status: infoEnv.status,
+    label: infoEnv.label,
+    cor: infoEnv.cor,
+    bg: infoEnv.bg,
+    border: infoEnv.border,
+    mensagem: blocoMensagem,
+    infoEnv
+  };
+
+  // 2. PREMISSA 2: PESO DO BLOCO X PORTE DO VEÍCULO
+  const tipoVeiculo = agendamento.tipo_veiculo || '';
+  const configVeiculo = obterConfiguracaoCapacidadeVeiculo(tipoVeiculo);
+  const limiteMaxKg = configVeiculo.limiteKg;
+
+  const pesoRaw = infoEnv?.registro?.peso_kg || agendamento.peso_kg || agendamento.peso || agendamento.peso_bloco;
+  const pesoKg = normalizarPeso(pesoRaw);
+
+  let pesoApto = false;
+  let pesoStatus = 'ok';
+  let excessoKg = 0;
+  let pesoMensagem = '';
+
+  if (pesoKg > 0) {
+    if (limiteMaxKg !== null && limiteMaxKg > 0) {
+      if (pesoKg <= limiteMaxKg) {
+        pesoApto = true;
+        pesoStatus = 'ok';
+        pesoMensagem = `Peso de ${pesoKg.toLocaleString('pt-BR')} kg está dentro do limite de ${limiteMaxKg.toLocaleString('pt-BR')} kg (${configVeiculo.tipo})`;
+      } else {
+        pesoApto = false;
+        pesoStatus = 'excesso';
+        excessoKg = pesoKg - limiteMaxKg;
+        pesoMensagem = `Excesso de peso: ${pesoKg.toLocaleString('pt-BR')} kg ultrapassa o limite recomendado de ${limiteMaxKg.toLocaleString('pt-BR')} kg em +${excessoKg.toLocaleString('pt-BR')} kg (${configVeiculo.tipo})`;
+        motivosBloqueio.push(pesoMensagem);
+      }
+    } else {
+      pesoApto = true;
+      pesoStatus = 'sem_limite';
+      pesoMensagem = `Peso de ${pesoKg.toLocaleString('pt-BR')} kg (${configVeiculo.tipo} - limite não restrito)`;
+      avisosAtencao.push(`Veículo ${configVeiculo.tipo}: Limite de peso ainda não foi definido formalmente.`);
+    }
+  } else {
+    pesoApto = false;
+    pesoStatus = 'pendente';
+    pesoMensagem = `Peso do bloco ${agendamento.numero_bloco || ''} não informado no sistema`;
+    motivosBloqueio.push(`Peso do bloco não cadastrado (necessário para validação de capacidade)`);
+  }
+
+  const pesoItem = {
+    apto: pesoApto,
+    status: pesoStatus,
+    pesoKg,
+    pesoFormatado: pesoKg > 0 ? `${pesoKg.toLocaleString('pt-BR')} kg` : 'Não informado',
+    limiteMaxKg,
+    limiteFormatado: configVeiculo.labelLimite,
+    excessoKg,
+    tipoVeiculo: configVeiculo.tipo,
+    mensagem: pesoMensagem
+  };
+
+  // 3. PREMISSA 3: CNH X DOCUMENTOS DO VEÍCULO
+  const confDoc = verificarConformidadeDocumental({
+    cpf: agendamento.motorista_cpf,
+    nome: agendamento.motorista_nome,
+    placaCavalo: agendamento.placa_cavalo,
+    placaCarreta: agendamento.placa_carreta,
+    placaCarreta2: agendamento.placa_carreta_2,
+    dataAgendamento: agendamento.data_agendamento,
+    tipoVeiculo: agendamento.tipo_veiculo
+  });
+
+  let docApto = false;
+  let docStatus = confDoc.statusGeral;
+  let docMensagem = '';
+
+  if (confDoc.statusGeral === 'VENCIDO') {
+    docApto = false;
+    const listaVencidos = confDoc.itensVencidos?.map(i => `${i.titulo} (${i.labelData})`).join(', ') || 'Documentos vencidos';
+    docMensagem = `Documentação vencida: ${listaVencidos}`;
+    motivosBloqueio.push(`Documento Vencido: ${listaVencidos}`);
+  } else if (confDoc.statusGeral === 'NAO_CADASTRADO') {
+    docApto = false;
+    const faltam = confDoc.camposFaltando?.join(', ') || 'Cadastro incompleto';
+    docMensagem = `Documentação incompleta: ${faltam}`;
+    motivosBloqueio.push(`Documentos pendentes na base de conformidade: ${faltam}`);
+  } else if (confDoc.statusGeral === 'AVENCER') {
+    docApto = true;
+    const avencer = confDoc.itensAVencer?.map(i => `${i.titulo} (${i.labelData})`).join(', ') || '';
+    docMensagem = `Documentos válidos (atenção: ${avencer})`;
+    avisosAtencao.push(`Documentos a vencer em breve: ${avencer}`);
+  } else {
+    docApto = true;
+    docMensagem = 'Documentos do motorista e veículos em total conformidade';
+  }
+
+  if (confDoc.alertas?.length > 0) {
+    confDoc.alertas.forEach(al => {
+      avisosAtencao.push(al);
+    });
+  }
+
+  const documentosItem = {
+    apto: docApto,
+    status: docStatus,
+    mensagem: docMensagem,
+    confDoc
+  };
+
+  // RESULTADO GERAL & BADGES DE RECOMENDAÇÃO
+  const aptoParaLiberacao = blocoApto && pesoApto && docApto;
+
+  let badge = {
+    label: '🟢 Apto p/ Liberar',
+    cor: '#22c55e',
+    bg: 'rgba(34, 197, 94, 0.15)',
+    border: '#16a34a',
+    icon: 'CheckCircle2'
+  };
+
+  if (!aptoParaLiberacao) {
+    if (pesoStatus === 'excesso') {
+      badge = {
+        label: '🔴 Excesso de Peso',
+        cor: '#ef4444',
+        bg: 'rgba(239, 68, 68, 0.15)',
+        border: '#dc2626',
+        icon: 'AlertTriangle'
+      };
+    } else if (!blocoApto) {
+      badge = {
+        label: `🔴 Bloco: ${infoEnv.label}`,
+        cor: '#ef4444',
+        bg: 'rgba(239, 68, 68, 0.15)',
+        border: '#dc2626',
+        icon: 'PackageX'
+      };
+    } else if (docStatus === 'VENCIDO') {
+      badge = {
+        label: '🔴 Doc. Vencido',
+        cor: '#ef4444',
+        bg: 'rgba(239, 68, 68, 0.15)',
+        border: '#dc2626',
+        icon: 'FileX'
+      };
+    } else if (pesoStatus === 'pendente') {
+      badge = {
+        label: '🟡 Peso Pendente',
+        cor: '#f59e0b',
+        bg: 'rgba(245, 158, 11, 0.15)',
+        border: '#d97706',
+        icon: 'Scale'
+      };
+    } else if (docStatus === 'NAO_CADASTRADO') {
+      badge = {
+        label: '🟡 Doc. Pendente',
+        cor: '#f59e0b',
+        bg: 'rgba(245, 158, 11, 0.15)',
+        border: '#d97706',
+        icon: 'FileWarning'
+      };
+    } else {
+      badge = {
+        label: '🔴 Não Recomendado',
+        cor: '#ef4444',
+        bg: 'rgba(239, 68, 68, 0.15)',
+        border: '#dc2626',
+        icon: 'AlertCircle'
+      };
+    }
+  }
+
+  return {
+    apto: aptoParaLiberacao,
+    statusGeral: aptoParaLiberacao ? 'APTO' : (motivosBloqueio.length > 0 ? 'NAO_RECOMENDADO' : 'PENDENTE'),
+    bloco: blocoItem,
+    peso: pesoItem,
+    documentos: documentosItem,
+    motivosBloqueio,
+    avisosAtencao,
+    badge
+  };
+}
 
 const _env = (typeof import.meta !== 'undefined' && import.meta.env) ? import.meta.env : (typeof process !== 'undefined' && process.env ? process.env : {});
 export const EMAIL_NOTIFICACAO_DESTINO = _env.VITE_EMAIL_NOTIFICACAO_DESTINO || '';

@@ -23,7 +23,8 @@ import {
   obterStatusConformidadeCarreta,
   formatarCNPJ,
   consultarCNPJReceita,
-  obterAgendamentosLocais
+  obterAgendamentosLocais,
+  avaliarAptidaoLiberacaoAgendamento
 } from '../services/agendamentoService';
 import { 
   verificarStatusEnvelopamentoAgendamento, 
@@ -124,12 +125,14 @@ export function ModalEditarAgendamento({
 
   // Sincronização em tempo real do status de envelopamento do bloco
   const [infoEnvelopamento, setInfoEnvelopamento] = useState(null);
+  const [listaEnvelopamentos, setListaEnvelopamentos] = useState([]);
 
   useEffect(() => {
     let ativo = true;
     if (formData.numero_bloco && formData.numero_bloco.length >= 2) {
       listarEnvelopamentos().then(envs => {
         if (ativo) {
+          setListaEnvelopamentos(envs || []);
           const res = verificarStatusEnvelopamentoAgendamento(formData, envs);
           setInfoEnvelopamento(res);
         }
@@ -479,6 +482,65 @@ export function ModalEditarAgendamento({
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           
+          {/* Card Inteligente de Indicação de Liberação (Exclusivo Admin) */}
+          {isAdmin && formData.status === 'Aguardando Liberação' && (() => {
+            const aptidao = avaliarAptidaoLiberacaoAgendamento(formData, listaEnvelopamentos);
+            return (
+              <div style={{
+                background: aptidao.apto ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+                border: aptidao.apto ? '1px solid rgba(34, 197, 94, 0.35)' : '1px solid rgba(239, 68, 68, 0.35)',
+                borderRadius: 10,
+                padding: '12px 16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '1rem' }}>{aptidao.apto ? '🟢' : '🔴'}</span>
+                    <strong style={{ color: aptidao.apto ? '#4ade80' : '#f87171', fontSize: '0.86rem' }}>
+                      {aptidao.apto ? 'Indicação: Apto para Liberação' : 'Indicação: Não Recomendado para Liberação'}
+                    </strong>
+                  </div>
+                  <span style={{
+                    background: aptidao.badge.bg,
+                    color: aptidao.badge.cor,
+                    border: `1px solid ${aptidao.badge.border}`,
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    fontSize: '0.72rem',
+                    fontWeight: 800
+                  }}>
+                    {aptidao.badge.label}
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: '0.76rem' }}>
+                  {/* Item 1 */}
+                  <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: 6, border: aptidao.bloco.apto ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(239,68,68,0.2)' }}>
+                    <span style={{ color: aptidao.bloco.apto ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+                      1. Bloco: {aptidao.bloco.label}
+                    </span>
+                    <div style={{ color: 'var(--slate-400)', fontSize: '0.70rem', marginTop: 2 }}>{aptidao.bloco.mensagem}</div>
+                  </div>
+
+                  {/* Item 2 */}
+                  <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: 6, border: aptidao.peso.apto ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(239,68,68,0.2)' }}>
+                    <span style={{ color: aptidao.peso.apto ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+                      2. Peso vs Porte: {aptidao.peso.pesoFormatado}
+                    </span>
+                    <div style={{ color: 'var(--slate-400)', fontSize: '0.70rem', marginTop: 2 }}>{aptidao.peso.mensagem}</div>
+                  </div>
+
+                  {/* Item 3 */}
+                  <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: 6, border: aptidao.documentos.apto ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(239,68,68,0.2)' }}>
+                    <span style={{ color: aptidao.documentos.apto ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+                      3. Docs: {aptidao.documentos.status === 'REGULAR' ? 'Regular' : aptidao.documentos.status === 'AVENCER' ? 'A Vencer' : aptidao.documentos.status === 'VENCIDO' ? 'Vencido' : 'Pendente'}
+                    </span>
+                    <div style={{ color: 'var(--slate-400)', fontSize: '0.70rem', marginTop: 2 }}>{aptidao.documentos.mensagem}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Seção 1: Dados do Bloco & Pedreira */}
           <div style={{
             background: 'var(--bg-card-hover, rgba(255, 255, 255, 0.02))',

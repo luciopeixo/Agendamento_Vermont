@@ -33,7 +33,9 @@ import {
   obterBaseMotoristas,
   carregarBaseMotoristasUnificada,
   invalidarCacheMotoristas,
-  isSupabaseConfigurado
+  isSupabaseConfigurado,
+  avaliarAptidaoLiberacaoAgendamento,
+  LIMITES_PESO_VEICULO
 } from '../services/agendamentoService';
 import { 
   listarEnvelopamentos, 
@@ -297,8 +299,22 @@ export function PainelGestao({
   // Filtro exclusivo para visualizar apenas agendamentos finalizados sem NF
   const [exibindoApenasSemNF, setExibindoApenasSemNF] = useState(false);
 
+  // Estados para Análise de Aptidão e Indicação de Liberação de Agendamentos (Admin)
+  const [detalhesAptidaoAgendamento, setDetalhesAptidaoAgendamento] = useState(null);
+  const [exibindoApenasAptos, setExibindoApenasAptos] = useState(false);
+
   // Base de envelopamentos sincronizada em tempo real para status visual dos blocos
   const [envelopamentos, setEnvelopamentos] = useState([]);
+
+  // Agendamentos em 'Aguardando Liberação' que atendem 100% às 3 premissas de liberação (Exclusivo Admin)
+  const aptosParaLiberacao = useMemo(() => {
+    if (!isAdmin) return [];
+    return agendamentos.filter(ag => {
+      if (ag.status !== 'Aguardando Liberação') return false;
+      const res = avaliarAptidaoLiberacaoAgendamento(ag, envelopamentos);
+      return res.apto;
+    });
+  }, [agendamentos, envelopamentos, isAdmin]);
 
   // Agendamentos Finalizados sem confirmação de emissão de Nota Fiscal (para alerta ao Admin)
   const finalizadosSemNF = useMemo(() => {
@@ -900,9 +916,11 @@ export function PainelGestao({
         const isFinalizado = st === 'Finalizado' || st === 'Carregado';
         return isFinalizado && !a.nota_fiscal_emitida;
       })
-    : exibindoPendenciasAnteriores
-      ? pendenciasAnteriores
-      : agendamentos;
+    : exibindoApenasAptos
+      ? agendamentos.filter(a => a.status === 'Aguardando Liberação' && avaliarAptidaoLiberacaoAgendamento(a, envelopamentos).apto)
+      : exibindoPendenciasAnteriores
+        ? pendenciasAnteriores
+        : agendamentos;
 
   const agendamentosFiltrados = listaBase.filter(ag => {
     if (!termoBusca.trim()) return true;
@@ -930,7 +948,7 @@ export function PainelGestao({
   // Reseta para a primeira página quando qualquer filtro ou termo de busca for alterado
   useEffect(() => {
     setPaginaAtual(1);
-  }, [filtroPedreira, filtroStatus, filtroData, termoBusca, exibindoPendenciasAnteriores, exibindoApenasSemNF]);
+  }, [filtroPedreira, filtroStatus, filtroData, termoBusca, exibindoPendenciasAnteriores, exibindoApenasSemNF, exibindoApenasAptos]);
 
   // Cálculos de Paginação
   const totalItens = agendamentosFiltrados.length;
@@ -1507,14 +1525,52 @@ export function PainelGestao({
           </span>
         </div>
 
-        <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #f59e0b' }}>
-          <span style={{ fontSize: '0.74rem', color: '#d97706', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Clock size={13} /> Aguardando Liberação
-          </span>
+        <div 
+          className="glass-panel" 
+          style={{ 
+            padding: '14px 16px', 
+            borderLeft: `4px solid ${exibindoApenasAptos ? '#22c55e' : '#f59e0b'}`,
+            background: exibindoApenasAptos ? 'rgba(34, 197, 94, 0.12)' : undefined,
+            boxShadow: exibindoApenasAptos ? '0 0 15px rgba(34, 197, 94, 0.25)' : undefined
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+            <span style={{ fontSize: '0.74rem', color: '#d97706', textTransform: 'uppercase', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Clock size={13} /> Aguardando Liberação
+            </span>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setExibindoApenasAptos(prev => !prev);
+                  setExibindoApenasSemNF(false);
+                  setExibindoPendenciasAnteriores(false);
+                }}
+                className="badge"
+                style={{
+                  cursor: 'pointer',
+                  background: exibindoApenasAptos ? '#22c55e' : 'rgba(34, 197, 94, 0.18)',
+                  color: exibindoApenasAptos ? '#fff' : '#4ade80',
+                  border: '1px solid #16a34a',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  padding: '2px 6px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3
+                }}
+                title="Clique para alternar entre ver todos ou apenas os agendamentos aptos segundo as 3 premissas (bloco, peso e documentos)"
+              >
+                🟢 {aptosParaLiberacao.length} Apto{aptosParaLiberacao.length === 1 ? '' : 's'}
+              </button>
+            )}
+          </div>
           <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#d97706', marginTop: 4 }}>
             {agendamentos.filter(a => a.status === 'Aguardando Liberação').length}
           </div>
-          <span style={{ fontSize: '0.72rem', color: 'var(--slate-400)' }}>Aguardando aval</span>
+          <span style={{ fontSize: '0.72rem', color: exibindoApenasAptos ? '#22c55e' : 'var(--slate-400)', fontWeight: exibindoApenasAptos ? 700 : 400 }}>
+            {exibindoApenasAptos ? 'Visualizando apenas Aptos 🟢' : isAdmin && aptosParaLiberacao.length > 0 ? `${aptosParaLiberacao.length} pronto(s) para liberação` : 'Aguardando aval admin'}
+          </span>
         </div>
 
         <div className="glass-panel" style={{ padding: '14px 16px', borderLeft: '4px solid #a855f7' }}>
@@ -2559,21 +2615,60 @@ export function PainelGestao({
                       </td>
 
                       {/* Status */}
-                      <td style={{ padding: '12px 14px', minWidth: 175 }}>
+                      <td style={{ padding: '12px 14px', minWidth: 180 }}>
                         {ag.status === 'Aguardando Liberação' && (
-                          <span className="badge" style={{
-                            background: 'rgba(245, 158, 11, 0.15)',
-                            color: '#b45309',
-                            border: '1px solid rgba(217, 119, 6, 0.45)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 5,
-                            padding: '4px 8px',
-                            fontSize: '0.76rem',
-                            fontWeight: 800
-                          }}>
-                            <Clock size={12} /> Aguardando Liberação
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                            <span className="badge" style={{
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              color: '#b45309',
+                              border: '1px solid rgba(217, 119, 6, 0.45)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5,
+                              padding: '4px 8px',
+                              fontSize: '0.76rem',
+                              fontWeight: 800
+                            }}>
+                              <Clock size={12} /> Aguardando Liberação
+                            </span>
+
+                            {/* Indicação Inteligente de Liberação (Exclusivo Admin) */}
+                            {isAdmin && (() => {
+                              const aptidao = avaliarAptidaoLiberacaoAgendamento(ag, envelopamentos);
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => setDetalhesAptidaoAgendamento({ ag, aptidao })}
+                                  className="badge"
+                                  style={{
+                                    cursor: 'pointer',
+                                    background: aptidao.badge.bg,
+                                    border: `1px solid ${aptidao.badge.border}`,
+                                    color: aptidao.badge.cor,
+                                    fontSize: '0.68rem',
+                                    fontWeight: 800,
+                                    padding: '3px 7px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: 4,
+                                    textAlign: 'left',
+                                    borderRadius: 6,
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: aptidao.apto ? '0 0 10px rgba(34, 197, 94, 0.25)' : 'none'
+                                  }}
+                                  title={
+                                    aptidao.apto 
+                                      ? '✅ Bloco envelopado/liberado, peso compatível e documentação regular. Clique para ver checklist de liberação.' 
+                                      : `⚠️ Pendências para liberação:\n• ${aptidao.motivosBloqueio.join('\n• ')}\nClique para analisar checklist.`
+                                  }
+                                >
+                                  <span>{aptidao.badge.label}</span>
+                                  <span style={{ fontSize: '0.65rem', opacity: 0.85 }}>🔍</span>
+                                </button>
+                              );
+                            })()}
+                          </div>
                         )}
                         {(ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
                           <span className="badge" style={{
@@ -2968,11 +3063,374 @@ export function PainelGestao({
           agendamento={mudancaStatusPendente.agendamento}
           novoStatus={mudancaStatusPendente.novoStatus}
           usuarioInfo={usuarioInfo}
+          envelopamentos={envelopamentos}
           processando={processandoMudancaStatus}
           onConfirmar={handleConfirmarMudancaStatus}
           onCancelar={handleCancelarMudancaStatus}
         />
       )}
+
+      {/* Modal Detalhado de Indicação de Liberação de Agendamento (Admin) */}
+      {detalhesAptidaoAgendamento && (() => {
+        const { ag, aptidao } = detalhesAptidaoAgendamento;
+        const protocolo = (ag.id || '').substring(0, 8).toUpperCase();
+        const placas = formatarPlacasExibicao(ag);
+
+        return (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(5, 10, 8, 0.88)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 650,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16
+          }}>
+            <div
+              className="glass-panel animate-fade"
+              style={{
+                width: '100%',
+                maxWidth: 640,
+                maxHeight: '92vh',
+                display: 'flex',
+                flexDirection: 'column',
+                background: '#0d1411',
+                border: aptidao.apto ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
+                boxShadow: aptidao.apto 
+                  ? '0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(34, 197, 94, 0.2)' 
+                  : '0 20px 50px rgba(0,0,0,0.9), 0 0 30px rgba(239, 68, 68, 0.2)',
+                borderRadius: 16,
+                overflow: 'hidden'
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                padding: '16px 20px',
+                background: aptidao.apto ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: aptidao.apto ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                    border: aptidao.apto ? '1px solid #22c55e' : '1px solid #ef4444',
+                    color: aptidao.apto ? '#4ade80' : '#f87171',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {aptidao.apto ? <CheckCircle2 size={22} /> : <AlertTriangle size={22} />}
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', color: '#fff' }}>
+                      Indicação de Liberação de Agendamento
+                    </h3>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: 'var(--slate-400)' }}>
+                      Análise das 3 premissas operacionais (Exclusivo Administrador Geral)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetalhesAptidaoAgendamento(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--slate-400)',
+                    cursor: 'pointer',
+                    padding: 4
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Corpo */}
+              <div style={{ padding: '18px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                
+                {/* Resumo do Agendamento */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                  gap: 8,
+                  fontSize: '0.80rem'
+                }}>
+                  <div>
+                    <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.70rem' }}>Protocolo</span>
+                    <strong style={{ color: '#fff', fontFamily: 'monospace' }}>#{protocolo}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.70rem' }}>Nº Bloco / Material</span>
+                    <strong style={{ color: '#4ade80' }}>{ag.numero_bloco}</strong> ({ag.material})
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.70rem' }}>Pedreira</span>
+                    <strong style={{ color: '#fff' }}>{ag.pedreira}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.70rem' }}>Data & Horário</span>
+                    <strong style={{ color: '#fff' }}>{formatarDataBR(ag.data_agendamento)} • {ag.horario_agendamento}</strong>
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.70rem' }}>Cliente & Transportadora</span>
+                    <span style={{ color: '#e2e8f0' }}>
+                      <strong>{limparNomeEmpresa(ag.cliente)}</strong> | Transp: {limparNomeEmpresa(ag.transportadora)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Banner de Status Geral */}
+                <div style={{
+                  background: aptidao.apto ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                  border: aptidao.apto ? '1px solid rgba(34, 197, 94, 0.35)' : '1px solid rgba(239, 68, 68, 0.35)',
+                  borderRadius: 10,
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: '1.3rem' }}>{aptidao.apto ? '🟢' : '🔴'}</span>
+                    <div>
+                      <strong style={{ color: aptidao.apto ? '#4ade80' : '#f87171', fontSize: '0.92rem', display: 'block' }}>
+                        {aptidao.apto ? 'SITUAÇÃO: APTO PARA LIBERAÇÃO' : 'SITUAÇÃO: NÃO RECOMENDADO PARA LIBERAÇÃO'}
+                      </strong>
+                      <span style={{ color: 'var(--slate-300)', fontSize: '0.76rem' }}>
+                        {aptidao.apto 
+                          ? 'Todas as 3 premissas foram validadas com sucesso.' 
+                          : `${aptidao.motivosBloqueio.length} premissa(s) não atendida(s).`}
+                      </span>
+                    </div>
+                  </div>
+                  <span style={{
+                    background: aptidao.badge.bg,
+                    color: aptidao.badge.cor,
+                    border: `1px solid ${aptidao.badge.border}`,
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    fontSize: '0.74rem',
+                    fontWeight: 800
+                  }}>
+                    {aptidao.badge.label}
+                  </span>
+                </div>
+
+                {/* Os 3 Cards das Premissas */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  
+                  {/* PREMISSA 1: Status do Bloco */}
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.35)',
+                    border: aptidao.bloco.apto ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: 10,
+                    padding: '12px 14px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <strong style={{ fontSize: '0.84rem', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: aptidao.bloco.apto ? '#4ade80' : '#f87171' }}>
+                          {aptidao.bloco.apto ? '✅' : '❌'}
+                        </span>
+                        1. Status do Bloco / Envelopamento
+                      </strong>
+                      <span style={{
+                        background: aptidao.bloco.bg,
+                        color: aptidao.bloco.cor,
+                        border: `1px solid ${aptidao.bloco.border}`,
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: 4
+                      }}>
+                        {aptidao.bloco.label}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--slate-300)', lineHeight: '1.4' }}>
+                      {aptidao.bloco.mensagem}
+                    </div>
+                  </div>
+
+                  {/* PREMISSA 2: Peso do Bloco x Porte do Veículo */}
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.35)',
+                    border: aptidao.peso.apto ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: 10,
+                    padding: '12px 14px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <strong style={{ fontSize: '0.84rem', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: aptidao.peso.apto ? '#4ade80' : '#f87171' }}>
+                          {aptidao.peso.apto ? '✅' : '❌'}
+                        </span>
+                        2. Peso do Bloco vs Porte do Veículo
+                      </strong>
+                      <span style={{
+                        background: aptidao.peso.apto ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: aptidao.peso.apto ? '#4ade80' : '#f87171',
+                        border: aptidao.peso.apto ? '1px solid #16a34a' : '1px solid #dc2626',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: 4
+                      }}>
+                        {aptidao.peso.status === 'ok' ? 'Dentro do Limite' : aptidao.peso.status === 'excesso' ? 'Excesso de Peso' : aptidao.peso.status === 'sem_limite' ? 'Sem Limite Definido' : 'Peso Pendente'}
+                      </span>
+                    </div>
+                    
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                      gap: 8,
+                      background: 'rgba(255,255,255,0.02)',
+                      padding: '8px 10px',
+                      borderRadius: 6,
+                      fontSize: '0.76rem',
+                      marginBottom: 6
+                    }}>
+                      <div>
+                        <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.68rem' }}>Porte do Veículo</span>
+                        <strong style={{ color: '#38bdf8' }}>{aptidao.peso.tipoVeiculo}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.68rem' }}>Peso do Bloco</span>
+                        <strong style={{ color: aptidao.peso.pesoKg > 0 ? '#fff' : '#f59e0b' }}>{aptidao.peso.pesoFormatado}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.68rem' }}>Limite Recomendado</span>
+                        <strong style={{ color: '#a855f7' }}>{aptidao.peso.limiteFormatado}</strong>
+                      </div>
+                    </div>
+
+                    <div style={{ fontSize: '0.78rem', color: 'var(--slate-300)', lineHeight: '1.4' }}>
+                      {aptidao.peso.mensagem}
+                    </div>
+                  </div>
+
+                  {/* PREMISSA 3: CNH x Documentos do Veículo */}
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.35)',
+                    border: aptidao.documentos.apto ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: 10,
+                    padding: '12px 14px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <strong style={{ fontSize: '0.84rem', color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: aptidao.documentos.apto ? '#4ade80' : '#f87171' }}>
+                          {aptidao.documentos.apto ? '✅' : '❌'}
+                        </span>
+                        3. CNH & Documentos da Frota
+                      </strong>
+                      <span style={{
+                        background: aptidao.documentos.status === 'REGULAR' ? 'rgba(34, 197, 94, 0.15)' : aptidao.documentos.status === 'AVENCER' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: aptidao.documentos.status === 'REGULAR' ? '#4ade80' : aptidao.documentos.status === 'AVENCER' ? '#fbbf24' : '#f87171',
+                        border: `1px solid ${aptidao.documentos.status === 'REGULAR' ? '#16a34a' : aptidao.documentos.status === 'AVENCER' ? '#d97706' : '#dc2626'}`,
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: 4
+                      }}>
+                        {aptidao.documentos.status === 'REGULAR' ? 'Regular' : aptidao.documentos.status === 'AVENCER' ? 'A Vencer' : aptidao.documentos.status === 'VENCIDO' ? 'Vencido' : 'Não Cadastrado'}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '0.76rem', color: '#e2e8f0', marginBottom: 6 }}>
+                      <span>Motorista: <strong>{ag.motorista_nome || 'Não informado'}</strong> (CPF: {ag.motorista_cpf || 'Não informado'}) — {placas.map(p => `${p.label}: ${p.placa}`).join(' | ')}</span>
+                    </div>
+
+                    <div style={{ fontSize: '0.78rem', color: 'var(--slate-300)', lineHeight: '1.4' }}>
+                      {aptidao.documentos.mensagem}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Tabela de Referência Rápida de Limites */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  fontSize: '0.72rem'
+                }}>
+                  <strong style={{ color: 'var(--slate-400)', display: 'block', marginBottom: 6 }}>
+                    📖 Tabela de Referência Oficial Vermont (Limites Máximos Recomendados):
+                  </strong>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 4, color: 'var(--slate-300)' }}>
+                    {LIMITES_PESO_VEICULO.map(l => (
+                      <div key={l.tipo} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: 2 }}>
+                        <span>• {l.tipo}:</span>
+                        <strong style={{ color: l.limiteKg ? '#4ade80' : '#94a3b8' }}>{l.labelLimite}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Rodapé com Ações */}
+              <div style={{
+                padding: '14px 20px',
+                background: 'rgba(0, 0, 0, 0.4)',
+                borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                flexWrap: 'wrap'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setDetalhesAptidaoAgendamento(null)}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 16px', fontSize: '0.84rem' }}
+                >
+                  Fechar
+                </button>
+
+                {isAdmin && ag.status === 'Aguardando Liberação' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDetalhesAptidaoAgendamento(null);
+                      solicitarMudancaStatus(ag, 'Liberado para Carregar');
+                    }}
+                    className={`btn ${aptidao.apto ? 'btn-vermont' : 'btn-secondary'}`}
+                    style={{
+                      padding: '9px 20px',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: aptidao.apto ? undefined : 'rgba(245, 158, 11, 0.2)',
+                      borderColor: aptidao.apto ? undefined : '#d97706',
+                      color: aptidao.apto ? undefined : '#fbbf24'
+                    }}
+                  >
+                    <CheckCircle2 size={16} />
+                    Liberar para Carregar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal de Limpeza em Lote de Testes e Cache */}
       {modalLimpezaAberto && (
