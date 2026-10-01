@@ -3313,13 +3313,53 @@ export function obterConfiguracaoCapacidadeVeiculo(tipoVeiculo = '') {
 }
 
 /**
+ * Localiza todos os agendamentos ou pontos que compõem uma mesma viagem / carga combinada
+ */
+export function obterItensCargaCombinadaAgendamento(agendamento, todosAgendamentos = []) {
+  if (!agendamento) return [];
+
+  const isCombinado = Boolean(
+    agendamento.is_combinado ||
+    (agendamento.observacoes && (
+      agendamento.observacoes.includes('[Carga Combinada') ||
+      agendamento.observacoes.includes('[Carga Mista')
+    )) ||
+    (Array.isArray(agendamento.pontos) && agendamento.pontos.length > 1)
+  );
+
+  // Se o próprio agendamento já contém os pontos anexados
+  if (Array.isArray(agendamento.pontos) && agendamento.pontos.length > 1) {
+    return agendamento.pontos;
+  }
+
+  const placaCavalo = String(agendamento.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  const dataAg = agendamento.data_agendamento;
+
+  if (isCombinado && placaCavalo && dataAg && Array.isArray(todosAgendamentos) && todosAgendamentos.length > 0) {
+    const irmaos = todosAgendamentos.filter(item => {
+      if (String(item.status || '').toLowerCase() === 'cancelado') return false;
+      const itemPlaca = String(item.placa_cavalo || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
+      const matchPlaca = itemPlaca === placaCavalo;
+      const matchData = item.data_agendamento === dataAg;
+      return matchPlaca && matchData;
+    });
+
+    if (irmaos.length > 1) {
+      return irmaos;
+    }
+  }
+
+  return [agendamento];
+}
+
+/**
  * Avalia a aptidão e gera a indicação inteligente de liberação de agendamento (Exclusivo Admin)
  * Baseado nas 3 premissas operacionais:
- * 1. Status do Bloco (Envelopamento): Deve ser "Envelopado" ou "Sem envelopamento" (liberado)
- * 2. Peso do Bloco vs Porte do Veículo: Deve respeitar o limite máximo recomendado da tabela
+ * 1. Status do Bloco (Envelopamento): Todos os blocos (inclusive em Carga Combinada) devem estar "Envelopado" ou "Sem envelopamento"
+ * 2. Peso do Bloco vs Porte do Veículo: Em Carga Combinada, soma o peso de TODOS os blocos e compara com a capacidade do veículo
  * 3. Documentos: CNH do motorista, CRLV e Laudo de Rocha regulares
  */
-export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamentos = []) {
+export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamentos = [], todosAgendamentos = []) {
   if (!agendamento) {
     return {
       apto: false,
@@ -3336,75 +3376,116 @@ export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamen
   const motivosBloqueio = [];
   const avisosAtencao = [];
 
+  // Localiza todos os blocos / pontos caso seja Carga Combinada
+  const itensCarga = obterItensCargaCombinadaAgendamento(agendamento, todosAgendamentos);
+  const isCargaCombinada = itensCarga.length > 1;
+
   // 1. PREMISSA 1: STATUS DO BLOCO / ENVELOPAMENTO
-  const infoEnv = verificarStatusEnvelopamentoAgendamento(agendamento, listaEnvelopamentos);
-  const blocoApto = infoEnv.isEnvelopadoOuLiberado === true;
+  const blocosAnalise = itensCarga.map(item => {
+    const info = verificarStatusEnvelopamentoAgendamento(item, listaEnvelopamentos);
+    const pesoNum = normalizarPeso(info?.registro?.peso_kg || item.peso_kg || item.peso || item.peso_bloco);
+    return {
+      agendamentoId: item.id,
+      numero_bloco: item.numero_bloco || 'S/N',
+      material: item.material || '',
+      pedreira: item.pedreira || '',
+      pesoKg: pesoNum,
+      pesoFormatado: pesoNum > 0 ? `${pesoNum.toLocaleString('pt-BR')} kg` : 'Sem peso',
+      infoEnv: info,
+      apto: info.isEnvelopadoOuLiberado === true
+    };
+  });
+
+  const blocosPendentes = blocosAnalise.filter(b => !b.apto);
+  const blocoApto = blocosPendentes.length === 0;
 
   let blocoMensagem = '';
-  if (infoEnv.isEnvelopadoOuLiberado) {
-    blocoMensagem = infoEnv.status === 'sem_envelopamento'
-      ? 'Bloco liberado sem necessidade de envelopamento'
-      : 'Bloco envelopado e liberado para transporte';
+  if (blocoApto) {
+    if (isCargaCombinada) {
+      blocoMensagem = `Carga Combinada (${blocosAnalise.length} blocos): Todos os blocos liberados (${blocosAnalise.map(b => `Bloco ${b.numero_bloco}: ${b.infoEnv.label}`).join(' | ')})`;
+    } else {
+      blocoMensagem = blocosAnalise[0]?.infoEnv.status === 'sem_envelopamento'
+        ? 'Bloco liberado sem necessidade de envelopamento'
+        : 'Bloco envelopado e liberado para transporte';
+    }
   } else {
-    blocoMensagem = infoEnv.descricao || `Status atual do bloco no pátio: ${infoEnv.label}`;
-    motivosBloqueio.push(`Bloco ${agendamento.numero_bloco || 'S/N'}: ${infoEnv.label} (${blocoMensagem})`);
+    const detalhesPendentes = blocosPendentes.map(b => `Bloco ${b.numero_bloco} (${b.infoEnv.label})`).join(', ');
+    blocoMensagem = isCargaCombinada 
+      ? `Pendência no pátio: ${detalhesPendentes}` 
+      : (blocosAnalise[0]?.infoEnv.descricao || `Status atual: ${blocosAnalise[0]?.infoEnv.label}`);
+    motivosBloqueio.push(`Blocos pendentes no pátio: ${detalhesPendentes}`);
   }
 
   const blocoItem = {
     apto: blocoApto,
-    status: infoEnv.status,
-    label: infoEnv.label,
-    cor: infoEnv.cor,
-    bg: infoEnv.bg,
-    border: infoEnv.border,
+    isCargaCombinada,
+    totalBlocos: blocosAnalise.length,
+    blocos: blocosAnalise,
+    label: blocoApto 
+      ? (isCargaCombinada ? `${blocosAnalise.length} Blocos OK` : blocosAnalise[0]?.infoEnv.label) 
+      : (isCargaCombinada ? `${blocosPendentes.length} Bloco(s) Pendente(s)` : blocosAnalise[0]?.infoEnv.label),
+    cor: blocoApto ? '#22c55e' : '#ef4444',
+    bg: blocoApto ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+    border: blocoApto ? '#16a34a' : '#dc2626',
     mensagem: blocoMensagem,
-    infoEnv
+    infoEnv: blocosAnalise[0]?.infoEnv
   };
 
-  // 2. PREMISSA 2: PESO DO BLOCO X PORTE DO VEÍCULO
-  const tipoVeiculo = agendamento.tipo_veiculo || '';
+  // 2. PREMISSA 2: PESO TOTAL (INDIVIDUAL OU SOMA DOS BLOCOS DA CARGA COMBINADA) X PORTE DO VEÍCULO
+  const tipoVeiculo = agendamento.tipo_veiculo || itensCarga[0]?.tipo_veiculo || '';
   const configVeiculo = obterConfiguracaoCapacidadeVeiculo(tipoVeiculo);
   const limiteMaxKg = configVeiculo.limiteKg;
 
-  const pesoRaw = infoEnv?.registro?.peso_kg || agendamento.peso_kg || agendamento.peso || agendamento.peso_bloco;
-  const pesoKg = normalizarPeso(pesoRaw);
+  const pesoTotalKg = blocosAnalise.reduce((acc, b) => acc + (b.pesoKg || 0), 0);
+  const blocosSemPeso = blocosAnalise.filter(b => !b.pesoKg || b.pesoKg <= 0);
 
   let pesoApto = false;
   let pesoStatus = 'ok';
   let excessoKg = 0;
   let pesoMensagem = '';
 
-  if (pesoKg > 0) {
+  if (blocosSemPeso.length > 0) {
+    pesoApto = false;
+    pesoStatus = 'pendente';
+    const nomesSemPeso = blocosSemPeso.map(b => `Bloco ${b.numero_bloco}`).join(', ');
+    pesoMensagem = `Peso não informado para: ${nomesSemPeso}`;
+    motivosBloqueio.push(`Peso não informado no sistema: ${nomesSemPeso}`);
+  } else if (pesoTotalKg > 0) {
+    const detalheSomaPesos = isCargaCombinada 
+      ? ` (${blocosAnalise.map(b => `${b.numero_bloco}: ${b.pesoKg.toLocaleString('pt-BR')} kg`).join(' + ')})`
+      : '';
+
     if (limiteMaxKg !== null && limiteMaxKg > 0) {
-      if (pesoKg <= limiteMaxKg) {
+      if (pesoTotalKg <= limiteMaxKg) {
         pesoApto = true;
         pesoStatus = 'ok';
-        pesoMensagem = `Peso de ${pesoKg.toLocaleString('pt-BR')} kg está dentro do limite de ${limiteMaxKg.toLocaleString('pt-BR')} kg (${configVeiculo.tipo})`;
+        pesoMensagem = isCargaCombinada
+          ? `Peso Total Combinado de ${pesoTotalKg.toLocaleString('pt-BR')} kg${detalheSomaPesos} está dentro do limite de ${limiteMaxKg.toLocaleString('pt-BR')} kg (${configVeiculo.tipo})`
+          : `Peso de ${pesoTotalKg.toLocaleString('pt-BR')} kg está dentro do limite de ${limiteMaxKg.toLocaleString('pt-BR')} kg (${configVeiculo.tipo})`;
       } else {
         pesoApto = false;
         pesoStatus = 'excesso';
-        excessoKg = pesoKg - limiteMaxKg;
-        pesoMensagem = `Excesso de peso: ${pesoKg.toLocaleString('pt-BR')} kg ultrapassa o limite recomendado de ${limiteMaxKg.toLocaleString('pt-BR')} kg em +${excessoKg.toLocaleString('pt-BR')} kg (${configVeiculo.tipo})`;
+        excessoKg = pesoTotalKg - limiteMaxKg;
+        pesoMensagem = isCargaCombinada
+          ? `Excesso de peso na Carga Combinada: Peso Total de ${pesoTotalKg.toLocaleString('pt-BR')} kg${detalheSomaPesos} ultrapassa o limite recomendado de ${limiteMaxKg.toLocaleString('pt-BR')} kg em +${excessoKg.toLocaleString('pt-BR')} kg (${configVeiculo.tipo})`
+          : `Excesso de peso: ${pesoTotalKg.toLocaleString('pt-BR')} kg ultrapassa o limite recomendado de ${limiteMaxKg.toLocaleString('pt-BR')} kg em +${excessoKg.toLocaleString('pt-BR')} kg (${configVeiculo.tipo})`;
         motivosBloqueio.push(pesoMensagem);
       }
     } else {
       pesoApto = true;
       pesoStatus = 'sem_limite';
-      pesoMensagem = `Peso de ${pesoKg.toLocaleString('pt-BR')} kg (${configVeiculo.tipo} - limite não restrito)`;
+      pesoMensagem = `Peso total de ${pesoTotalKg.toLocaleString('pt-BR')} kg${detalheSomaPesos} (${configVeiculo.tipo} - sem limite rígido definido)`;
       avisosAtencao.push(`Veículo ${configVeiculo.tipo}: Limite de peso ainda não foi definido formalmente.`);
     }
-  } else {
-    pesoApto = false;
-    pesoStatus = 'pendente';
-    pesoMensagem = `Peso do bloco ${agendamento.numero_bloco || ''} não informado no sistema`;
-    motivosBloqueio.push(`Peso do bloco não cadastrado (necessário para validação de capacidade)`);
   }
 
   const pesoItem = {
     apto: pesoApto,
     status: pesoStatus,
-    pesoKg,
-    pesoFormatado: pesoKg > 0 ? `${pesoKg.toLocaleString('pt-BR')} kg` : 'Não informado',
+    isCargaCombinada,
+    pesoKg: pesoTotalKg,
+    pesoFormatado: pesoTotalKg > 0 ? `${pesoTotalKg.toLocaleString('pt-BR')} kg` : 'Não informado',
+    detalheBlocos: blocosAnalise.map(b => ({ bloco: b.numero_bloco, pesoKg: b.pesoKg, pesoFormatado: b.pesoFormatado })),
     limiteMaxKg,
     limiteFormatado: configVeiculo.labelLimite,
     excessoKg,
@@ -3464,7 +3545,8 @@ export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamen
   const aptoParaLiberacao = blocoApto && pesoApto && docApto;
 
   let badge = {
-    label: '🟢 Apto p/ Liberar',
+    label: isCargaCombinada ? '🟢 Carga Combinada Apta' : '🟢 Apto p/ Liberar',
+    labelCurto: 'Apto',
     cor: '#22c55e',
     bg: 'rgba(34, 197, 94, 0.15)',
     border: '#16a34a',
@@ -3474,7 +3556,8 @@ export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamen
   if (!aptoParaLiberacao) {
     if (pesoStatus === 'excesso') {
       badge = {
-        label: '🔴 Excesso de Peso',
+        label: isCargaCombinada ? '🔴 Excesso Carga Combinada' : '🔴 Excesso de Peso',
+        labelCurto: 'Excesso Peso',
         cor: '#ef4444',
         bg: 'rgba(239, 68, 68, 0.15)',
         border: '#dc2626',
@@ -3482,7 +3565,8 @@ export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamen
       };
     } else if (!blocoApto) {
       badge = {
-        label: `🔴 Bloco: ${infoEnv.label}`,
+        label: isCargaCombinada ? `🔴 ${blocosPendentes.length} Bloco(s) Pendentes` : `🔴 Bloco: ${blocosAnalise[0]?.infoEnv.label}`,
+        labelCurto: 'Bloco Pendente',
         cor: '#ef4444',
         bg: 'rgba(239, 68, 68, 0.15)',
         border: '#dc2626',
@@ -3491,6 +3575,7 @@ export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamen
     } else if (docStatus === 'VENCIDO') {
       badge = {
         label: '🔴 Doc. Vencido',
+        labelCurto: 'Doc Vencido',
         cor: '#ef4444',
         bg: 'rgba(239, 68, 68, 0.15)',
         border: '#dc2626',
@@ -3499,6 +3584,7 @@ export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamen
     } else if (pesoStatus === 'pendente') {
       badge = {
         label: '🟡 Peso Pendente',
+        labelCurto: 'Peso Pendente',
         cor: '#f59e0b',
         bg: 'rgba(245, 158, 11, 0.15)',
         border: '#d97706',
@@ -3507,6 +3593,7 @@ export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamen
     } else if (docStatus === 'NAO_CADASTRADO') {
       badge = {
         label: '🟡 Doc. Pendente',
+        labelCurto: 'Doc Pendente',
         cor: '#f59e0b',
         bg: 'rgba(245, 158, 11, 0.15)',
         border: '#d97706',
@@ -3515,6 +3602,7 @@ export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamen
     } else {
       badge = {
         label: '🔴 Não Recomendado',
+        labelCurto: 'Pendente',
         cor: '#ef4444',
         bg: 'rgba(239, 68, 68, 0.15)',
         border: '#dc2626',
@@ -3525,6 +3613,7 @@ export function avaliarAptidaoLiberacaoAgendamento(agendamento, listaEnvelopamen
 
   return {
     apto: aptoParaLiberacao,
+    isCargaCombinada,
     statusGeral: aptoParaLiberacao ? 'APTO' : (motivosBloqueio.length > 0 ? 'NAO_RECOMENDADO' : 'PENDENTE'),
     bloco: blocoItem,
     peso: pesoItem,

@@ -309,12 +309,13 @@ export function PainelGestao({
   // Agendamentos em 'Aguardando Liberação' que atendem 100% às 3 premissas de liberação (Exclusivo Admin)
   const aptosParaLiberacao = useMemo(() => {
     if (!isAdmin) return [];
+    const base = todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos;
     return agendamentos.filter(ag => {
       if (ag.status !== 'Aguardando Liberação') return false;
-      const res = avaliarAptidaoLiberacaoAgendamento(ag, envelopamentos);
+      const res = avaliarAptidaoLiberacaoAgendamento(ag, envelopamentos, base);
       return res.apto;
     });
-  }, [agendamentos, envelopamentos, isAdmin]);
+  }, [agendamentos, todosAgendamentos, envelopamentos, isAdmin]);
 
   // Agendamentos Finalizados sem confirmação de emissão de Nota Fiscal (para alerta ao Admin)
   const finalizadosSemNF = useMemo(() => {
@@ -917,7 +918,7 @@ export function PainelGestao({
         return isFinalizado && !a.nota_fiscal_emitida;
       })
     : exibindoApenasAptos
-      ? agendamentos.filter(a => a.status === 'Aguardando Liberação' && avaliarAptidaoLiberacaoAgendamento(a, envelopamentos).apto)
+      ? agendamentos.filter(a => a.status === 'Aguardando Liberação' && avaliarAptidaoLiberacaoAgendamento(a, envelopamentos, todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos).apto)
       : exibindoPendenciasAnteriores
         ? pendenciasAnteriores
         : agendamentos;
@@ -2606,238 +2607,189 @@ export function PainelGestao({
                         </div>
                         <div style={{ fontSize: '0.78rem', marginTop: 2 }}>
                           {listaPlacasTabela.map((p, idx) => (
-                            <div key={idx} style={{ color: 'var(--slate-400)' }}>
-                              <span>{p.label}:</span>{' '}
-                              <strong style={{ fontFamily: 'monospace', color: 'inherit' }}>{p.placa}</strong>
+                            <div key={idx} style={{ color: 'var(--slate-300)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span style={{ color: 'var(--slate-500)', fontSize: '0.70rem' }}>{p.label}:</span>
+                              <strong style={{ fontFamily: 'monospace' }}>{p.placa}</strong>
                             </div>
                           ))}
                         </div>
                       </td>
 
-                      {/* Status */}
-                      <td style={{ padding: '12px 14px', minWidth: 180 }}>
-                        {ag.status === 'Aguardando Liberação' && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      {/* Status & Indicação Inteligente de Liberação */}
+                      <td style={{ padding: '8px 12px', minWidth: 160 }}>
+                        {/* Linha 1: Status Atual + Badge Inteligente Compacto (em linha única) */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          {ag.status === 'Aguardando Liberação' && (
                             <span className="badge" style={{
                               background: 'rgba(245, 158, 11, 0.15)',
-                              color: '#b45309',
-                              border: '1px solid rgba(217, 119, 6, 0.45)',
+                              color: '#d97706',
+                              border: '1px solid rgba(217, 119, 6, 0.4)',
                               display: 'inline-flex',
                               alignItems: 'center',
-                              gap: 5,
-                              padding: '4px 8px',
-                              fontSize: '0.76rem',
-                              fontWeight: 800
+                              gap: 4,
+                              padding: '2px 7px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700
                             }}>
-                              <Clock size={12} /> Aguardando Liberação
-                            </span>
-
-                            {/* Indicação Inteligente de Liberação (Exclusivo Admin) */}
-                            {isAdmin && (() => {
-                              const aptidao = avaliarAptidaoLiberacaoAgendamento(ag, envelopamentos);
-                              return (
-                                <button
-                                  type="button"
-                                  onClick={() => setDetalhesAptidaoAgendamento({ ag, aptidao })}
-                                  className="badge"
-                                  style={{
-                                    cursor: 'pointer',
-                                    background: aptidao.badge.bg,
-                                    border: `1px solid ${aptidao.badge.border}`,
-                                    color: aptidao.badge.cor,
-                                    fontSize: '0.68rem',
-                                    fontWeight: 800,
-                                    padding: '3px 7px',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    gap: 4,
-                                    textAlign: 'left',
-                                    borderRadius: 6,
-                                    transition: 'all 0.15s ease',
-                                    boxShadow: aptidao.apto ? '0 0 10px rgba(34, 197, 94, 0.25)' : 'none'
-                                  }}
-                                  title={
-                                    aptidao.apto 
-                                      ? '✅ Bloco envelopado/liberado, peso compatível e documentação regular. Clique para ver checklist de liberação.' 
-                                      : `⚠️ Pendências para liberação:\n• ${aptidao.motivosBloqueio.join('\n• ')}\nClique para analisar checklist.`
-                                  }
-                                >
-                                  <span>{aptidao.badge.label}</span>
-                                  <span style={{ fontSize: '0.65rem', opacity: 0.85 }}>🔍</span>
-                                </button>
-                              );
-                            })()}
-                          </div>
-                        )}
-                        {(ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
-                          <span className="badge" style={{
-                            background: 'rgba(168, 85, 247, 0.15)',
-                            color: '#9333ea',
-                            border: '1px solid rgba(147, 51, 234, 0.45)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 5,
-                            padding: '4px 8px',
-                            fontSize: '0.76rem',
-                            fontWeight: 800
-                          }}>
-                            <CheckCircle2 size={12} /> Liberado p/ Carregar
-                          </span>
-                        )}
-                        {ag.status === 'Carregando' && (
-                          <span className="badge" style={{
-                            background: 'rgba(56, 189, 248, 0.15)',
-                            color: '#0284c7',
-                            border: '1px solid rgba(2, 132, 199, 0.45)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 5,
-                            padding: '4px 8px',
-                            fontSize: '0.76rem',
-                            fontWeight: 800
-                          }}>
-                            <PlayCircle size={12} /> Carregando
-                          </span>
-                        )}
-                        {(ag.status === 'Finalizado' || ag.status === 'Carregado') && (
-                          <span className="badge" style={{
-                            background: 'rgba(16, 185, 129, 0.15)',
-                            color: '#16a34a',
-                            border: '1px solid rgba(22, 163, 74, 0.45)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 5,
-                            padding: '4px 8px',
-                            fontSize: '0.76rem',
-                            fontWeight: 800
-                          }}>
-                            <CheckCheck size={12} /> Finalizado
-                          </span>
-                        )}
-                        {ag.status === 'Cancelado' && (
-                          <span className="badge badge-danger" style={{ padding: '4px 8px', fontSize: '0.76rem', fontWeight: 700 }}>
-                            ❌ Cancelado
-                          </span>
-                        )}
-
-                        {/* Seletor Moderno de Alteração de Status */}
-                        <div className="no-print" style={{ marginTop: 8 }}>
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            background: !isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'rgba(15, 23, 42, 0.45)' : 'rgba(15, 23, 42, 0.85)',
-                            border: !isAdmin && ag.status === 'Aguardando Liberação' ? '1px solid rgba(245, 158, 11, 0.25)' : !isAdmin && (ag.status === 'Finalizado' || ag.status === 'Carregado') ? '1px solid rgba(34, 197, 94, 0.25)' : '1px solid rgba(255, 255, 255, 0.12)',
-                            borderRadius: 8,
-                            padding: '2px 6px',
-                            opacity: !isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado') ? 0.75 : 1
-                          }}>
-                            <span style={{ fontSize: '0.68rem', color: 'var(--slate-400)', fontWeight: 600, textTransform: 'uppercase' }}>
-                              Mudar:
-                            </span>
-                            <select
-                              value={ag.status === 'Carregado' ? 'Finalizado' : ag.status}
-                              onChange={(e) => solicitarMudancaStatus(ag, e.target.value)}
-                              disabled={!isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado')}
-                              title={!isAdmin && (ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'Agendamentos Finalizados estão concluídos e bloqueados para alteração' : (!isAdmin && ag.status === 'Aguardando Liberação' ? 'Apenas o Administrador Geral pode liberar ou alterar agendamentos em Aguardando Liberação' : 'Alterar status operacional')}
-                              style={{
-                                flex: 1,
-                                padding: '4px 6px',
-                                fontSize: '0.76rem',
-                                fontWeight: 600,
-                                borderRadius: 5,
-                                background: '#111915',
-                                border: '1px solid rgba(255, 255, 255, 0.08)',
-                                color: '#f1f5f9',
-                                cursor: !isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'not-allowed' : 'pointer',
-                                outline: 'none'
-                              }}
-                            >
-                              {isAdmin && (
-                                <option value="Aguardando Liberação" style={{ background: '#111915', color: '#fbbf24' }}>
-                                  🟡 Aguardando Liberação
-                                </option>
-                              )}
-                              {!isAdmin && ag.status === 'Aguardando Liberação' && (
-                                <option value="Aguardando Liberação" style={{ background: '#111915', color: '#fbbf24' }}>
-                                  🟡 Aguardando Liberação (Bloqueado)
-                                </option>
-                              )}
-                              <option value="Liberado para Carregar" style={{ background: '#111915', color: '#c084fc' }}>
-                                🟣 Liberado p/ Carregar
-                              </option>
-                              <option value="Carregando" style={{ background: '#111915', color: '#38bdf8' }}>
-                                🔵 Carregando
-                              </option>
-                              <option value="Finalizado" style={{ background: '#111915', color: '#34d399' }}>
-                                ✅ Finalizado
-                              </option>
-                              <option value="Cancelado" style={{ background: '#111915', color: '#f87171' }}>
-                                ❌ Cancelado
-                              </option>
-                            </select>
-                          </div>
-                          {!isAdmin && ag.status === 'Aguardando Liberação' && (
-                            <span style={{ fontSize: '0.67rem', color: '#fde68a', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 3 }}>
-                              🔒 Liberação exclusiva do Admin
+                              <Clock size={11} /> Aguardando
                             </span>
                           )}
-                          {!isAdmin && (ag.status === 'Finalizado' || ag.status === 'Carregado') && (
-                            <span style={{ fontSize: '0.67rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 3 }}>
-                              🔒 Finalizado (Bloqueado)
+                          {(ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
+                            <span className="badge" style={{
+                              background: 'rgba(168, 85, 247, 0.15)',
+                              color: '#9333ea',
+                              border: '1px solid rgba(147, 51, 234, 0.4)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '2px 7px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700
+                            }}>
+                              <CheckCircle2 size={11} /> Liberado
                             </span>
                           )}
+                          {ag.status === 'Carregando' && (
+                            <span className="badge" style={{
+                              background: 'rgba(56, 189, 248, 0.15)',
+                              color: '#0284c7',
+                              border: '1px solid rgba(2, 132, 199, 0.4)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '2px 7px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700
+                            }}>
+                              <PlayCircle size={11} /> Carregando
+                            </span>
+                          )}
+                          {(ag.status === 'Finalizado' || ag.status === 'Carregado') && (
+                            <span className="badge" style={{
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              color: '#16a34a',
+                              border: '1px solid rgba(22, 163, 74, 0.4)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '2px 7px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700
+                            }}>
+                              <CheckCheck size={11} /> Finalizado
+                            </span>
+                          )}
+                          {ag.status === 'Cancelado' && (
+                            <span className="badge badge-danger" style={{ padding: '2px 7px', fontSize: '0.72rem', fontWeight: 700 }}>
+                              ❌ Cancelado
+                            </span>
+                          )}
+
+                          {/* Selo Compacto, Moderno e Elegante de Aptidão (Exclusivo Admin em Aguardando Liberação) */}
+                          {isAdmin && ag.status === 'Aguardando Liberação' && (() => {
+                            const aptidao = avaliarAptidaoLiberacaoAgendamento(ag, envelopamentos, todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos);
+                            const labelExibicao = aptidao.apto 
+                              ? (aptidao.isCargaCombinada ? '🟢 Carga Apta' : '🟢 Apto')
+                              : (aptidao.badge.labelCurto || aptidao.badge.label);
+
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setDetalhesAptidaoAgendamento({ ag, aptidao })}
+                                style={{
+                                  cursor: 'pointer',
+                                  background: aptidao.badge.bg,
+                                  border: `1px solid ${aptidao.badge.border}`,
+                                  color: aptidao.badge.cor,
+                                  fontSize: '0.67rem',
+                                  fontWeight: 800,
+                                  padding: '2px 6px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 3,
+                                  borderRadius: 4,
+                                  transition: 'all 0.15s ease',
+                                  boxShadow: aptidao.apto ? '0 0 6px rgba(34, 197, 94, 0.25)' : 'none'
+                                }}
+                                title={
+                                  aptidao.apto 
+                                    ? `✅ Apto para Liberação ${aptidao.isCargaCombinada ? `(Carga Combinada: soma dos blocos ${aptidao.peso.pesoFormatado} <= ${aptidao.peso.limiteFormatado})` : ''}. Clique para checklist.` 
+                                    : `⚠️ Pendências:\n• ${aptidao.motivosBloqueio.join('\n• ')}\nClique para detalhes.`
+                                }
+                              >
+                                <span>{labelExibicao}</span>
+                                <span style={{ fontSize: '0.58rem', opacity: 0.8 }}>🔍</span>
+                              </button>
+                            );
+                          })()}
                         </div>
 
-                        {/* Link / Botão para Histórico de Alterações de Status */}
-                        <div className="no-print">
-                          {histArr.length > 0 ? (
+                        {/* Linha 2: Seletor Compacto e Discreto de Alteração de Status + Botão de Histórico */}
+                        <div className="no-print" style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <select
+                            value={ag.status === 'Carregado' ? 'Finalizado' : ag.status}
+                            onChange={(e) => solicitarMudancaStatus(ag, e.target.value)}
+                            disabled={!isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado')}
+                            title={!isAdmin && (ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'Agendamentos Finalizados estão concluídos' : (!isAdmin && ag.status === 'Aguardando Liberação' ? 'Liberação exclusiva do Administrador Geral' : 'Mudar status operacional')}
+                            style={{
+                              flex: 1,
+                              padding: '2px 5px',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              borderRadius: 4,
+                              background: !isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'rgba(15, 23, 42, 0.4)' : '#111915',
+                              border: '1px solid rgba(255, 255, 255, 0.10)',
+                              color: '#f1f5f9',
+                              cursor: !isAdmin && (ag.status === 'Aguardando Liberação' || ag.status === 'Finalizado' || ag.status === 'Carregado') ? 'not-allowed' : 'pointer',
+                              outline: 'none',
+                              height: 24
+                            }}
+                          >
+                            {isAdmin && (
+                              <option value="Aguardando Liberação" style={{ background: '#111915', color: '#fbbf24' }}>
+                                🟡 Aguardando
+                              </option>
+                            )}
+                            {!isAdmin && ag.status === 'Aguardando Liberação' && (
+                              <option value="Aguardando Liberação" style={{ background: '#111915', color: '#fbbf24' }}>
+                                🟡 Aguardando (Bloqueado)
+                              </option>
+                            )}
+                            <option value="Liberado para Carregar" style={{ background: '#111915', color: '#c084fc' }}>
+                              🟣 Liberado p/ Carregar
+                            </option>
+                            <option value="Carregando" style={{ background: '#111915', color: '#38bdf8' }}>
+                              🔵 Carregando
+                            </option>
+                            <option value="Finalizado" style={{ background: '#111915', color: '#34d399' }}>
+                              ✅ Finalizado
+                            </option>
+                            <option value="Cancelado" style={{ background: '#111915', color: '#f87171' }}>
+                              ❌ Cancelado
+                            </option>
+                          </select>
+
+                          {histArr.length > 0 && (
                             <button
                               type="button"
                               onClick={() => setAgendamentoParaHistorico(ag)}
                               style={{
-                                marginTop: 5,
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: 4,
-                                background: 'rgba(56, 189, 248, 0.08)',
-                                border: '1px dashed rgba(56, 189, 248, 0.35)',
+                                justifyContent: 'center',
+                                background: 'rgba(56, 189, 248, 0.1)',
+                                border: '1px solid rgba(56, 189, 248, 0.3)',
                                 color: '#38bdf8',
-                                fontSize: '0.68rem',
-                                fontWeight: 600,
-                                padding: '2px 6px',
+                                padding: '2px 5px',
                                 borderRadius: 4,
                                 cursor: 'pointer',
-                                width: '100%',
-                                justifyContent: 'center',
-                                transition: 'all 0.15s'
+                                height: 24,
+                                fontSize: '0.68rem',
+                                fontWeight: 700
                               }}
-                              title="Ver histórico completo de quem alterou o status e data/hora"
+                              title={`Histórico: ${histArr.length} alteração(ões)`}
                             >
-                              <History size={11} /> {histArr.length} {histArr.length === 1 ? 'alteração' : 'alterações'}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setAgendamentoParaHistorico(ag)}
-                              style={{
-                                marginTop: 5,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--slate-500)',
-                                fontSize: '0.66rem',
-                                padding: '2px 4px',
-                                cursor: 'pointer',
-                                width: '100%',
-                                justifyContent: 'center'
-                              }}
-                              title="Ver registro de auditoria do status"
-                            >
-                              <History size={10} /> Histórico
+                              <History size={11} />
                             </button>
                           )}
                         </div>
@@ -3042,6 +2994,7 @@ export function PainelGestao({
       {agendamentoParaEditar && (
         <ModalEditarAgendamento
           agendamento={agendamentoParaEditar}
+          todosAgendamentos={todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos}
           onFechar={() => setAgendamentoParaEditar(null)}
           onSalvo={handleSalvoEdicao}
           isAdmin={isAdmin}
@@ -3064,6 +3017,7 @@ export function PainelGestao({
           novoStatus={mudancaStatusPendente.novoStatus}
           usuarioInfo={usuarioInfo}
           envelopamentos={envelopamentos}
+          todosAgendamentos={todosAgendamentos.length > 0 ? todosAgendamentos : agendamentos}
           processando={processandoMudancaStatus}
           onConfirmar={handleConfirmarMudancaStatus}
           onCancelar={handleCancelarMudancaStatus}
@@ -3174,8 +3128,14 @@ export function PainelGestao({
                     <strong style={{ color: '#fff', fontFamily: 'monospace' }}>#{protocolo}</strong>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.70rem' }}>Nº Bloco / Material</span>
-                    <strong style={{ color: '#4ade80' }}>{ag.numero_bloco}</strong> ({ag.material})
+                    <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.70rem' }}>
+                      {aptidao.isCargaCombinada ? `Carga Combinada (${aptidao.bloco.totalBlocos || 2} Blocos)` : 'Nº Bloco / Material'}
+                    </span>
+                    <strong style={{ color: '#4ade80' }}>
+                      {aptidao.isCargaCombinada && aptidao.bloco.blocos 
+                        ? aptidao.bloco.blocos.map(b => b.numero_bloco).join(' + ') 
+                        : ag.numero_bloco}
+                    </strong> ({ag.material})
                   </div>
                   <div>
                     <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.70rem' }}>Pedreira</span>
@@ -3209,11 +3169,13 @@ export function PainelGestao({
                     <span style={{ fontSize: '1.3rem' }}>{aptidao.apto ? '🟢' : '🔴'}</span>
                     <div>
                       <strong style={{ color: aptidao.apto ? '#4ade80' : '#f87171', fontSize: '0.92rem', display: 'block' }}>
-                        {aptidao.apto ? 'SITUAÇÃO: APTO PARA LIBERAÇÃO' : 'SITUAÇÃO: NÃO RECOMENDADO PARA LIBERAÇÃO'}
+                        {aptidao.apto 
+                          ? (aptidao.isCargaCombinada ? 'SITUAÇÃO: CARGA COMBINADA APTA PARA LIBERAÇÃO' : 'SITUAÇÃO: APTO PARA LIBERAÇÃO') 
+                          : 'SITUAÇÃO: NÃO RECOMENDADO PARA LIBERAÇÃO'}
                       </strong>
                       <span style={{ color: 'var(--slate-300)', fontSize: '0.76rem' }}>
                         {aptidao.apto 
-                          ? 'Todas as 3 premissas foram validadas com sucesso.' 
+                          ? (aptidao.isCargaCombinada ? 'Soma dos blocos e todas as 3 premissas validadas com sucesso.' : 'Todas as 3 premissas foram validadas com sucesso.')
                           : `${aptidao.motivosBloqueio.length} premissa(s) não atendida(s).`}
                       </span>
                     </div>
@@ -3260,6 +3222,41 @@ export function PainelGestao({
                         {aptidao.bloco.label}
                       </span>
                     </div>
+
+                    {/* Lista individual de blocos se for carga combinada */}
+                    {aptidao.isCargaCombinada && Array.isArray(aptidao.bloco.blocos) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8, marginTop: 4 }}>
+                        {aptidao.bloco.blocos.map((b, bIdx) => (
+                          <div key={bIdx} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: 'rgba(255,255,255,0.03)',
+                            padding: '6px 10px',
+                            borderRadius: 6,
+                            fontSize: '0.74rem'
+                          }}>
+                            <div>
+                              <strong style={{ color: '#fff' }}>Bloco {b.numero_bloco}</strong>
+                              {b.material && <span style={{ color: 'var(--slate-400)', marginLeft: 6 }}>({b.material})</span>}
+                              <span style={{ color: '#38bdf8', marginLeft: 8 }}>• Peso: {b.pesoFormatado}</span>
+                            </div>
+                            <span style={{
+                              background: b.infoEnv?.bg || (b.apto ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'),
+                              color: b.infoEnv?.cor || (b.apto ? '#4ade80' : '#f87171'),
+                              border: `1px solid ${b.infoEnv?.border || (b.apto ? '#22c55e' : '#dc2626')}`,
+                              padding: '1px 6px',
+                              borderRadius: 4,
+                              fontSize: '0.68rem',
+                              fontWeight: 700
+                            }}>
+                              {b.infoEnv?.label || (b.apto ? 'Liberado' : 'Pendente')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <div style={{ fontSize: '0.78rem', color: 'var(--slate-300)', lineHeight: '1.4' }}>
                       {aptidao.bloco.mensagem}
                     </div>
@@ -3277,7 +3274,7 @@ export function PainelGestao({
                         <span style={{ color: aptidao.peso.apto ? '#4ade80' : '#f87171' }}>
                           {aptidao.peso.apto ? '✅' : '❌'}
                         </span>
-                        2. Peso do Bloco vs Porte do Veículo
+                        2. {aptidao.isCargaCombinada ? 'Peso Total Combinado vs Porte do Veículo' : 'Peso do Bloco vs Porte do Veículo'}
                       </strong>
                       <span style={{
                         background: aptidao.peso.apto ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
@@ -3307,7 +3304,9 @@ export function PainelGestao({
                         <strong style={{ color: '#38bdf8' }}>{aptidao.peso.tipoVeiculo}</strong>
                       </div>
                       <div>
-                        <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.68rem' }}>Peso do Bloco</span>
+                        <span style={{ color: 'var(--slate-400)', display: 'block', fontSize: '0.68rem' }}>
+                          {aptidao.isCargaCombinada ? 'Peso Total (Soma)' : 'Peso do Bloco'}
+                        </span>
                         <strong style={{ color: aptidao.peso.pesoKg > 0 ? '#fff' : '#f59e0b' }}>{aptidao.peso.pesoFormatado}</strong>
                       </div>
                       <div>
@@ -3315,6 +3314,20 @@ export function PainelGestao({
                         <strong style={{ color: '#a855f7' }}>{aptidao.peso.limiteFormatado}</strong>
                       </div>
                     </div>
+
+                    {aptidao.isCargaCombinada && aptidao.peso.detalheBlocos?.length > 1 && (
+                      <div style={{
+                        background: 'rgba(56, 189, 248, 0.08)',
+                        border: '1px solid rgba(56, 189, 248, 0.2)',
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        fontSize: '0.74rem',
+                        color: '#7dd3fc',
+                        marginBottom: 6
+                      }}>
+                        <strong>⚖️ Soma dos Blocos na Carreta:</strong> {aptidao.peso.detalheBlocos.map(b => `Bloco ${b.bloco} (${b.pesoFormatado})`).join(' + ')} = <strong>{aptidao.peso.pesoFormatado}</strong>
+                      </div>
+                    )}
 
                     <div style={{ fontSize: '0.78rem', color: 'var(--slate-300)', lineHeight: '1.4' }}>
                       {aptidao.peso.mensagem}

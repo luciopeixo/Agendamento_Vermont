@@ -7,6 +7,7 @@ export function ModalConfirmarStatus({
   novoStatus,
   usuarioInfo,
   envelopamentos = [],
+  todosAgendamentos = [],
   onConfirmar,
   onCancelar,
   processando = false
@@ -288,7 +289,7 @@ export function ModalConfirmarStatus({
 
           {/* Checklist Inteligente de Liberação (Exclusivo quando liberando agendamento) */}
           {(novoStatus === 'Liberado para Carregar' || novoStatus === 'Confirmado') && (() => {
-            const aptidao = avaliarAptidaoLiberacaoAgendamento(agendamento, envelopamentos);
+            const aptidao = avaliarAptidaoLiberacaoAgendamento(agendamento, envelopamentos, todosAgendamentos);
             return (
               <div style={{
                 background: aptidao.apto ? 'rgba(34, 197, 94, 0.06)' : 'rgba(239, 68, 68, 0.06)',
@@ -299,7 +300,7 @@ export function ModalConfirmarStatus({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#fff' }}>
-                      📋 Checklist de Liberação Operacional
+                      📋 Checklist de Liberação Operacional {aptidao.isCargaCombinada ? `(Carga Combinada: ${aptidao.bloco.totalBlocos || 2} blocos)` : ''}
                     </span>
                   </div>
                   <span style={{
@@ -339,11 +340,16 @@ export function ModalConfirmarStatus({
                     </span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>2. Peso vs Porte do Veículo:</span>
+                        <span>2. {aptidao.isCargaCombinada ? 'Peso Total Combinado vs Porte:' : 'Peso vs Porte do Veículo:'}</span>
                         <span style={{ color: aptidao.peso.apto ? '#4ade80' : '#f87171' }}>
                           {aptidao.peso.pesoFormatado} (Limite: {aptidao.peso.limiteFormatado})
                         </span>
                       </div>
+                      {aptidao.isCargaCombinada && aptidao.peso.detalheBlocos?.length > 1 && (
+                        <div style={{ color: '#7dd3fc', fontSize: '0.72rem', marginTop: 2, fontWeight: 600 }}>
+                          Soma: {aptidao.peso.detalheBlocos.map(b => `${b.bloco} (${b.pesoFormatado})`).join(' + ')} = {aptidao.peso.pesoFormatado}
+                        </div>
+                      )}
                       <div style={{ color: 'var(--slate-400)', fontSize: '0.74rem', marginTop: 2 }}>
                         {aptidao.peso.mensagem}
                       </div>

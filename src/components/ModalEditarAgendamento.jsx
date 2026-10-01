@@ -33,6 +33,7 @@ import {
 
 export function ModalEditarAgendamento({ 
   agendamento, 
+  todosAgendamentos = [],
   onFechar, 
   onSalvo, 
   isAdmin = false,
@@ -484,7 +485,7 @@ export function ModalEditarAgendamento({
           
           {/* Card Inteligente de Indicação de Liberação (Exclusivo Admin) */}
           {isAdmin && formData.status === 'Aguardando Liberação' && (() => {
-            const aptidao = avaliarAptidaoLiberacaoAgendamento(formData, listaEnvelopamentos);
+            const aptidao = avaliarAptidaoLiberacaoAgendamento(formData, listaEnvelopamentos, todosAgendamentos);
             return (
               <div style={{
                 background: aptidao.apto ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
@@ -496,7 +497,9 @@ export function ModalEditarAgendamento({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: '1rem' }}>{aptidao.apto ? '🟢' : '🔴'}</span>
                     <strong style={{ color: aptidao.apto ? '#4ade80' : '#f87171', fontSize: '0.86rem' }}>
-                      {aptidao.apto ? 'Indicação: Apto para Liberação' : 'Indicação: Não Recomendado para Liberação'}
+                      {aptidao.apto 
+                        ? (aptidao.isCargaCombinada ? 'Indicação: Carga Combinada Apta para Liberação' : 'Indicação: Apto para Liberação') 
+                        : 'Indicação: Não Recomendado para Liberação'}
                     </strong>
                   </div>
                   <span style={{
@@ -524,7 +527,7 @@ export function ModalEditarAgendamento({
                   {/* Item 2 */}
                   <div style={{ background: 'rgba(0,0,0,0.25)', padding: '6px 10px', borderRadius: 6, border: aptidao.peso.apto ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(239,68,68,0.2)' }}>
                     <span style={{ color: aptidao.peso.apto ? '#4ade80' : '#f87171', fontWeight: 700 }}>
-                      2. Peso vs Porte: {aptidao.peso.pesoFormatado}
+                      2. {aptidao.isCargaCombinada ? 'Peso Total Combinado:' : 'Peso vs Porte:'} {aptidao.peso.pesoFormatado}
                     </span>
                     <div style={{ color: 'var(--slate-400)', fontSize: '0.70rem', marginTop: 2 }}>{aptidao.peso.mensagem}</div>
                   </div>
