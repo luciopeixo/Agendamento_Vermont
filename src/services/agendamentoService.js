@@ -2297,8 +2297,162 @@ export const CNPJ_CONHECIDOS_PADRAO = {
   // GMA Transportes Ltda
   'GMATRANSPORTES': '09.201.403/0002-54',
   'GMATRANSPORTESLTDA': '09.201.403/0002-54',
-  'GMATRANSPORTE': '09.201.403/0002-54'
+  'GMATRANSPORTE': '09.201.403/0002-54',
+  // Granito Zucchi Ltda
+  'GRANITOZUCCHI': '39.622.121/0001-00',
+  'GRANITOZUCCHILTDA': '39.622.121/0001-00',
+  'ZUCCHI': '39.622.121/0001-00',
+  'ZUCCHIBRASIL': '39.622.121/0001-00',
+  'ZUCCHIGRANITOS': '39.622.121/0001-00',
+  // Cajugram Granitos e Mármores do Brasil Ltda
+  'CAJUGRAM': '32.440.901/0001-90',
+  'CAJUGRAMGRANITOS': '32.440.901/0001-90',
+  'CAJUGRAMGRANITOSEMARMORESDOBRASILLTDA': '32.440.901/0001-90',
+  'CAJUGRAN': '32.440.901/0001-90',
+  'CAJUGRANGRANITOS': '32.440.901/0001-90',
+  // Favorita do Brasil
+  'FAVORITA': '02.611.161/0001-47',
+  'FAVORITADOBRASIL': '02.611.161/0001-47',
+  'FAVORITADOBRASILMARMORESEGRANITOSLTDA': '02.611.161/0001-47',
+  // Gramil Granitos
+  'GRAMIL': '27.126.218/0001-43',
+  'GRAMILGRANITOS': '27.126.218/0001-43',
+  'GRAMILGRANITOSEMARMORESITAPEMIRIMLTDA': '27.126.218/0001-43',
+  // Magban Mármores
+  'MAGBAN': '31.292.568/0001-57',
+  'MAGBANMARMORESEGRANITOSAQUIDABANLTDA': '31.292.568/0001-57',
+  // Mineral Stone
+  'MINERALSTONE': '13.293.623/0001-41',
+  'MINERALSTONEEXPORTACAOLTDA': '13.293.623/0001-41'
 };
+
+/**
+ * Base oficial de Razão Social e Nome Fantasia padronizados por CNPJ
+ */
+export const EMPRESAS_OFICIAIS_POR_CNPJ = {
+  '39622121000100': {
+    razao_social: 'GRANITO ZUCCHI LTDA',
+    nome_fantasia: 'GRANITO ZUCCHI',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'SERRA - ES'
+  },
+  '39622121000291': {
+    razao_social: 'GRANITO ZUCCHI LTDA',
+    nome_fantasia: 'ZUCCHI BRASIL',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'SERRA - ES'
+  },
+  '39622121': {
+    razao_social: 'GRANITO ZUCCHI LTDA',
+    nome_fantasia: 'GRANITO ZUCCHI',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'SERRA - ES'
+  },
+  '32440901000190': {
+    razao_social: 'CAJUGRAM GRANITOS E MARMORES DO BRASIL LTDA',
+    nome_fantasia: 'CAJUGRAM GRANITOS',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'MIMOSO DO SUL - ES'
+  },
+  '02611161000147': {
+    razao_social: 'FAVORITA DO BRASIL MARMORES E GRANITOS LTDA',
+    nome_fantasia: 'FAVORITA DO BRASIL',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'SERRA - ES'
+  },
+  '27126218000143': {
+    razao_social: 'GRAMIL GRANITOS E MARMORES ITAPEMIRIM LTDA',
+    nome_fantasia: 'GRAMIL GRANITOS',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'CACHOEIRO DE ITAPEMIRIM - ES'
+  },
+  '31292568000157': {
+    razao_social: 'MAGBAN MARMORES E GRANITOS AQUIDABAN LTDA',
+    nome_fantasia: 'MAGBAN',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'CACHOEIRO DE ITAPEMIRIM - ES'
+  },
+  '13293623000141': {
+    razao_social: 'MINERAL STONE EXPORTACAO LTDA',
+    nome_fantasia: 'MINERAL STONE',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'SERRA - ES'
+  },
+  '07498412000130': {
+    razao_social: 'VERMONT MINERAÇÃO LTDA',
+    nome_fantasia: 'VERMONT MINERAÇÃO',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'SOBRAL - CE'
+  },
+  '32476525000194': {
+    razao_social: 'BRASIGRAN BRASILEIRA DE GRANITOS LTDA',
+    nome_fantasia: 'BRASIGRAN',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'SERRA - ES'
+  },
+  '49131491000107': {
+    razao_social: 'FBS LOGISTICA E TRANSPORTE LTDA',
+    nome_fantasia: 'FBS LOGISTICA',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'SERRA - ES'
+  },
+  '13051611000291': {
+    razao_social: 'J. M. BERGAMINI TRANSPORTES EIRELI',
+    nome_fantasia: 'JM BERGAMINI',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'CACHOEIRO DE ITAPEMIRIM - ES'
+  },
+  '07825404000163': {
+    razao_social: 'BRUNO LUCCHETTI DO BRASIL COMERCIO, IMPORTACAO E EXPORTACAO DE ROCHAS ORNAMENTAIS LTDA',
+    nome_fantasia: 'BRUNO LUCCHETTI',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'CACHOEIRO DE ITAPEMIRIM - ES'
+  },
+  '09201403000254': {
+    razao_social: 'GMA TRANSPORTES LTDA',
+    nome_fantasia: 'GMA TRANSPORTES',
+    situacao_cadastral: 'ATIVA',
+    cidade: 'CACHOEIRO DE ITAPEMIRIM - ES'
+  }
+};
+
+/**
+ * Padroniza o nome do cliente e preenche o CNPJ oficial caso seja uma empresa conhecida
+ */
+export function padronizarNomeClienteEcnpj(nome = '', cnpj = '') {
+  let nomeLimpo = limparNomeEmpresa(nome || '').trim().toUpperCase();
+  let cnpjLimpo = String(cnpj || '').replace(/\D/g, '');
+
+  // 1. Se tiver CNPJ com 14 dígitos, busca correspondência na base oficial (exata ou por raiz de 8 dígitos)
+  if (cnpjLimpo.length === 14) {
+    const infoOficial = EMPRESAS_OFICIAIS_POR_CNPJ[cnpjLimpo] || EMPRESAS_OFICIAIS_POR_CNPJ[cnpjLimpo.slice(0, 8)];
+    if (infoOficial) {
+      return {
+        cliente: infoOficial.razao_social,
+        cliente_cnpj: formatarCNPJ(cnpjLimpo)
+      };
+    }
+  }
+
+  // 2. Se o nome fornecido for uma chave conhecida, resolve a Razão Social oficial e o CNPJ
+  const chave = normalizarNomeEmpresaChave(nomeLimpo);
+  if (chave) {
+    const cnpjConhecido = CNPJ_CONHECIDOS_PADRAO[chave];
+    if (cnpjConhecido) {
+      const cnpjDig = cnpjConhecido.replace(/\D/g, '');
+      const infoOficial = EMPRESAS_OFICIAIS_POR_CNPJ[cnpjDig] || EMPRESAS_OFICIAIS_POR_CNPJ[cnpjDig.slice(0, 8)];
+      return {
+        cliente: infoOficial?.razao_social || nomeLimpo,
+        cliente_cnpj: formatarCNPJ(cnpjDig)
+      };
+    }
+  }
+
+  return {
+    cliente: nomeLimpo,
+    cliente_cnpj: cnpjLimpo.length === 14 ? formatarCNPJ(cnpjLimpo) : (cnpj || null)
+  };
+}
 
 /**
  * Busca CNPJ salvo no cache ou na lista oficial de conhecidos
@@ -2493,14 +2647,14 @@ export function validarCNPJ(cnpj = '') {
 }
 
 /**
- * Consulta em tempo real dados cadastrais do CNPJ diretamente na Receita Federal (via BrasilAPI / MinhaReceita)
+ * Consulta em tempo real dados cadastrais do CNPJ diretamente na Receita Federal (via BrasilAPI / MinhaReceita / Fallbacks)
  */
 export async function consultarCNPJReceita(cnpj = '') {
-  if (!cnpj) return { valido: null, encontrado: false, empresa: null };
+  if (!cnpj) return { valido: null, encontrado: false, empresa: null, razao_social: '', nome: '' };
   const limpo = String(cnpj).replace(/\D/g, '');
 
   if (limpo.length < 14) {
-    return { valido: null, encontrado: false, empresa: null };
+    return { valido: null, encontrado: false, empresa: null, razao_social: '', nome: '' };
   }
 
   // 1. Validação matemática do CNPJ
@@ -2509,11 +2663,34 @@ export async function consultarCNPJReceita(cnpj = '') {
       valido: false,
       erro: 'CNPJ inválido (dígitos verificadores incorretos).',
       encontrado: false,
-      empresa: null
+      empresa: null,
+      razao_social: '',
+      nome: ''
     };
   }
 
-  // 2. Consulta primária via BrasilAPI (Dados Oficiais da Receita Federal)
+  // 2. Verificação imediata na base de empresas parceiras padrão (Resposta Instantânea e Nomenclatura Correta)
+  if (EMPRESAS_OFICIAIS_POR_CNPJ && EMPRESAS_OFICIAIS_POR_CNPJ[limpo]) {
+    const infoPadrao = EMPRESAS_OFICIAIS_POR_CNPJ[limpo];
+    return {
+      valido: true,
+      encontrado: true,
+      fonte: 'Receita Federal / Base Oficial',
+      razao_social: infoPadrao.razao_social,
+      nome_fantasia: infoPadrao.nome_fantasia,
+      nome: infoPadrao.razao_social,
+      empresa: {
+        razao_social: infoPadrao.razao_social,
+        nome_fantasia: infoPadrao.nome_fantasia,
+        nome_exibicao: infoPadrao.razao_social,
+        situacao_cadastral: infoPadrao.situacao_cadastral || 'ATIVA',
+        cidade: infoPadrao.cidade || '',
+        telefone: ''
+      }
+    };
+  }
+
+  // 3. Consulta primária via BrasilAPI (Dados Oficiais da Receita Federal)
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6500);
@@ -2534,6 +2711,9 @@ export async function consultarCNPJReceita(cnpj = '') {
         valido: true,
         encontrado: true,
         fonte: 'Receita Federal (BrasilAPI)',
+        razao_social: razaoSocial,
+        nome_fantasia: nomeFantasia,
+        nome: razaoSocial,
         empresa: {
           razao_social: razaoSocial,
           nome_fantasia: nomeFantasia,
@@ -2548,7 +2728,7 @@ export async function consultarCNPJReceita(cnpj = '') {
     console.warn('Consulta BrasilAPI indisponível ou lenta, acionando fallback MinhaReceita...', eBrasilApi);
   }
 
-  // 3. Consulta secundária via MinhaReceita.org (Fallback público da Receita Federal)
+  // 4. Consulta secundária via MinhaReceita.org (Fallback público da Receita Federal)
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6500);
@@ -2569,6 +2749,9 @@ export async function consultarCNPJReceita(cnpj = '') {
         valido: true,
         encontrado: true,
         fonte: 'Receita Federal (MinhaReceita)',
+        razao_social: razaoSocial,
+        nome_fantasia: nomeFantasia,
+        nome: razaoSocial,
         empresa: {
           razao_social: razaoSocial,
           nome_fantasia: nomeFantasia,
@@ -2583,11 +2766,13 @@ export async function consultarCNPJReceita(cnpj = '') {
     console.warn('Fallback MinhaReceita indisponível:', eMinhaReceita);
   }
 
-  // 4. Se a API estiver offline mas o CNPJ for autêntico:
+  // 5. Se a API estiver offline mas o CNPJ for autêntico:
   return {
     valido: true,
     encontrado: false,
     aviso: 'CNPJ autêntico. Conexão temporariamente lenta com a Receita Federal; você pode digitar a Razão Social manualmente.',
+    razao_social: '',
+    nome: '',
     empresa: null
   };
 }
@@ -3724,12 +3909,14 @@ export async function salvarEdicaoAgendamento(agendamentoAtualizado, usuarioInfo
     const historicoAtualizado = registrarHistoricoEdicao(itemAtual, agendamentoAtualizado, usuarioInfo);
     agendamentoAtualizado.historico_status = historicoAtualizado;
 
+    const cliPadronizado = padronizarNomeClienteEcnpj(agendamentoAtualizado.cliente, agendamentoAtualizado.cliente_cnpj);
+
     const payloadBase = {
       pedreira: agendamentoAtualizado.pedreira,
       material: agendamentoAtualizado.material,
       numero_bloco: agendamentoAtualizado.numero_bloco ? String(agendamentoAtualizado.numero_bloco).toUpperCase().trim() : '',
-      cliente: agendamentoAtualizado.cliente ? String(agendamentoAtualizado.cliente).toUpperCase().trim() : '',
-      cliente_cnpj: agendamentoAtualizado.cliente_cnpj ? String(agendamentoAtualizado.cliente_cnpj).trim() : null,
+      cliente: cliPadronizado.cliente || (agendamentoAtualizado.cliente ? String(agendamentoAtualizado.cliente).toUpperCase().trim() : ''),
+      cliente_cnpj: cliPadronizado.cliente_cnpj || (agendamentoAtualizado.cliente_cnpj ? String(agendamentoAtualizado.cliente_cnpj).trim() : null),
       transportadora: agendamentoAtualizado.transportadora ? String(agendamentoAtualizado.transportadora).toUpperCase().trim() : '',
       transportadora_cnpj: agendamentoAtualizado.transportadora_cnpj ? String(agendamentoAtualizado.transportadora_cnpj).trim() : null,
       motorista_nome: agendamentoAtualizado.motorista_nome ? String(agendamentoAtualizado.motorista_nome).toUpperCase().trim() : '',
@@ -5128,12 +5315,14 @@ export async function salvarAgendamento(dados) {
       ? dados.placa_carreta_2.toUpperCase().replace(/[^A-Z0-9]/g, '')
       : null;
 
+    const cliPadronizado = padronizarNomeClienteEcnpj(dados.cliente, dados.cliente_cnpj);
+
     const payload = {
       pedreira: dados.pedreira,
       material: dados.material.trim(),
       numero_bloco: dados.numero_bloco.toUpperCase().trim(),
-      cliente: dados.cliente.toUpperCase().trim(),
-      cliente_cnpj: dados.cliente_cnpj ? dados.cliente_cnpj.trim() : null,
+      cliente: cliPadronizado.cliente || dados.cliente.toUpperCase().trim(),
+      cliente_cnpj: cliPadronizado.cliente_cnpj || (dados.cliente_cnpj ? dados.cliente_cnpj.trim() : null),
       transportadora: dados.transportadora.toUpperCase().trim(),
       transportadora_cnpj: dados.transportadora_cnpj ? dados.transportadora_cnpj.trim() : null,
       motorista_nome: dados.motorista_nome.toUpperCase().trim(),
@@ -5339,12 +5528,16 @@ export async function salvarAgendamentoCombinado({ ponto1, ponto2, ponto3 = null
 
       const obsPonto = `[Carga Combinada ${numPonto}/${totalPontos}] ${outrosPontosTexto}${obsBase ? ` | Obs: ${obsBase}` : ''}`;
 
+      const cliOrig = p.cliente || veiculo.cliente || '';
+      const cnpjOrig = p.cliente_cnpj || veiculo.cliente_cnpj || '';
+      const cliPadronizado = padronizarNomeClienteEcnpj(cliOrig, cnpjOrig);
+
       return {
         pedreira: p.pedreira,
         material: p.material.trim(),
         numero_bloco: p.numero_bloco.toUpperCase().trim(),
-        cliente: (p.cliente || veiculo.cliente || '').toUpperCase().trim(),
-        cliente_cnpj: p.cliente_cnpj ? p.cliente_cnpj.trim() : (veiculo.cliente_cnpj ? veiculo.cliente_cnpj.trim() : null),
+        cliente: cliPadronizado.cliente || cliOrig.toUpperCase().trim(),
+        cliente_cnpj: cliPadronizado.cliente_cnpj || (cnpjOrig ? cnpjOrig.trim() : null),
         transportadora: veiculo.transportadora.toUpperCase().trim(),
         transportadora_cnpj: veiculo.transportadora_cnpj ? veiculo.transportadora_cnpj.trim() : null,
         motorista_nome: veiculo.motorista_nome.toUpperCase().trim(),

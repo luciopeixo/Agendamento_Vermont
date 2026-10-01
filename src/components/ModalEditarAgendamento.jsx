@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Save, Edit3, Truck, Calendar, Clock, MapPin, AlertCircle, AlertTriangle, CheckCircle2, History, User, ArrowRight, Building2 } from 'lucide-react';
+import { X, Save, Edit3, Truck, Calendar, Clock, MapPin, AlertCircle, AlertTriangle, CheckCircle2, History, User, ArrowRight, Building2, Search, RefreshCw } from 'lucide-react';
 import { 
   PEDREIRAS_CEARA, 
   TIPOS_VEICULO, 
@@ -153,79 +153,146 @@ export function ModalEditarAgendamento({
     });
   };
 
-  const handleCNPJClienteChange = async (valor) => {
-    const formatado = formatarCNPJ(valor);
-    handleChange('cliente_cnpj', formatado);
-
-    const limpo = formatado.replace(/\D/g, '');
-    if (limpo.length === 14) {
-      // Tenta recuperar nome local rapidamente de outros agendamentos
-      try {
-        const locais = obterAgendamentosLocais();
-        const achadoLocal = locais.find(ag => {
-          const cCNPJ = String(ag.cliente_cnpj || resolverCnpjCliente(ag) || '').replace(/\D/g, '');
-          return cCNPJ === limpo && ag.cliente;
-        });
-        if (achadoLocal && achadoLocal.cliente) {
-          const nomeLocal = limparNomeEmpresa(achadoLocal.cliente);
-          if (nomeLocal) {
-            handleChange('cliente', nomeLocal);
-          }
-        }
-      } catch (e) {
-        // ignora
-      }
-
-      setStatusCNPJCliente(prev => ({ ...prev, buscando: true, erro: '' }));
-      try {
-        const resultado = await consultarCNPJReceita(limpo);
-        if (!resultado.valido) {
-          setStatusCNPJCliente({
-            buscando: false,
-            valido: false,
-            erro: resultado.erro || 'CNPJ inválido (dígitos verificadores incorretos).',
-            encontrado: false,
-            razaoSocial: '',
-            situacao: ''
-          });
-        } else if (resultado.encontrado && resultado.empresa) {
-          const razao = (resultado.empresa.razao_social || resultado.empresa.nome_fantasia || '').toUpperCase().trim();
-          setStatusCNPJCliente({
-            buscando: false,
-            valido: true,
-            erro: '',
-            encontrado: true,
-            razaoSocial: razao,
-            situacao: resultado.empresa.situacao_cadastral || 'ATIVA'
-          });
-          if (razao) {
-            handleChange('cliente', razao);
-          }
-        } else {
-          setStatusCNPJCliente({
-            buscando: false,
-            valido: true,
-            erro: '',
-            encontrado: false,
-            razaoSocial: '',
-            situacao: ''
-          });
-        }
-      } catch (e) {
+  const consultarReceitaCliente = async (cnpjParaConsultar = formData.cliente_cnpj) => {
+    const limpo = String(cnpjParaConsultar || '').replace(/\D/g, '');
+    if (limpo.length !== 14) {
+      if (limpo.length > 0) {
         setStatusCNPJCliente({
           buscando: false,
-          valido: null,
+          valido: false,
+          erro: 'CNPJ incompleto (deve conter 14 dígitos).',
+          encontrado: false,
+          razaoSocial: '',
+          situacao: ''
+        });
+      }
+      return;
+    }
+
+    setStatusCNPJCliente(prev => ({ ...prev, buscando: true, erro: '' }));
+    try {
+      const resultado = await consultarCNPJReceita(limpo);
+      if (!resultado.valido) {
+        setStatusCNPJCliente({
+          buscando: false,
+          valido: false,
+          erro: resultado.erro || 'CNPJ inválido (dígitos verificadores incorretos).',
+          encontrado: false,
+          razaoSocial: '',
+          situacao: ''
+        });
+      } else if (resultado.encontrado && (resultado.razao_social || resultado.empresa)) {
+        const razao = (resultado.razao_social || resultado.empresa?.razao_social || resultado.empresa?.nome_fantasia || '').toUpperCase().trim();
+        const situacao = resultado.empresa?.situacao_cadastral || 'ATIVA';
+        setStatusCNPJCliente({
+          buscando: false,
+          valido: true,
+          erro: '',
+          encontrado: true,
+          razaoSocial: razao,
+          situacao: situacao
+        });
+        if (razao) {
+          handleChange('cliente', razao);
+        }
+      } else {
+        setStatusCNPJCliente({
+          buscando: false,
+          valido: true,
           erro: '',
           encontrado: false,
           razaoSocial: '',
           situacao: ''
         });
       }
+    } catch (e) {
+      setStatusCNPJCliente({
+        buscando: false,
+        valido: null,
+        erro: 'Erro na consulta Receita.',
+        encontrado: false,
+        razaoSocial: '',
+        situacao: ''
+      });
+    }
+  };
+
+  const handleCNPJClienteChange = async (valor) => {
+    const formatado = formatarCNPJ(valor);
+    handleChange('cliente_cnpj', formatado);
+
+    const limpo = formatado.replace(/\D/g, '');
+    if (limpo.length === 14) {
+      await consultarReceitaCliente(formatado);
     } else {
       setStatusCNPJCliente({
         buscando: false,
         valido: null,
         erro: '',
+        encontrado: false,
+        razaoSocial: '',
+        situacao: ''
+      });
+    }
+  };
+
+  const consultarReceitaTransportadora = async (cnpjParaConsultar = formData.transportadora_cnpj) => {
+    const limpo = String(cnpjParaConsultar || '').replace(/\D/g, '');
+    if (limpo.length !== 14) {
+      if (limpo.length > 0) {
+        setStatusCNPJTransp({
+          buscando: false,
+          valido: false,
+          erro: 'CNPJ incompleto (deve conter 14 dígitos).',
+          encontrado: false,
+          razaoSocial: '',
+          situacao: ''
+        });
+      }
+      return;
+    }
+
+    setStatusCNPJTransp(prev => ({ ...prev, buscando: true, erro: '' }));
+    try {
+      const resultado = await consultarCNPJReceita(limpo);
+      if (!resultado.valido) {
+        setStatusCNPJTransp({
+          buscando: false,
+          valido: false,
+          erro: resultado.erro || 'CNPJ inválido (dígitos verificadores incorretos).',
+          encontrado: false,
+          razaoSocial: '',
+          situacao: ''
+        });
+      } else if (resultado.encontrado && (resultado.razao_social || resultado.empresa)) {
+        const razao = (resultado.razao_social || resultado.empresa?.razao_social || resultado.empresa?.nome_fantasia || '').toUpperCase().trim();
+        const situacao = resultado.empresa?.situacao_cadastral || 'ATIVA';
+        setStatusCNPJTransp({
+          buscando: false,
+          valido: true,
+          erro: '',
+          encontrado: true,
+          razaoSocial: razao,
+          situacao: situacao
+        });
+        if (razao) {
+          handleChange('transportadora', razao);
+        }
+      } else {
+        setStatusCNPJTransp({
+          buscando: false,
+          valido: true,
+          erro: '',
+          encontrado: false,
+          razaoSocial: '',
+          situacao: ''
+        });
+      }
+    } catch (e) {
+      setStatusCNPJTransp({
+        buscando: false,
+        valido: null,
+        erro: 'Erro na consulta Receita.',
         encontrado: false,
         razaoSocial: '',
         situacao: ''
@@ -239,68 +306,7 @@ export function ModalEditarAgendamento({
 
     const limpo = formatado.replace(/\D/g, '');
     if (limpo.length === 14) {
-      // Tenta recuperar nome local rapidamente de outros agendamentos
-      try {
-        const locais = obterAgendamentosLocais();
-        const achadoLocal = locais.find(ag => {
-          const tCNPJ = String(ag.transportadora_cnpj || resolverCnpjTransportadora(ag) || '').replace(/\D/g, '');
-          return tCNPJ === limpo && ag.transportadora;
-        });
-        if (achadoLocal && achadoLocal.transportadora) {
-          const nomeLocal = limparNomeEmpresa(achadoLocal.transportadora);
-          if (nomeLocal) {
-            handleChange('transportadora', nomeLocal);
-          }
-        }
-      } catch (e) {
-        // ignora
-      }
-
-      setStatusCNPJTransp(prev => ({ ...prev, buscando: true, erro: '' }));
-      try {
-        const resultado = await consultarCNPJReceita(limpo);
-        if (!resultado.valido) {
-          setStatusCNPJTransp({
-            buscando: false,
-            valido: false,
-            erro: resultado.erro || 'CNPJ inválido (dígitos verificadores incorretos).',
-            encontrado: false,
-            razaoSocial: '',
-            situacao: ''
-          });
-        } else if (resultado.encontrado && resultado.empresa) {
-          const razao = (resultado.empresa.razao_social || resultado.empresa.nome_fantasia || '').toUpperCase().trim();
-          setStatusCNPJTransp({
-            buscando: false,
-            valido: true,
-            erro: '',
-            encontrado: true,
-            razaoSocial: razao,
-            situacao: resultado.empresa.situacao_cadastral || 'ATIVA'
-          });
-          if (razao) {
-            handleChange('transportadora', razao);
-          }
-        } else {
-          setStatusCNPJTransp({
-            buscando: false,
-            valido: true,
-            erro: '',
-            encontrado: false,
-            razaoSocial: '',
-            situacao: ''
-          });
-        }
-      } catch (e) {
-        setStatusCNPJTransp({
-          buscando: false,
-          valido: null,
-          erro: '',
-          encontrado: false,
-          razaoSocial: '',
-          situacao: ''
-        });
-      }
+      await consultarReceitaTransportadora(formatado);
     } else {
       setStatusCNPJTransp({
         buscando: false,
@@ -688,17 +694,49 @@ export function ModalEditarAgendamento({
                     </span>
                   )}
                 </label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="00.000.000/0000-00"
-                  maxLength={18}
-                  value={formData.cliente_cnpj}
-                  onChange={(e) => handleCNPJClienteChange(e.target.value)}
-                  style={{
-                    borderColor: statusCNPJCliente.valido === false ? '#ef4444' : statusCNPJCliente.encontrado ? '#00a83e' : undefined
-                  }}
-                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="00.000.000/0000-00"
+                    maxLength={18}
+                    value={formData.cliente_cnpj}
+                    onChange={(e) => handleCNPJClienteChange(e.target.value)}
+                    onBlur={() => {
+                      const dig = String(formData.cliente_cnpj || '').replace(/\D/g, '');
+                      if (dig.length === 14) {
+                        consultarReceitaCliente(formData.cliente_cnpj);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      borderColor: statusCNPJCliente.valido === false ? '#ef4444' : statusCNPJCliente.encontrado ? '#00a83e' : undefined
+                    }}
+                  />
+                  <button
+                    type="button"
+                    title="Consultar CNPJ na Receita Federal"
+                    onClick={() => consultarReceitaCliente(formData.cliente_cnpj)}
+                    disabled={statusCNPJCliente.buscando}
+                    style={{
+                      padding: '0 12px',
+                      background: 'rgba(0, 168, 62, 0.15)',
+                      border: '1px solid rgba(0, 168, 62, 0.35)',
+                      color: 'var(--vermont-green-light)',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {statusCNPJCliente.buscando ? (
+                      <RefreshCw size={15} className="spinner" />
+                    ) : (
+                      <Search size={15} />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="form-group">
@@ -782,17 +820,49 @@ export function ModalEditarAgendamento({
                     </span>
                   )}
                 </label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="00.000.000/0000-00"
-                  maxLength={18}
-                  value={formData.transportadora_cnpj}
-                  onChange={(e) => handleCNPJTransportadoraChange(e.target.value)}
-                  style={{
-                    borderColor: statusCNPJTransp.valido === false ? '#ef4444' : statusCNPJTransp.encontrado ? '#00a83e' : undefined
-                  }}
-                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="00.000.000/0000-00"
+                    maxLength={18}
+                    value={formData.transportadora_cnpj}
+                    onChange={(e) => handleCNPJTransportadoraChange(e.target.value)}
+                    onBlur={() => {
+                      const dig = String(formData.transportadora_cnpj || '').replace(/\D/g, '');
+                      if (dig.length === 14) {
+                        consultarReceitaTransportadora(formData.transportadora_cnpj);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      borderColor: statusCNPJTransp.valido === false ? '#ef4444' : statusCNPJTransp.encontrado ? '#00a83e' : undefined
+                    }}
+                  />
+                  <button
+                    type="button"
+                    title="Consultar CNPJ na Receita Federal"
+                    onClick={() => consultarReceitaTransportadora(formData.transportadora_cnpj)}
+                    disabled={statusCNPJTransp.buscando}
+                    style={{
+                      padding: '0 12px',
+                      background: 'rgba(0, 168, 62, 0.15)',
+                      border: '1px solid rgba(0, 168, 62, 0.35)',
+                      color: 'var(--vermont-green-light)',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {statusCNPJTransp.buscando ? (
+                      <RefreshCw size={15} className="spinner" />
+                    ) : (
+                      <Search size={15} />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="form-group">
