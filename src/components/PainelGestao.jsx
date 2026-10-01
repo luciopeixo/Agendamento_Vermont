@@ -2631,7 +2631,7 @@ export function PainelGestao({
                               fontSize: '0.72rem',
                               fontWeight: 700
                             }}>
-                              <Clock size={11} /> Aguardando
+                              <Clock size={11} /> Aguardando Liberação
                             </span>
                           )}
                           {(ag.status === 'Liberado para Carregar' || ag.status === 'Confirmado') && (
@@ -2747,12 +2747,12 @@ export function PainelGestao({
                           >
                             {isAdmin && (
                               <option value="Aguardando Liberação" style={{ background: '#111915', color: '#fbbf24' }}>
-                                🟡 Aguardando
+                                🟡 Aguardando Liberação
                               </option>
                             )}
                             {!isAdmin && ag.status === 'Aguardando Liberação' && (
                               <option value="Aguardando Liberação" style={{ background: '#111915', color: '#fbbf24' }}>
-                                🟡 Aguardando (Bloqueado)
+                                🟡 Aguardando Liberação (Bloqueado)
                               </option>
                             )}
                             <option value="Liberado para Carregar" style={{ background: '#111915', color: '#c084fc' }}>
