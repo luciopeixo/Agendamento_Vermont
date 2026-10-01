@@ -740,14 +740,34 @@ export function ModalEditarAgendamento({
               </div>
 
               <div className="form-group">
-                <label className="form-label">Cliente Destinatário</label>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Cliente Destinatário</span>
+                  {(Boolean(formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJCliente.encontrado) && (
+                    <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      🔒 Nomenclatura da Receita Federal
+                    </span>
+                  )}
+                </label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Razão Social ou Nome Fantasia"
+                  placeholder="Razão Social oficial da Receita Federal"
                   value={formData.cliente}
                   onChange={(e) => handleChange('cliente', e.target.value.toUpperCase())}
+                  readOnly={Boolean((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJCliente.encontrado)}
+                  style={{
+                    backgroundColor: (Boolean(formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJCliente.encontrado) ? 'rgba(0, 168, 62, 0.08)' : undefined,
+                    borderColor: (Boolean(formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJCliente.encontrado) ? 'rgba(0, 168, 62, 0.4)' : undefined,
+                    cursor: (Boolean(formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJCliente.encontrado) ? 'not-allowed' : undefined,
+                    color: (Boolean(formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJCliente.encontrado) ? '#e2e8f0' : undefined,
+                    fontWeight: (Boolean(formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJCliente.encontrado) ? 600 : undefined
+                  }}
                 />
+                {(Boolean(formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJCliente.encontrado) && (
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 3 }}>
+                    🔒 O nome é obtido e bloqueado automaticamente através da base da Receita Federal para manter a padronização oficial.
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -866,14 +886,34 @@ export function ModalEditarAgendamento({
               </div>
 
               <div className="form-group">
-                <label className="form-label">Transportadora</label>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Transportadora</span>
+                  {(Boolean(formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJTransp.encontrado) && (
+                    <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      🔒 Nomenclatura da Receita Federal
+                    </span>
+                  )}
+                </label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="Razão Social da Transportadora"
+                  placeholder="Razão Social oficial da Transportadora"
                   value={formData.transportadora}
                   onChange={(e) => handleChange('transportadora', e.target.value.toUpperCase())}
+                  readOnly={Boolean((formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJTransp.encontrado)}
+                  style={{
+                    backgroundColor: (Boolean(formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJTransp.encontrado) ? 'rgba(0, 168, 62, 0.08)' : undefined,
+                    borderColor: (Boolean(formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJTransp.encontrado) ? 'rgba(0, 168, 62, 0.4)' : undefined,
+                    cursor: (Boolean(formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJTransp.encontrado) ? 'not-allowed' : undefined,
+                    color: (Boolean(formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJTransp.encontrado) ? '#e2e8f0' : undefined,
+                    fontWeight: (Boolean(formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJTransp.encontrado) ? 600 : undefined
+                  }}
                 />
+                {(Boolean(formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || statusCNPJTransp.encontrado) && (
+                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 3 }}>
+                    🔒 O nome da transportadora é obtido e bloqueado automaticamente através da base da Receita Federal.
+                  </span>
+                )}
               </div>
 
               <div className="form-group">

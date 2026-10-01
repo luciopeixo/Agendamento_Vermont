@@ -1809,9 +1809,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <div className="form-group">
                   <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
                     <span>Cliente / Destinatário</span>
-                    {statusCNPJCliente.encontrado && formData.cliente && (
+                    {(Boolean((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente))) && (
                       <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        🔒 Razão Social travada (Validada na Receita)
+                        🔒 Razão Social travada (Receita Federal)
                       </span>
                     )}
                   </label>
@@ -1822,15 +1822,20 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     value={formData.cliente}
                     onChange={(e) => handleChange('cliente', e.target.value)}
                     required
-                    readOnly={Boolean(statusCNPJCliente.encontrado && formData.cliente)}
+                    readOnly={Boolean((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente))}
                     style={{
-                      backgroundColor: statusCNPJCliente.encontrado && formData.cliente ? 'var(--vermont-green-subtle)' : undefined,
-                      borderColor: statusCNPJCliente.encontrado && formData.cliente ? 'var(--vermont-green)' : undefined,
-                      cursor: statusCNPJCliente.encontrado && formData.cliente ? 'not-allowed' : undefined,
-                      color: statusCNPJCliente.encontrado && formData.cliente ? 'inherit' : undefined,
-                      fontWeight: statusCNPJCliente.encontrado && formData.cliente ? 600 : undefined
+                      backgroundColor: ((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente)) ? 'var(--vermont-green-subtle)' : undefined,
+                      borderColor: ((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente)) ? 'var(--vermont-green)' : undefined,
+                      cursor: ((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente)) ? 'not-allowed' : undefined,
+                      color: ((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente)) ? 'inherit' : undefined,
+                      fontWeight: ((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente)) ? 600 : undefined
                     }}
                   />
+                  {(Boolean((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente))) && (
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 3 }}>
+                      🔒 A nomenclatura é obtida e travada automaticamente pela Receita Federal a partir do CNPJ.
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -2163,9 +2168,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <div className="form-group">
                   <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
                     <span>Cliente / Destinatário (1º Bloco)</span>
-                    {statusCNPJCliente.encontrado && formData.cliente && (
+                    {(Boolean((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente))) && (
                       <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        🔒 Razão Social travada (Validada na Receita)
+                        🔒 Razão Social travada (Receita Federal)
                       </span>
                     )}
                   </label>
@@ -2176,15 +2181,20 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     value={formData.cliente}
                     onChange={(e) => handleChange('cliente', e.target.value)}
                     required
-                    readOnly={Boolean(statusCNPJCliente.encontrado && formData.cliente)}
+                    readOnly={Boolean((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente))}
                     style={{
-                      backgroundColor: statusCNPJCliente.encontrado && formData.cliente ? 'var(--vermont-green-subtle)' : undefined,
-                      borderColor: statusCNPJCliente.encontrado && formData.cliente ? 'var(--vermont-green)' : undefined,
-                      cursor: statusCNPJCliente.encontrado && formData.cliente ? 'not-allowed' : undefined,
-                      color: statusCNPJCliente.encontrado && formData.cliente ? 'inherit' : undefined,
-                      fontWeight: statusCNPJCliente.encontrado && formData.cliente ? 600 : undefined
+                      backgroundColor: ((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente)) ? 'var(--vermont-green-subtle)' : undefined,
+                      borderColor: ((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente)) ? 'var(--vermont-green)' : undefined,
+                      cursor: ((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente)) ? 'not-allowed' : undefined,
+                      color: ((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente)) ? 'inherit' : undefined,
+                      fontWeight: ((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente)) ? 600 : undefined
                     }}
                   />
+                  {(Boolean((formData.cliente_cnpj && formData.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente.encontrado && formData.cliente))) && (
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 3 }}>
+                      🔒 A nomenclatura é obtida e travada automaticamente pela Receita Federal a partir do CNPJ.
+                    </span>
+                  )}
                 </div>
 
                 {/* Data 1 */}
@@ -2420,9 +2430,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                 <div className="form-group">
                   <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
                     <span>Cliente / Destinatário (2º Bloco)</span>
-                    {statusCNPJCliente2.encontrado && ponto2.cliente && (
+                    {(Boolean((ponto2.cliente_cnpj && ponto2.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente2.encontrado && ponto2.cliente))) && (
                       <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        🔒 Razão Social travada (Validada na Receita)
+                        🔒 Razão Social travada (Receita Federal)
                       </span>
                     )}
                   </label>
@@ -2433,15 +2443,20 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                     value={ponto2.cliente}
                     onChange={(e) => handlePonto2Change('cliente', e.target.value)}
                     required
-                    readOnly={Boolean(statusCNPJCliente2.encontrado && ponto2.cliente)}
+                    readOnly={Boolean((ponto2.cliente_cnpj && ponto2.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente2.encontrado && ponto2.cliente))}
                     style={{
-                      backgroundColor: statusCNPJCliente2.encontrado && ponto2.cliente ? 'var(--vermont-green-subtle)' : undefined,
-                      borderColor: statusCNPJCliente2.encontrado && ponto2.cliente ? 'var(--vermont-green)' : undefined,
-                      cursor: statusCNPJCliente2.encontrado && ponto2.cliente ? 'not-allowed' : undefined,
-                      color: statusCNPJCliente2.encontrado && ponto2.cliente ? 'inherit' : undefined,
-                      fontWeight: statusCNPJCliente2.encontrado && ponto2.cliente ? 600 : undefined
+                      backgroundColor: ((ponto2.cliente_cnpj && ponto2.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente2.encontrado && ponto2.cliente)) ? 'var(--vermont-green-subtle)' : undefined,
+                      borderColor: ((ponto2.cliente_cnpj && ponto2.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente2.encontrado && ponto2.cliente)) ? 'var(--vermont-green)' : undefined,
+                      cursor: ((ponto2.cliente_cnpj && ponto2.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente2.encontrado && ponto2.cliente)) ? 'not-allowed' : undefined,
+                      color: ((ponto2.cliente_cnpj && ponto2.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente2.encontrado && ponto2.cliente)) ? 'inherit' : undefined,
+                      fontWeight: ((ponto2.cliente_cnpj && ponto2.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente2.encontrado && ponto2.cliente)) ? 600 : undefined
                     }}
                   />
+                  {(Boolean((ponto2.cliente_cnpj && ponto2.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente2.encontrado && ponto2.cliente))) && (
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 3 }}>
+                      🔒 A nomenclatura é obtida e travada automaticamente pela Receita Federal a partir do CNPJ.
+                    </span>
+                  )}
                 </div>
 
                 {/* Data 2 */}
@@ -2787,9 +2802,9 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                   <div className="form-group">
                     <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
                       <span>Cliente / Destinatário (3º Bloco)</span>
-                      {statusCNPJCliente3.encontrado && ponto3.cliente && (
+                      {(Boolean((ponto3.cliente_cnpj && ponto3.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente3.encontrado && ponto3.cliente))) && (
                         <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          🔒 Razão Social travada (Validada na Receita)
+                          🔒 Razão Social travada (Receita Federal)
                         </span>
                       )}
                     </label>
@@ -2800,15 +2815,20 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
                       value={ponto3.cliente}
                       onChange={(e) => handlePonto3Change('cliente', e.target.value)}
                       required
-                      readOnly={Boolean(statusCNPJCliente3.encontrado && ponto3.cliente)}
+                      readOnly={Boolean((ponto3.cliente_cnpj && ponto3.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente3.encontrado && ponto3.cliente))}
                       style={{
-                        backgroundColor: statusCNPJCliente3.encontrado && ponto3.cliente ? 'var(--vermont-green-subtle)' : undefined,
-                        borderColor: statusCNPJCliente3.encontrado && ponto3.cliente ? 'var(--vermont-green)' : undefined,
-                        cursor: statusCNPJCliente3.encontrado && ponto3.cliente ? 'not-allowed' : undefined,
-                        color: statusCNPJCliente3.encontrado && ponto3.cliente ? 'inherit' : undefined,
-                        fontWeight: statusCNPJCliente3.encontrado && ponto3.cliente ? 600 : undefined
+                        backgroundColor: ((ponto3.cliente_cnpj && ponto3.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente3.encontrado && ponto3.cliente)) ? 'var(--vermont-green-subtle)' : undefined,
+                        borderColor: ((ponto3.cliente_cnpj && ponto3.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente3.encontrado && ponto3.cliente)) ? 'var(--vermont-green)' : undefined,
+                        cursor: ((ponto3.cliente_cnpj && ponto3.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente3.encontrado && ponto3.cliente)) ? 'not-allowed' : undefined,
+                        color: ((ponto3.cliente_cnpj && ponto3.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente3.encontrado && ponto3.cliente)) ? 'inherit' : undefined,
+                        fontWeight: ((ponto3.cliente_cnpj && ponto3.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente3.encontrado && ponto3.cliente)) ? 600 : undefined
                       }}
                     />
+                    {(Boolean((ponto3.cliente_cnpj && ponto3.cliente_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJCliente3.encontrado && ponto3.cliente))) && (
+                      <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 3 }}>
+                        🔒 A nomenclatura é obtida e travada automaticamente pela Receita Federal a partir do CNPJ.
+                      </span>
+                    )}
                   </div>
 
                   {/* Data 3 */}
@@ -3014,28 +3034,33 @@ export function AgendamentoForm({ onAgendamentoSucesso }) {
             <div className="form-group">
               <label className="form-label form-label-required" style={{ justifyContent: 'space-between' }}>
                 <span>Nome da Transportadora</span>
-                {statusCNPJ.encontrado && formData.transportadora && (
+                {(Boolean((formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJ.encontrado && formData.transportadora))) && (
                   <span style={{ fontSize: '0.72rem', color: '#86efac', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    🔒 Razão Social travada (Validada na Receita)
+                    🔒 Razão Social travada (Receita Federal)
                   </span>
                 )}
               </label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="Razão Social ou Nome Fantasia"
+                placeholder="Razão Social oficial da Transportadora"
                 value={formData.transportadora}
                 onChange={(e) => handleChange('transportadora', e.target.value)}
                 required
-                readOnly={Boolean(statusCNPJ.encontrado && formData.transportadora)}
+                readOnly={Boolean((formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJ.encontrado && formData.transportadora))}
                 style={{
-                  backgroundColor: statusCNPJ.encontrado && formData.transportadora ? 'var(--vermont-green-subtle)' : undefined,
-                  borderColor: statusCNPJ.encontrado && formData.transportadora ? 'var(--vermont-green)' : undefined,
-                  cursor: statusCNPJ.encontrado && formData.transportadora ? 'not-allowed' : undefined,
-                  color: statusCNPJ.encontrado && formData.transportadora ? 'inherit' : undefined,
-                  fontWeight: statusCNPJ.encontrado && formData.transportadora ? 600 : undefined
+                  backgroundColor: ((formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJ.encontrado && formData.transportadora)) ? 'var(--vermont-green-subtle)' : undefined,
+                  borderColor: ((formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJ.encontrado && formData.transportadora)) ? 'var(--vermont-green)' : undefined,
+                  cursor: ((formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJ.encontrado && formData.transportadora)) ? 'not-allowed' : undefined,
+                  color: ((formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJ.encontrado && formData.transportadora)) ? 'inherit' : undefined,
+                  fontWeight: ((formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJ.encontrado && formData.transportadora)) ? 600 : undefined
                 }}
               />
+              {(Boolean((formData.transportadora_cnpj && formData.transportadora_cnpj.replace(/\D/g, '').length >= 14) || (statusCNPJ.encontrado && formData.transportadora))) && (
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginTop: 3 }}>
+                  🔒 A nomenclatura da transportadora é obtida e travada automaticamente pela Receita Federal a partir do CNPJ.
+                </span>
+              )}
             </div>
 
             {/* CPF do Motorista com Validação & Busca em Tempo Real */}
