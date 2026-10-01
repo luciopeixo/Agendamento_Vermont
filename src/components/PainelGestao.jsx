@@ -35,7 +35,7 @@ import {
   invalidarCacheMotoristas,
   isSupabaseConfigurado,
   avaliarAptidaoLiberacaoAgendamento,
-  LIMITES_PESO_VEICULO
+  obterTabelaLimitesVeiculos
 } from '../services/agendamentoService';
 import { 
   listarEnvelopamentos, 
@@ -3381,10 +3381,10 @@ export function PainelGestao({
                   fontSize: '0.72rem'
                 }}>
                   <strong style={{ color: 'var(--slate-400)', display: 'block', marginBottom: 6 }}>
-                    📖 Tabela de Referência Oficial Vermont (Limites Máximos Recomendados):
+                    📖 Parâmetros Operacionais de Capacidade por Porte:
                   </strong>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 4, color: 'var(--slate-300)' }}>
-                    {LIMITES_PESO_VEICULO.map(l => (
+                    {obterTabelaLimitesVeiculos().map(l => (
                       <div key={l.tipo} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: 2 }}>
                         <span>• {l.tipo}:</span>
                         <strong style={{ color: l.limiteKg ? '#4ade80' : '#94a3b8' }}>{l.labelLimite}</strong>
